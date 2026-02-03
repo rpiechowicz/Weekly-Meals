@@ -9,7 +9,15 @@ import SwiftUI
 
 struct ProductsView: View {
     var body: some View {
-        Text("Procuts!")
+        VStack(spacing: 0) {
+            Headers(HeaderConstans.Products.self)
+            
+            // Tutaj będzie główna zawartość produktów
+            ScrollView {
+                Text("Zawartość produktów")
+                    .padding()
+            }
+        }
     }
 }
 

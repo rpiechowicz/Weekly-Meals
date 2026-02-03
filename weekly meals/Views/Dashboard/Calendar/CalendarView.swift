@@ -9,7 +9,15 @@ import SwiftUI
 
 struct CalendarView: View {
     var body: some View {
-        Text("Calendar!")
+        VStack(spacing: 0) {
+            Headers(HeaderConstans.Calendar.self)
+            
+            // Tutaj będzie główna zawartość kalendarza
+            ScrollView {
+                Text("Zawartość kalendarza")
+                    .padding()
+            }
+        }
     }
 }
 

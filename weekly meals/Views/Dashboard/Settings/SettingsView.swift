@@ -1,15 +1,16 @@
-//
-//  SettingsView.swift
-//  weekly meals
-//
-//  Created by Rafi on 03/02/2026.
-//
-
 import SwiftUI
 
 struct SettingsView: View {
     var body: some View {
-        Text("Settings")
+        VStack(spacing: 0) {
+            Headers(HeaderConstans.Settings.self)
+            
+            // Tutaj będzie główna zawartość ustawień
+            ScrollView {
+                Text("Zawartość ustawień")
+                    .padding()
+            }
+        }
     }
 }
 

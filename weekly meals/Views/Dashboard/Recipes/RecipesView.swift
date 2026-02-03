@@ -9,7 +9,15 @@ import SwiftUI
 
 struct RecipesView: View {
     var body: some View {
-        Text("Recies")
+        VStack(spacing: 0) {
+            Headers(HeaderConstans.Recipes.self)
+            
+            // Tutaj będzie główna zawartość przepisów
+            ScrollView {
+                Text("Zawartość przepisów")
+                    .padding()
+            }
+        }
     }
 }
 

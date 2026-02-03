@@ -3,19 +3,19 @@ import SwiftUI
 struct NavigationMenu: View {
     var body: some View {
         TabView() {
-            Tab(MenuConstans.CalendarMenuName, systemImage: MenuConstans.CalendarMenuIcon) {
+            Tab(MenuConstans.Calendar.name, systemImage: MenuConstans.Calendar.icon) {
                 CalendarView()
             }
             
-            Tab(MenuConstans.RecipesMenuName, systemImage: MenuConstans.RecipesMenuIcon) {
+            Tab(MenuConstans.Recipes.name, systemImage: MenuConstans.Recipes.icon) {
                 RecipesView()
             }
             
-            Tab(MenuConstans.ProductsMenuName, systemImage: MenuConstans.ProductsMenuIcon) {
+            Tab(MenuConstans.Products.name, systemImage: MenuConstans.Products.icon) {
                 ProductsView()
             }
             
-            Tab(MenuConstans.SettingsMenuName, systemImage: MenuConstans.SettingsMenuIcon) {
+            Tab(MenuConstans.Settings.name, systemImage: MenuConstans.Settings.icon) {
                 SettingsView()
             }
         }.tint(.green)

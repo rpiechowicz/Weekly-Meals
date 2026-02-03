@@ -1,11 +1,21 @@
 struct MenuConstans {
-    static let CalendarMenuName: String = "Kalendarz"
-    static let RecipesMenuName: String = "Przepisy"
-    static let ProductsMenuName: String = "Produkty"
-    static let SettingsMenuName: String = "Ustawienia"
+    struct Calendar: IMenuConfiguration {
+        static let name: String = "Kalendarz"
+        static let icon: String = "calendar"
+    }
     
-    static let CalendarMenuIcon: String = "calendar"
-    static let RecipesMenuIcon: String = "book.pages"
-    static let ProductsMenuIcon: String = "basket.fill"
-    static let SettingsMenuIcon: String = "gearshape"
+    struct Recipes: IMenuConfiguration {
+        static let name: String = "Przepisy"
+        static let icon: String = "book.pages"
+    }
+    
+    struct Products: IMenuConfiguration {
+        static let name: String = "Produkty"
+        static let icon: String = "basket.fill"
+    }
+    
+    struct Settings: IMenuConfiguration {
+        static let name: String = "Ustawienia"
+        static let icon: String = "gearshape"
+    }
 }
