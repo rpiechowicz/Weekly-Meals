@@ -12,7 +12,7 @@ struct AuthBackgroundView: View {
             ZStack {
                 Circle()
                     .fill(LinearGradient(
-                        colors: [.green.opacity(0.25), .clear],
+                        colors: [.blue.opacity(0.25), .clear],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     ))
@@ -22,7 +22,7 @@ struct AuthBackgroundView: View {
                 
                 RoundedRectangle(cornerRadius: 48, style: .continuous)
                     .fill(LinearGradient(
-                        colors: [.green.opacity(0.18), .clear],
+                        colors: [.blue.opacity(0.18), .clear],
                         startPoint: .bottomTrailing,
                         endPoint: .topLeading
                     ))

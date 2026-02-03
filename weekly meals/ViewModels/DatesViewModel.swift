@@ -2,7 +2,7 @@ import Foundation
 import Observation
 
 @Observable
-class CalendarViewModel {
+class DatesViewModel {
     var selectedDate: Date = Date()
     var currentWeekOffset: Int = 0 // 0 = bieżący tydzień, -1 = poprzedni, +1 = następny
     
@@ -49,6 +49,13 @@ class CalendarViewModel {
         let formatter = DateFormatter()
         formatter.dateFormat = "d"
         return formatter.string(from: date)
+    }
+    
+    func formattedDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEEE, d MMMM"
+        formatter.locale = Locale(identifier: "pl_PL")
+        return formatter.string(from: date).capitalized
     }
         
     /// Wybiera konkretną datę

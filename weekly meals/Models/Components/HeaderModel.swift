@@ -1,6 +1,6 @@
 import Foundation
 
-protocol IHeaderConfiguration {
+protocol HeaderModel{
     static var title: String { get }
     static var subtitle: String { get }
 }

@@ -8,14 +8,16 @@
 import SwiftUI
 
 struct RecipesView: View {
+    @State private var selectedCategory: RecipesCategory = .all
+
+    private var categories: [RecipesCategory] = RecipesCategory.allCases
+
     var body: some View {
         VStack(spacing: 0) {
             Headers(HeaderConstans.Recipes.self)
             
-            // Tutaj będzie główna zawartość przepisów
             ScrollView {
-                Text("Zawartość przepisów")
-                    .padding()
+                FiltersView(categories: categories, selectedCategory: $selectedCategory)
             }
         }
     }

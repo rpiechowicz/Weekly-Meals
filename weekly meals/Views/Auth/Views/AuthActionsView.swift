@@ -19,7 +19,7 @@ struct AuthActionsView: View {
             .padding()
             .background(
                 LinearGradient(
-                    colors: [.green, .green.opacity(0.8)],
+                    colors: [.blue, .blue.opacity(0.8)],
                     startPoint: .leading,
                     endPoint: .trailing
                 )

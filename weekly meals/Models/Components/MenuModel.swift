@@ -1,6 +1,6 @@
 import Foundation
 
-protocol IMenuConfiguration {
+protocol MenuModel {
     static var name: String { get }
     static var icon: String { get }
 }

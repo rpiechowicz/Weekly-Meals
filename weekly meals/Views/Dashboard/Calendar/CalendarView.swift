@@ -1,19 +1,20 @@
-//
-//  CalendarView.swift
-//  weekly meals
-//
-//  Created by Rafi on 03/02/2026.
-//
-
 import SwiftUI
 
 struct CalendarView: View {
-    @State private var viewModel = CalendarViewModel()
-    
+    @State private var datesViewModel = DatesViewModel()
+
     var body: some View {
         ScrollView {
-            VStack(spacing: 0) {
-                DatesView(viewModel: viewModel)
+            VStack() {
+                DatesView(datesViewModal: datesViewModel)
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(datesViewModel.formattedDate(datesViewModel.selectedDate))
+                        .font(.title2)
+                        .fontWeight(.bold)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 20)
             }
         }
         .safeAreaInset(edge: .top, spacing: 0) {

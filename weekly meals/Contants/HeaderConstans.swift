@@ -1,20 +1,20 @@
 struct HeaderConstans {
-    struct Calendar: IHeaderConfiguration {
+    struct Calendar: HeaderModel {
         static let title: String = "Kalendarz"
         static let subtitle: String = "Zaplanuj swoje posiłki na cały tydzień"
     }
     
-    struct Recipes: IHeaderConfiguration {
+    struct Recipes: HeaderModel {
         static let title: String = "Przepisy"
         static let subtitle: String = "Odkryj pyszne przepisy i twórz własne"
     }
     
-    struct Products: IHeaderConfiguration {
+    struct Products: HeaderModel {
         static let title: String = "Produkty"
         static let subtitle: String = "Zarządzaj swoją listą zakupów"
     }
     
-    struct Settings: IHeaderConfiguration {
+    struct Settings: HeaderModel {
         static let title: String = "Ustawienia"
         static let subtitle: String = "Dostosuj aplikację do swoich potrzeb"
     }

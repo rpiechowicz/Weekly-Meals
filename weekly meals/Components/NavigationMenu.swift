@@ -18,7 +18,7 @@ struct NavigationMenu: View {
             Tab(MenuConstans.Settings.name, systemImage: MenuConstans.Settings.icon) {
                 SettingsView()
             }
-        }.tint(.green)
+        }.tint(.blue)
     }
 }
 

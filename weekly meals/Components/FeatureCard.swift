@@ -12,7 +12,7 @@ struct FeatureCard: View {
                     .fill(.thinMaterial)
                 Image(systemName: icon)
                     .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(.green)
+                    .foregroundStyle(.blue)
             }
             .frame(width: 40, height: 40)
 

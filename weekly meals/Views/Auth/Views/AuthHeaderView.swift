@@ -5,7 +5,7 @@ struct AuthHeaderView: View {
         VStack(spacing: 8) {
             Image(systemName: "fork.knife.circle.fill")
                 .symbolRenderingMode(.palette)
-                .foregroundStyle(.green, .green.opacity(0.35))
+                .foregroundStyle(.blue, .blue.opacity(0.35))
                 .font(.system(size: 64))
                 .accessibilityHidden(true)
 

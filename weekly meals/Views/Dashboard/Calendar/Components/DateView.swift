@@ -20,14 +20,14 @@ struct DateView: View {
             
             if isToday {
                 Circle()
-                    .fill(isSelected ? .white : .green)
-                    .frame(width: 4, height: 4)
+                    .fill(isSelected ? .white : .blue)
+                    .frame(width: 5, height: 5)
             }
         }
         .frame(width: 60, height: 80)
         .background {
             RoundedRectangle(cornerRadius: 16)
-                .fill(isSelected ? Color.green : Color.gray.opacity(0.1))
+                .fill(isSelected ? Color.blue : Color.gray.opacity(0.1))
         }
         .overlay {
             if !isSelected {

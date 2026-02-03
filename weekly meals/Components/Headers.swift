@@ -9,7 +9,7 @@ struct Headers: View {
         self.subtitle = subtitle
     }
     
-    init<T: IHeaderConfiguration>(_ configurationType: T.Type) {
+    init<T: HeaderModel>(_ configurationType: T.Type) {
         self.title = configurationType.title
         self.subtitle = configurationType.subtitle
     }
