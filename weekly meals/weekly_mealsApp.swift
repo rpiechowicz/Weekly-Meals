@@ -11,7 +11,8 @@ import SwiftUI
 struct weekly_mealsApp: App {
     var body: some Scene {
         WindowGroup {
-            AuthView()
+//            AuthView()
+            DashboardView()
         }
     }
 }

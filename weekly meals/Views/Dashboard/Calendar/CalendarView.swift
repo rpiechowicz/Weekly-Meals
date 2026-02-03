@@ -8,15 +8,16 @@
 import SwiftUI
 
 struct CalendarView: View {
+    @State private var viewModel = CalendarViewModel()
+    
     var body: some View {
-        VStack(spacing: 0) {
-            Headers(HeaderConstans.Calendar.self)
-            
-            // Tutaj będzie główna zawartość kalendarza
-            ScrollView {
-                Text("Zawartość kalendarza")
-                    .padding()
+        ScrollView {
+            VStack(spacing: 0) {
+                DatesView(viewModel: viewModel)
             }
+        }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            Headers(HeaderConstans.Calendar.self)
         }
     }
 }

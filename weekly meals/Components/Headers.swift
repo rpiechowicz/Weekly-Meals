@@ -15,20 +15,28 @@ struct Headers: View {
     }
     
     var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
+        VStack() {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.system(size: 34, weight: .bold, design: .default))
+                    
+                    Text(subtitle)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
                 
-                Text(subtitle)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+//                TODO: Dodac akcje ikony
+//                Spacer()
+//                Image(systemName: "plus.circle.fill")
+//                    .font(Font.system(size: 30, weight: .bold, design: .default))
             }
-            
-            Spacer()
         }
-        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 20)
+        .padding(.top, 8)
+        .padding(.bottom, 12)
+        .background(.ultraThinMaterial)
     }
 }
 
