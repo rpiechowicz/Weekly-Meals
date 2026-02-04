@@ -4,8 +4,8 @@ struct CalendarView: View {
     @State private var datesViewModel = DatesViewModel()
 
     var body: some View {
-        ScrollView {
-            VStack() {
+        NavigationStack {
+            VStack {
                 DatesView(datesViewModal: datesViewModel)
                 
                 VStack(alignment: .leading, spacing: 8) {
@@ -15,10 +15,16 @@ struct CalendarView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 20)
+
+                ScrollView {
+                    LazyVStack {
+                        ForEach(1...50, id: \.self) { index in
+                            Text("\(index)")
+                        }
+                    }
+                }
             }
-        }
-        .safeAreaInset(edge: .top, spacing: 0) {
-            Headers(HeaderConstans.Calendar.self)
+            .navigationTitle("Kalendarz")
         }
     }
 }

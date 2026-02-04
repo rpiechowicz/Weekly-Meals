@@ -6,8 +6,6 @@ enum RecipesCategory: String, CaseIterable, Identifiable, Codable {
     case breakfast = "Śniadania"
     case lunch = "Obiady"
     case dinner = "Kolacje"
-    case chemistry = "Chemia"
-    case other = "Reszta"
 
     var id: String { rawValue }
 }
@@ -47,6 +45,19 @@ struct Ingredient: Identifiable, Codable, Hashable {
         self.name = name
         self.amount = amount
         self.unit = unit
+    }
+}
+
+/// Pojedynczy krok przygotowania posiłku
+struct PreparationStep: Identifiable, Codable, Hashable {
+    let id: UUID
+    var stepNumber: Int
+    var instruction: String
+
+    init(id: UUID = UUID(), stepNumber: Int, instruction: String) {
+        self.id = id
+        self.stepNumber = stepNumber
+        self.instruction = instruction
     }
 }
 
@@ -90,6 +101,9 @@ struct Recipe: Identifiable, Codable {
     /// Lista składników wchodzących w skład przepisu.
     var ingredients: [Ingredient]
 
+    /// Kroki przygotowania posiłku.
+    var preparationSteps: [PreparationStep]
+
     /// Wartości odżywcze dla całego przepisu (chyba że aplikacja przyjmie, że to wartości na porcję – wtedy zmień opis zgodnie z potrzebą).
     var nutrition: Nutrition
 
@@ -104,6 +118,7 @@ struct Recipe: Identifiable, Codable {
         difficulty: Difficulty = .easy,
         imageURL: URL? = nil,
         ingredients: [Ingredient] = [],
+        preparationSteps: [PreparationStep] = [],
         nutrition: Nutrition = .zero
     ) {
         self.id = id
@@ -116,6 +131,7 @@ struct Recipe: Identifiable, Codable {
         self.difficulty = difficulty
         self.imageURL = imageURL
         self.ingredients = ingredients
+        self.preparationSteps = preparationSteps
         self.nutrition = nutrition
     }
 }

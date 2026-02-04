@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct FiltersView: View {
+struct RecipeFilters: View {
     let categories: [RecipesCategory]
     @Binding var selectedCategory: RecipesCategory
 

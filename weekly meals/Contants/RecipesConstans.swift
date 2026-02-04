@@ -15,10 +15,6 @@ enum RecipesConstants {
             return "Obiady"
         case .dinner:
             return "Kolacje"
-        case .chemistry:
-            return "Chemia"
-        case .other:
-            return "Inne"
         @unknown default:
             return String(describing: category)
         }
