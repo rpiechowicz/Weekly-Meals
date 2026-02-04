@@ -3,6 +3,7 @@ import SwiftUI
 struct RecipesView: View {
     @State private var selectedCategory: RecipesCategory = .all
     @State private var searchText = ""
+    @State private var selectedRecipe: Recipe?
 
     private var categories: [RecipesCategory] = RecipesCategory.allCases
     
@@ -13,8 +14,13 @@ struct RecipesView: View {
     private var filteredRecipes: [Recipe] {
         var filtered = recipes
         
-        // Filter by category
-        if selectedCategory != .all {
+        // Filter by category (handle favourites separately)
+        switch selectedCategory {
+        case .all:
+            break
+        case .favourite:
+            filtered = filtered.filter { $0.favourite }
+        default:
             filtered = filtered.filter { $0.category == selectedCategory }
         }
         
@@ -37,35 +43,50 @@ struct RecipesView: View {
                 
                 // Recipes List
                 ScrollView {
-                    LazyVStack(spacing: 10) {
-                        ForEach(filteredRecipes) { recipe in
-                            RecipeItem(recipe: recipe)
+                    if filteredRecipes.isEmpty {
+                        VStack(spacing: 16) {
+                            Image(systemName: "fork.knife.circle")
+                                .font(.system(size: 64))
+                                .foregroundStyle(.secondary)
+                            
+                            Text("Brak przepisów")
+                                .font(.title2)
+                                .fontWeight(.semibold)
+                            
+                            Text("Spróbuj wybrać inną kategorię")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
                         }
-                        
-                        if filteredRecipes.isEmpty {
-                            VStack(spacing: 16) {
-                                Image(systemName: "fork.knife.circle")
-                                    .font(.system(size: 64))
-                                    .foregroundStyle(.secondary)
-                                
-                                Text("Brak przepisów")
-                                    .font(.title2)
-                                    .fontWeight(.semibold)
-                                
-                                Text("Spróbuj wybrać inną kategorię")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 80)
+                        .padding(.horizontal)
+                    } else {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: 12)], spacing: 16) {
+                            ForEach(filteredRecipes) { recipe in
+                                Button {
+                                    selectedRecipe = recipe
+                                } label: {
+                                    RecipeItemView(recipe: recipe)
+                                }
+                                .buttonStyle(.plain)
                             }
-                            .frame(maxWidth: .infinity)
-                            .padding(.top, 80)
                         }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 16)
                     }
-                    .padding(.horizontal)
-                    .padding(.vertical, 10)
                 }
+                .background(Color(.systemGroupedBackground))
             }
             .navigationTitle("Przepisy")
             .searchable(text: $searchText, prompt: "Szukaj przepisów")
+            .sheet(item: $selectedRecipe) { selected in
+                NavigationStack {
+                    RecipeDetailView(recipe: selected)
+                        .navigationBarTitleDisplayMode(.inline)
+                }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+            }
         }
     }
 }

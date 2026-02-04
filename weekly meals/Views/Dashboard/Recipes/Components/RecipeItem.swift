@@ -1,133 +1,61 @@
 import SwiftUI
 
-struct RecipeItem: View {
+struct RecipeItemView: View {
     let recipe: Recipe
-    @State private var showingDetail = false
-    
+
     var body: some View {
-        Button {
-            showingDetail = true
-        } label: {
-            HStack(spacing: 12) {
-                // Image
-                ZStack {
-                    if let imageURL = recipe.imageURL {
-                        AsyncImage(url: imageURL) { image in
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                        } placeholder: {
-                            placeholderImage
-                        }
-                        .frame(width: 100, height: 100)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                    } else {
-                        placeholderImage
-                            .frame(width: 100, height: 100)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                    }
-                    
-                    // Category badge
-                    VStack {
-                        Spacer()
-                        HStack {
-                            Text(recipe.category.rawValue)
-                                .font(.caption2)
-                                .fontWeight(.medium)
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(.ultraThinMaterial, in: Capsule())
-                            Spacer()
-                        }
-                        .padding(6)
-                    }
-                }
-                
-                // Content
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack {
-                        Text(recipe.name)
-                            .font(.headline)
-                            .foregroundStyle(.primary)
-                            .lineLimit(2)
-                        
-                        Spacer()
-                        
+        VStack(alignment: .leading, spacing: 8) {
+            ZStack(alignment: .topLeading) {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color(.secondarySystemFill))
+                    .frame(height: 140)
+                    .overlay(
+                        Image(systemName: "fork.knife.circle")
+                            .font(.system(size: 40))
+                            .foregroundStyle(.secondary)
+                    )
+                    .overlay(alignment: .topTrailing) {
                         if recipe.favourite {
                             Image(systemName: "heart.fill")
-                                .font(.subheadline)
                                 .foregroundStyle(.red)
+                                .padding(8)
                         }
                     }
-                    
-                    Text(recipe.description)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                    
-                    Spacer()
-                    
-                    HStack(spacing: 12) {
-                        Label("\(recipe.prepTimeMinutes) min", systemImage: "clock")
-                        Label("\(Int(recipe.nutritionPerServing.kcal)) kcal", systemImage: "flame")
-                        
-                        Spacer()
-                        
-                        Image(systemName: "chevron.right")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                    }
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
+
+            Text(recipe.category.rawValue)
+                .font(.caption2)
+                .padding(.horizontal, 8)
                 .padding(.vertical, 4)
+                .background(.thinMaterial, in: Capsule())
+                .padding(8)
             }
-            .padding(12)
-            .background(Color(.secondarySystemGroupedBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 16))
+
+            Text(recipe.name)
+                .font(.headline)
+                .foregroundStyle(.primary)
+                .lineLimit(2)
+
+            Text(recipe.description)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+
+            Spacer(minLength: 0)
         }
-        .buttonStyle(.plain)
-        .sheet(isPresented: $showingDetail) {
-            RecipeDetailView(recipe: recipe)
-        }
-    }
-    
-    private var placeholderImage: some View {
-        ZStack {
-            LinearGradient(
-                colors: [
-                    Color.accentColor.opacity(0.4),
-                    Color.accentColor.opacity(0.2)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            
-            Image(systemName: "fork.knife")
-                .font(.title2)
-                .foregroundStyle(.white.opacity(0.6))
-        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color(.secondarySystemGroupedBackground))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color(.separator), lineWidth: 0.5)
+        )
+        .frame(height: 220)
     }
 }
 
-#Preview("Single Recipe") {
-    RecipeItem(recipe: RecipesMock.omelette)
-        .padding()
-        .background(Color(.systemGroupedBackground))
-}
 
-#Preview("List Layout") {
-    NavigationStack {
-        ScrollView {
-            VStack(spacing: 12) {
-                ForEach(RecipesMock.all) { recipe in
-                    RecipeItem(recipe: recipe)
-                }
-            }
-            .padding()
-        }
-        .background(Color(.systemGroupedBackground))
-        .navigationTitle("Przepisy")
-    }
+#Preview {
+    RecipeItemView(recipe: Recipe(name: "Omlet z warzywami", description: "Puszysty omlet z papryką, szpinakiem i serem feta.", category: .breakfast))
 }

@@ -40,7 +40,6 @@ struct RecipeFilters: View {
                 }
             }
             .padding()
-            .padding(.top, 5)
         }
     }
 }

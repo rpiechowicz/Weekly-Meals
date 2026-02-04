@@ -93,7 +93,7 @@ struct RecipeDetailView: View {
                             .foregroundStyle(.secondary)
                         
                         // Quick Info
-                        HStack(spacing: 16) {
+                        HStack(spacing: 10) {
                             RecipeInfoBadge(icon: "clock", text: "\(recipe.prepTimeMinutes) min")
                             RecipeInfoBadge(icon: "person.2", text: "\(recipe.servings) porcje")
                             RecipeInfoBadge(icon: difficultyIcon, text: recipe.difficulty.rawValue, color: difficultyColor)
@@ -106,7 +106,7 @@ struct RecipeDetailView: View {
                             Text("Wartości odżywcze")
                                 .font(.headline)
                             
-                            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                                 NutritionCard(title: "Kalorie", value: "\(Int(recipe.nutritionPerServing.kcal))", unit: "kcal", icon: "flame.fill", color: .orange)
                                 NutritionCard(title: "Białko", value: "\(Int(recipe.nutritionPerServing.protein))", unit: "g", icon: "bolt.fill", color: .blue)
                                 NutritionCard(title: "Węglowodany", value: "\(Int(recipe.nutritionPerServing.carbs))", unit: "g", icon: "leaf.fill", color: .green)
