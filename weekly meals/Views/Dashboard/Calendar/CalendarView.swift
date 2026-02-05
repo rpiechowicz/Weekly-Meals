@@ -6,45 +6,65 @@ struct CalendarView: View {
         var protein: Int = 0
         var carbs: Int = 0
     }
-    
+
     @State private var datesViewModel = DatesViewModel()
-    
+
     @State private var breakfastRecipe: Recipe? = RecipesMock.omelette
     @State private var lunchRecipe: Recipe? = RecipesMock.chickenBowl
     @State private var dinnerRecipe: Recipe? = nil
-    
+
     @State private var slotToPick: MealSlot? = nil
     @State private var detailRecipe: Recipe? = nil
-    
+
     @State private var showTipPopover: Bool = false
-    
+
     private var countNutritionOfDay: DayNutrition {
-        let breakfastRecipeKcal: Int = Int(breakfastRecipe?.nutrition.kcal ?? 0)
-        let breakfastRecipeProtein: Int = Int(breakfastRecipe?.nutrition.protein ?? 0)
-        let breakfastRecipeCarbs: Int = Int(breakfastRecipe?.nutrition.carbs ?? 0)
-        
-        let lunchRecipeKcal: Int = Int(lunchRecipe?.nutrition.kcal ?? 0)
-        let lunchRecipeProtein: Int = Int(lunchRecipe?.nutrition.protein ?? 0)
-        let lunchRecipeCarbs: Int = Int(lunchRecipe?.nutrition.carbs ?? 0)
-        
-        let dinnerRecipeKcal: Int = Int(dinnerRecipe?.nutrition.kcal ?? 0)
-        let dinnerRecipeProtein: Int = Int(dinnerRecipe?.nutrition.protein ?? 0)
-        let dinnerRecipeCarbs: Int = Int(dinnerRecipe?.nutrition.carbs ?? 0)
-        
-        let countOfKcal: Int = (breakfastRecipeKcal + lunchRecipeKcal + dinnerRecipeKcal) / 2
-        let countOfProtein: Int = (breakfastRecipeProtein + lunchRecipeProtein + dinnerRecipeProtein) / 2
-        let countOfCarbs: Int = (breakfastRecipeCarbs + lunchRecipeCarbs + dinnerRecipeCarbs) / 2
-        
-        print(breakfastRecipeKcal, lunchRecipeKcal, dinnerRecipeKcal)
-        
-        return DayNutrition(kcal: countOfKcal, protein: countOfProtein, carbs: countOfCarbs)
+        let recipes = [breakfastRecipe, lunchRecipe, dinnerRecipe]
+
+        let totalKcal = recipes.compactMap { $0?.nutrition.kcal }.reduce(0, +)
+        let totalProtein = recipes.compactMap { $0?.nutrition.protein }.reduce(0, +)
+        let totalCarbs = recipes.compactMap { $0?.nutrition.carbs }.reduce(0, +)
+
+        return DayNutrition(
+            kcal: Int(totalKcal) / 2,
+            protein: Int(totalProtein) / 2,
+            carbs: Int(totalCarbs) / 2
+        )
+    }
+
+    private func recipe(for slot: MealSlot) -> Recipe? {
+        switch slot {
+        case .breakfast: breakfastRecipe
+        case .lunch: lunchRecipe
+        case .dinner: dinnerRecipe
+        }
+    }
+
+    private func handleTap(_ slot: MealSlot) {
+        if let recipe = recipe(for: slot) {
+            detailRecipe = recipe
+        } else {
+            slotToPick = slot
+        }
+    }
+
+    private func clearRecipe(for slot: MealSlot) {
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            switch slot {
+            case .breakfast: breakfastRecipe = nil
+            case .lunch: lunchRecipe = nil
+            case .dinner: dinnerRecipe = nil
+            }
+        }
     }
 
     var body: some View {
         NavigationStack {
-            VStack {
+            VStack(spacing: 0) {
                 DatesView(datesViewModal: datesViewModel)
-                
+
                 HStack(alignment: .center) {
                     Text(datesViewModel.formattedDate(datesViewModel.selectedDate))
                         .font(.title2)
@@ -59,7 +79,7 @@ struct CalendarView: View {
                             .font(.title3)
                             .symbolRenderingMode(.hierarchical)
                             .foregroundStyle(.secondary)
-                            .padding(8)
+                            .padding(6)
                             .background(.ultraThinMaterial, in: Circle())
                     }
                     .buttonStyle(.plain)
@@ -101,7 +121,6 @@ struct CalendarView: View {
                                         }
                                         .frame(maxWidth: .infinity, alignment: .leading)
 
-
                                         HStack(spacing: 6) {
                                             Image(systemName: "leaf.fill")
                                                 .foregroundStyle(.green)
@@ -124,13 +143,14 @@ struct CalendarView: View {
                                         .font(.footnote)
                                         .foregroundStyle(.secondary)
                                 }
-                                
-                                HStack(spacing: 8) {
+
+                                HStack(alignment: .top, spacing: 8) {
                                     Image(systemName: "hand.draw")
                                         .foregroundStyle(.blue)
-                                    Text("Przesuń w lewo posiłek aby edytować go.")
+                                    Text("Przesuń w prawo aby edytować, w lewo aby usunąć.")
                                         .font(.footnote)
                                         .foregroundStyle(.secondary)
+                                        .fixedSize(horizontal: false, vertical: true)
                                 }
                             }
                         }
@@ -140,38 +160,33 @@ struct CalendarView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 20)
+                .padding(.bottom, 6)
 
-                VStack(alignment: .leading, spacing: 12) {
-                    MealCardView(slot: .breakfast, recipe: breakfastRecipe)
-                        .onTapGesture {
-                            if let recipe = breakfastRecipe {
-                                detailRecipe = recipe
-                            } else {
-                                slotToPick = .breakfast
+                List {
+                    ForEach(MealSlot.allCases) { slot in
+                        MealCardView(slot: slot, recipe: recipe(for: slot))
+                            .contentShape(Rectangle())
+                            .onTapGesture { handleTap(slot) }
+                            .swipeActions(edge: .trailing) {
+                                if recipe(for: slot) != nil {
+                                    Button("Edytuj") { slotToPick = slot }
+                                        .tint(slot.accentColor)
+                                }
                             }
-                        }
-
-                    MealCardView(slot: .lunch, recipe: lunchRecipe)
-                        .onTapGesture {
-                            if let recipe = lunchRecipe {
-                                detailRecipe = recipe
-                            } else {
-                                slotToPick = .lunch
+                            .swipeActions(edge: .leading) {
+                                if recipe(for: slot) != nil {
+                                    Button("Usuń") { clearRecipe(for: slot) }
+                                        .tint(.red)
+                                }
                             }
-                        }
-
-                    MealCardView(slot: .dinner, recipe: dinnerRecipe)
-                        .onTapGesture {
-                            if let recipe = dinnerRecipe {
-                                detailRecipe = recipe
-                            } else {
-                                slotToPick = .dinner
-                            }
-                        }
+                            .listRowSeparator(.hidden)
+                            .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                            .listRowBackground(Color.clear)
+                    }
                 }
-                .padding(.horizontal)
-                
-                Spacer()
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .scrollDisabled(true)
             }
             .navigationTitle("Kalendarz")
             .sheet(item: $slotToPick) { slot in
@@ -191,7 +206,6 @@ struct CalendarView: View {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
             }
-            .ignoresSafeArea(edges: .bottom)
         }
     }
 }
