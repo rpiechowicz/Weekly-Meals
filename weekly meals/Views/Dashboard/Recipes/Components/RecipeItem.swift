@@ -43,14 +43,8 @@ struct RecipeItemView: View {
             Spacer(minLength: 0)
         }
         .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color(.secondarySystemGroupedBackground))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color(.separator), lineWidth: 0.5)
-        )
+        .myBackground()
+        .myBorderOverlay()
         .frame(height: 220)
     }
 }

@@ -36,15 +36,8 @@ struct NutritionCard: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(Color(.secondarySystemGroupedBackground))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(Color(.separator).opacity(0.2), lineWidth: 1)
-        )
-        .shadow(color: Color.black.opacity(0.08), radius: 4, x: 0, y: 2)
+        .myBackground()
+        .myBorderOverlay()
     }
 }
 

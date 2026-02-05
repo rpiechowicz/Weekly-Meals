@@ -156,15 +156,8 @@ struct RecipeDetailView: View {
                                     }
                                 }
                                 .padding(.horizontal, 16)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                        .fill(Color(.secondarySystemGroupedBackground))
-                                )
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                        .strokeBorder(Color(.separator).opacity(0.2), lineWidth: 1)
-                                )
-                                .shadow(color: Color.black.opacity(0.08), radius: 4, x: 0, y: 2)
+                                .myBackground()
+                                .myBorderOverlay()
                             }
                             
                             Divider()
@@ -199,15 +192,8 @@ struct RecipeDetailView: View {
                                 }
                             }
                             .padding(.horizontal, 16)
-                            .background(
-                                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                    .fill(Color(.secondarySystemGroupedBackground))
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                    .strokeBorder(Color(.separator).opacity(0.2), lineWidth: 1)
-                            )
-                            .shadow(color: Color.black.opacity(0.08), radius: 4, x: 0, y: 2)
+                            .myBackground()
+                            .myBorderOverlay()
                         }
                     }
                     .padding(.horizontal)

@@ -16,15 +16,8 @@ struct RecipeInfoBadge: View {
         .foregroundStyle(color)
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
-        .background(
-            Capsule()
-                .fill(Color(.secondarySystemGroupedBackground))
-        )
-        .overlay(
-            Capsule()
-                .strokeBorder(Color(.separator).opacity(0.2), lineWidth: 1)
-        )
-        .shadow(color: Color.black.opacity(0.06), radius: 3, x: 0, y: 1)
+        .myBackground()
+        .myBorderOverlay()
     }
 }
 
