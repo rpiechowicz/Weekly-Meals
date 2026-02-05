@@ -90,7 +90,7 @@ struct MealCardView: View {
         case .hard: return .red
         }
     }
-
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             // Header
@@ -141,7 +141,7 @@ struct MealCardView: View {
                             }
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                            
+                                                        
                             HStack(spacing: 4) {
                                 Image(systemName: "flame.fill")
                                 Text("\(Int(recipe.nutritionPerServing.kcal)) kcal")
