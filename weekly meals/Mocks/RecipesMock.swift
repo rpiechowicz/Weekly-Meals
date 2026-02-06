@@ -373,6 +373,405 @@ enum RecipesMock {
         nutrition: Nutrition(kcal: 1800, protein: 90, fat: 50, carbs: 230, fiber: 8, salt: 6)
     )
 
+    static let yogurtParfait = Recipe(
+        name: "Jogurt z granolą i owocami",
+        description: "Warstwowy pucharek z jogurtem naturalnym, granolą i świeżymi owocami.",
+        favourite: false,
+        category: .breakfast,
+        servings: 2,
+        prepTimeMinutes: 10,
+        difficulty: .easy,
+        imageURL: nil,
+        ingredients: [
+            Ingredient(name: "Jogurt naturalny", amount: 300, unit: .gram),
+            Ingredient(name: "Granola", amount: 80, unit: .gram),
+            Ingredient(name: "Truskawki", amount: 150, unit: .gram),
+            Ingredient(name: "Miód", amount: 20, unit: .gram)
+        ],
+        preparationSteps: [
+            PreparationStep(stepNumber: 1, instruction: "Do pucharków nałóż warstwę jogurtu, następnie granolę i truskawki."),
+            PreparationStep(stepNumber: 2, instruction: "Powtórz warstwy i polej miodem."),
+            PreparationStep(stepNumber: 3, instruction: "Podawaj od razu.")
+        ],
+        nutrition: Nutrition(kcal: 800, protein: 30, fat: 20, carbs: 120, fiber: 6, salt: 0.6)
+    )
+
+    static let chiaPudding = Recipe(
+        name: "Pudding chia z mlekiem i owocami",
+        description: "Lekki pudding z nasion chia, mleka i owoców.",
+        favourite: false,
+        category: .breakfast,
+        servings: 2,
+        prepTimeMinutes: 10,
+        difficulty: .easy,
+        imageURL: nil,
+        ingredients: [
+            Ingredient(name: "Nasiona chia", amount: 60, unit: .gram),
+            Ingredient(name: "Mleko", amount: 400, unit: .milliliter),
+            Ingredient(name: "Miód", amount: 20, unit: .gram),
+            Ingredient(name: "Maliny", amount: 100, unit: .gram)
+        ],
+        preparationSteps: [
+            PreparationStep(stepNumber: 1, instruction: "Wymieszaj nasiona chia z mlekiem i miodem."),
+            PreparationStep(stepNumber: 2, instruction: "Odstaw na minimum 20 minut lub na noc do lodówki."),
+            PreparationStep(stepNumber: 3, instruction: "Podawaj z malinami.")
+        ],
+        nutrition: Nutrition(kcal: 700, protein: 20, fat: 30, carbs: 70, fiber: 15, salt: 0.4)
+    )
+
+    static let frenchToast = Recipe(
+        name: "Tosty francuskie",
+        description: "Słodkie tosty w jajku z cynamonem i owocami.",
+        favourite: false,
+        category: .breakfast,
+        servings: 2,
+        prepTimeMinutes: 15,
+        difficulty: .easy,
+        imageURL: nil,
+        ingredients: [
+            Ingredient(name: "Pieczywo tostowe", amount: 4, unit: .piece),
+            Ingredient(name: "Jajka", amount: 2, unit: .piece),
+            Ingredient(name: "Mleko", amount: 100, unit: .milliliter),
+            Ingredient(name: "Masło", amount: 10, unit: .gram),
+            Ingredient(name: "Cynamon", amount: 1, unit: .teaspoon),
+            Ingredient(name: "Truskawki", amount: 100, unit: .gram)
+        ],
+        preparationSteps: [
+            PreparationStep(stepNumber: 1, instruction: "Roztrzep jajka z mlekiem i cynamonem."),
+            PreparationStep(stepNumber: 2, instruction: "Mocz kromki pieczywa w mieszance."),
+            PreparationStep(stepNumber: 3, instruction: "Smaż na maśle po 2–3 minuty z każdej strony."),
+            PreparationStep(stepNumber: 4, instruction: "Podawaj z owocami.")
+        ],
+        nutrition: Nutrition(kcal: 900, protein: 28, fat: 35, carbs: 110, fiber: 5, salt: 1.5)
+    )
+
+    static let smoothieBowl = Recipe(
+        name: "Smoothie bowl",
+        description: "Gęsty koktajl w misce z dodatkami.",
+        favourite: false,
+        category: .breakfast,
+        servings: 1,
+        prepTimeMinutes: 10,
+        difficulty: .easy,
+        imageURL: nil,
+        ingredients: [
+            Ingredient(name: "Banan", amount: 1, unit: .piece),
+            Ingredient(name: "Mrożone owoce", amount: 150, unit: .gram),
+            Ingredient(name: "Mleko", amount: 150, unit: .milliliter),
+            Ingredient(name: "Płatki owsiane", amount: 30, unit: .gram),
+            Ingredient(name: "Masło orzechowe", amount: 15, unit: .gram)
+        ],
+        preparationSteps: [
+            PreparationStep(stepNumber: 1, instruction: "Zmiksuj banana, owoce i mleko na gęsty koktajl."),
+            PreparationStep(stepNumber: 2, instruction: "Przelej do miski i posyp płatkami oraz masłem orzechowym.")
+        ],
+        nutrition: Nutrition(kcal: 600, protein: 12, fat: 18, carbs: 95, fiber: 8, salt: 0.5)
+    )
+
+    static let cottageCheeseBowl = Recipe(
+        name: "Twaróg z owocami i miodem",
+        description: "Białkowe śniadanie z twarogiem, owocami i miodem.",
+        favourite: false,
+        category: .breakfast,
+        servings: 1,
+        prepTimeMinutes: 10,
+        difficulty: .easy,
+        imageURL: nil,
+        ingredients: [
+            Ingredient(name: "Twaróg półtłusty", amount: 200, unit: .gram),
+            Ingredient(name: "Jogurt naturalny", amount: 50, unit: .gram),
+            Ingredient(name: "Miód", amount: 15, unit: .gram),
+            Ingredient(name: "Borówki", amount: 100, unit: .gram),
+            Ingredient(name: "Orzechy włoskie", amount: 20, unit: .gram)
+        ],
+        preparationSteps: [
+            PreparationStep(stepNumber: 1, instruction: "Wymieszaj twaróg z jogurtem i miodem."),
+            PreparationStep(stepNumber: 2, instruction: "Dodaj owoce i posyp orzechami."),
+            PreparationStep(stepNumber: 3, instruction: "Podawaj od razu.")
+        ],
+        nutrition: Nutrition(kcal: 500, protein: 35, fat: 20, carbs: 35, fiber: 4, salt: 0.8)
+    )
+
+    static let tunaSalad = Recipe(
+        name: "Sałatka z tuńczykiem",
+        description: "Lekka sałatka z tuńczykiem, kukurydzą i jajkiem.",
+        favourite: false,
+        category: .lunch,
+        servings: 2,
+        prepTimeMinutes: 15,
+        difficulty: .easy,
+        imageURL: nil,
+        ingredients: [
+            Ingredient(name: "Tuńczyk w sosie własnym", amount: 160, unit: .gram),
+            Ingredient(name: "Kukurydza", amount: 150, unit: .gram),
+            Ingredient(name: "Jajka", amount: 2, unit: .piece),
+            Ingredient(name: "Sałata", amount: 100, unit: .gram),
+            Ingredient(name: "Cebula czerwona", amount: 50, unit: .gram),
+            Ingredient(name: "Oliwa", amount: 15, unit: .gram)
+        ],
+        preparationSteps: [
+            PreparationStep(stepNumber: 1, instruction: "Ugotuj jajka na twardo i pokrój."),
+            PreparationStep(stepNumber: 2, instruction: "Wymieszaj tuńczyka, kukurydzę, sałatę i cebulę."),
+            PreparationStep(stepNumber: 3, instruction: "Dodaj jajka i skrop oliwą. Dopraw solą i pieprzem.")
+        ],
+        nutrition: Nutrition(kcal: 800, protein: 45, fat: 35, carbs: 50, fiber: 6, salt: 2.5)
+    )
+
+    static let quinoaVeggieBowl = Recipe(
+        name: "Miska z komosą i warzywami",
+        description: "Pożywna miska z komosą, warzywami i sosem.",
+        favourite: false,
+        category: .lunch,
+        servings: 2,
+        prepTimeMinutes: 25,
+        difficulty: .easy,
+        imageURL: nil,
+        ingredients: [
+            Ingredient(name: "Komosa ryżowa", amount: 150, unit: .gram),
+            Ingredient(name: "Warzywa mieszane", amount: 300, unit: .gram),
+            Ingredient(name: "Oliwa", amount: 10, unit: .gram),
+            Ingredient(name: "Sos sojowy", amount: 15, unit: .milliliter),
+            Ingredient(name: "Pestki dyni", amount: 20, unit: .gram)
+        ],
+        preparationSteps: [
+            PreparationStep(stepNumber: 1, instruction: "Ugotuj komosę zgodnie z instrukcją."),
+            PreparationStep(stepNumber: 2, instruction: "Podsmaż warzywa na oliwie."),
+            PreparationStep(stepNumber: 3, instruction: "Wymieszaj z komosą, sosem sojowym i pestkami.")
+        ],
+        nutrition: Nutrition(kcal: 1000, protein: 35, fat: 28, carbs: 150, fiber: 12, salt: 3)
+    )
+
+    static let capreseSandwich = Recipe(
+        name: "Kanapka caprese",
+        description: "Kanapka z mozzarellą, pomidorem i bazylią.",
+        favourite: false,
+        category: .lunch,
+        servings: 2,
+        prepTimeMinutes: 10,
+        difficulty: .easy,
+        imageURL: nil,
+        ingredients: [
+            Ingredient(name: "Bułka pełnoziarnista", amount: 2, unit: .piece),
+            Ingredient(name: "Mozzarella", amount: 125, unit: .gram),
+            Ingredient(name: "Pomidory", amount: 150, unit: .gram),
+            Ingredient(name: "Bazylia", amount: 10, unit: .gram),
+            Ingredient(name: "Oliwa", amount: 10, unit: .gram)
+        ],
+        preparationSteps: [
+            PreparationStep(stepNumber: 1, instruction: "Przekrój bułki i skrop oliwą."),
+            PreparationStep(stepNumber: 2, instruction: "Ułóż plastry mozzarelli i pomidora, dodaj bazylię."),
+            PreparationStep(stepNumber: 3, instruction: "Podawaj na świeżo lub podgrzej w opiekaczu.")
+        ],
+        nutrition: Nutrition(kcal: 700, protein: 30, fat: 30, carbs: 80, fiber: 6, salt: 2)
+    )
+
+    static let chickenSoup = Recipe(
+        name: "Rosół domowy",
+        description: "Aromatyczna zupa drobiowa z makaronem.",
+        favourite: false,
+        category: .lunch,
+        servings: 4,
+        prepTimeMinutes: 60,
+        difficulty: .medium,
+        imageURL: nil,
+        ingredients: [
+            Ingredient(name: "Kurczak (skrzydła/udo)", amount: 400, unit: .gram),
+            Ingredient(name: "Marchew", amount: 150, unit: .gram),
+            Ingredient(name: "Seler", amount: 100, unit: .gram),
+            Ingredient(name: "Pietruszka (korzeń)", amount: 100, unit: .gram),
+            Ingredient(name: "Cebula", amount: 100, unit: .gram),
+            Ingredient(name: "Makaron", amount: 200, unit: .gram),
+            Ingredient(name: "Przyprawy", amount: 2, unit: .teaspoon)
+        ],
+        preparationSteps: [
+            PreparationStep(stepNumber: 1, instruction: "Zalej kurczaka wodą i zagotuj, zbierz szumowiny."),
+            PreparationStep(stepNumber: 2, instruction: "Dodaj warzywa i gotuj na małym ogniu 45 minut."),
+            PreparationStep(stepNumber: 3, instruction: "Ugotuj makaron osobno."),
+            PreparationStep(stepNumber: 4, instruction: "Dopraw i podawaj z makaronem.")
+        ],
+        nutrition: Nutrition(kcal: 1600, protein: 90, fat: 50, carbs: 170, fiber: 8, salt: 6)
+    )
+
+    static let hummusPlate = Recipe(
+        name: "Talerz z hummusem i warzywami",
+        description: "Szybki lunch z hummusem, warzywami i pitą.",
+        favourite: false,
+        category: .lunch,
+        servings: 2,
+        prepTimeMinutes: 10,
+        difficulty: .easy,
+        imageURL: nil,
+        ingredients: [
+            Ingredient(name: "Hummus", amount: 200, unit: .gram),
+            Ingredient(name: "Warzywa świeże", amount: 300, unit: .gram),
+            Ingredient(name: "Chleb pita", amount: 2, unit: .piece),
+            Ingredient(name: "Oliwa", amount: 10, unit: .gram),
+            Ingredient(name: "Papryka słodka", amount: 1, unit: .teaspoon)
+        ],
+        preparationSteps: [
+            PreparationStep(stepNumber: 1, instruction: "Rozsmaruj hummus na talerzu i skrop oliwą."),
+            PreparationStep(stepNumber: 2, instruction: "Podaj z pokrojonymi warzywami i pitą."),
+            PreparationStep(stepNumber: 3, instruction: "Posyp papryką.")
+        ],
+        nutrition: Nutrition(kcal: 900, protein: 30, fat: 40, carbs: 110, fiber: 16, salt: 3)
+    )
+
+    static let riceAndBeans = Recipe(
+        name: "Ryż z fasolą",
+        description: "Proste danie z ryżem, czarną fasolą i przyprawami.",
+        favourite: false,
+        category: .lunch,
+        servings: 2,
+        prepTimeMinutes: 25,
+        difficulty: .easy,
+        imageURL: nil,
+        ingredients: [
+            Ingredient(name: "Ryż biały (suchy)", amount: 150, unit: .gram),
+            Ingredient(name: "Fasola czarna (ugotowana)", amount: 240, unit: .gram),
+            Ingredient(name: "Cebula", amount: 100, unit: .gram),
+            Ingredient(name: "Olej", amount: 10, unit: .gram),
+            Ingredient(name: "Przyprawy", amount: 2, unit: .teaspoon)
+        ],
+        preparationSteps: [
+            PreparationStep(stepNumber: 1, instruction: "Ugotuj ryż."),
+            PreparationStep(stepNumber: 2, instruction: "Podsmaż cebulę na oleju, dodaj fasolę i przyprawy."),
+            PreparationStep(stepNumber: 3, instruction: "Wymieszaj z ryżem i podawaj.")
+        ],
+        nutrition: Nutrition(kcal: 1100, protein: 30, fat: 20, carbs: 200, fiber: 16, salt: 4)
+    )
+
+    static let turkeyMeatballs = Recipe(
+        name: "Pulpety z indyka w sosie pomidorowym",
+        description: "Delikatne pulpety z indyka duszone w sosie pomidorowym, podawane z ryżem.",
+        favourite: false,
+        category: .dinner,
+        servings: 3,
+        prepTimeMinutes: 35,
+        difficulty: .medium,
+        imageURL: nil,
+        ingredients: [
+            Ingredient(name: "Mięso mielone z indyka", amount: 500, unit: .gram),
+            Ingredient(name: "Ryż (suchy)", amount: 150, unit: .gram),
+            Ingredient(name: "Passata pomidorowa", amount: 400, unit: .milliliter),
+            Ingredient(name: "Cebula", amount: 100, unit: .gram),
+            Ingredient(name: "Czosnek", amount: 2, unit: .piece),
+            Ingredient(name: "Oliwa", amount: 10, unit: .gram),
+            Ingredient(name: "Przyprawy", amount: 2, unit: .teaspoon)
+        ],
+        preparationSteps: [
+            PreparationStep(stepNumber: 1, instruction: "Uformuj małe pulpety z doprawionego mięsa."),
+            PreparationStep(stepNumber: 2, instruction: "Obsmaż na oliwie do zrumienienia."),
+            PreparationStep(stepNumber: 3, instruction: "Dodaj passatę, cebulę i czosnek, duś 15–20 minut."),
+            PreparationStep(stepNumber: 4, instruction: "Ugotuj ryż i podawaj z sosem.")
+        ],
+        nutrition: Nutrition(kcal: 2000, protein: 110, fat: 60, carbs: 180, fiber: 8, salt: 6)
+    )
+
+    static let shrimpPasta = Recipe(
+        name: "Makaron z krewetkami i czosnkiem",
+        description: "Kremowy makaron z krewetkami, czosnkiem i pietruszką.",
+        favourite: false,
+        category: .dinner,
+        servings: 2,
+        prepTimeMinutes: 25,
+        difficulty: .medium,
+        imageURL: nil,
+        ingredients: [
+            Ingredient(name: "Makaron spaghetti", amount: 200, unit: .gram),
+            Ingredient(name: "Krewetki", amount: 250, unit: .gram),
+            Ingredient(name: "Czosnek", amount: 2, unit: .piece),
+            Ingredient(name: "Oliwa", amount: 20, unit: .gram),
+            Ingredient(name: "Śmietanka", amount: 100, unit: .milliliter),
+            Ingredient(name: "Natka pietruszki", amount: 10, unit: .gram)
+        ],
+        preparationSteps: [
+            PreparationStep(stepNumber: 1, instruction: "Ugotuj makaron al dente."),
+            PreparationStep(stepNumber: 2, instruction: "Podsmaż czosnek na oliwie, dodaj krewetki."),
+            PreparationStep(stepNumber: 3, instruction: "Wlej śmietankę, dodaj pietruszkę i wymieszaj."),
+            PreparationStep(stepNumber: 4, instruction: "Połącz z makaronem i podawaj.")
+        ],
+        nutrition: Nutrition(kcal: 1500, protein: 70, fat: 60, carbs: 160, fiber: 4, salt: 4)
+    )
+
+    static let mushroomRisotto = Recipe(
+        name: "Risotto z pieczarkami",
+        description: "Kremowe risotto z pieczarkami i parmezanem.",
+        favourite: false,
+        category: .dinner,
+        servings: 3,
+        prepTimeMinutes: 35,
+        difficulty: .medium,
+        imageURL: nil,
+        ingredients: [
+            Ingredient(name: "Ryż arborio", amount: 300, unit: .gram),
+            Ingredient(name: "Bulion warzywny", amount: 1, unit: .liter),
+            Ingredient(name: "Pieczarki", amount: 300, unit: .gram),
+            Ingredient(name: "Cebula", amount: 100, unit: .gram),
+            Ingredient(name: "Parmezan", amount: 40, unit: .gram),
+            Ingredient(name: "Masło", amount: 20, unit: .gram),
+            Ingredient(name: "Oliwa", amount: 10, unit: .gram),
+            Ingredient(name: "Białe wino", amount: 100, unit: .milliliter)
+        ],
+        preparationSteps: [
+            PreparationStep(stepNumber: 1, instruction: "Podsmaż cebulę na oliwie i maśle."),
+            PreparationStep(stepNumber: 2, instruction: "Dodaj ryż i chwilę podsmaż."),
+            PreparationStep(stepNumber: 3, instruction: "Stopniowo dolewaj bulion, mieszając, aż ryż będzie kremowy."),
+            PreparationStep(stepNumber: 4, instruction: "Dodaj podsmażone pieczarki i parmezan.")
+        ],
+        nutrition: Nutrition(kcal: 2100, protein: 45, fat: 60, carbs: 320, fiber: 8, salt: 4)
+    )
+
+    static let tofuTeriyaki = Recipe(
+        name: "Tofu teriyaki z ryżem",
+        description: "Smażone tofu z brokułem w sosie teriyaki, podawane z ryżem.",
+        favourite: false,
+        category: .dinner,
+        servings: 2,
+        prepTimeMinutes: 25,
+        difficulty: .easy,
+        imageURL: nil,
+        ingredients: [
+            Ingredient(name: "Tofu", amount: 300, unit: .gram),
+            Ingredient(name: "Sos teriyaki", amount: 60, unit: .milliliter),
+            Ingredient(name: "Brokuł", amount: 200, unit: .gram),
+            Ingredient(name: "Ryż (suchy)", amount: 150, unit: .gram),
+            Ingredient(name: "Olej", amount: 10, unit: .gram),
+            Ingredient(name: "Sezam", amount: 10, unit: .gram)
+        ],
+        preparationSteps: [
+            PreparationStep(stepNumber: 1, instruction: "Ugotuj ryż."),
+            PreparationStep(stepNumber: 2, instruction: "Podsmaż tofu na oleju do zarumienienia."),
+            PreparationStep(stepNumber: 3, instruction: "Dodaj brokuł i sos teriyaki, duś kilka minut."),
+            PreparationStep(stepNumber: 4, instruction: "Podawaj z ryżem, posyp sezamem.")
+        ],
+        nutrition: Nutrition(kcal: 1400, protein: 55, fat: 35, carbs: 200, fiber: 10, salt: 4)
+    )
+
+    static let bakedPotatoesCottage = Recipe(
+        name: "Pieczone ziemniaki z twarogiem",
+        description: "Ziemniaki pieczone w skórce z kremowym twarogiem i szczypiorkiem.",
+        favourite: false,
+        category: .dinner,
+        servings: 2,
+        prepTimeMinutes: 45,
+        difficulty: .easy,
+        imageURL: nil,
+        ingredients: [
+            Ingredient(name: "Ziemniaki", amount: 600, unit: .gram),
+            Ingredient(name: "Twaróg półtłusty", amount: 200, unit: .gram),
+            Ingredient(name: "Jogurt naturalny", amount: 100, unit: .gram),
+            Ingredient(name: "Szczypiorek", amount: 10, unit: .gram),
+            Ingredient(name: "Oliwa", amount: 10, unit: .gram),
+            Ingredient(name: "Sól", amount: 1, unit: .teaspoon)
+        ],
+        preparationSteps: [
+            PreparationStep(stepNumber: 1, instruction: "Umyj ziemniaki, nakłuj i piecz 40–50 minut w 200°C."),
+            PreparationStep(stepNumber: 2, instruction: "Wymieszaj twaróg z jogurtem i szczypiorkiem."),
+            PreparationStep(stepNumber: 3, instruction: "Nacięte ziemniaki skrop oliwą i nadziej twarogiem.")
+        ],
+        nutrition: Nutrition(kcal: 1200, protein: 40, fat: 25, carbs: 200, fiber: 12, salt: 3)
+    )
+
     static let all: [Recipe] = [
         omelette,
         tomatoSoup,
@@ -387,7 +786,23 @@ enum RecipesMock {
         salmonQuinoa,
         lentilSoup,
         scrambledEggs,
-        beefStirFry
+        beefStirFry,
+        yogurtParfait,
+        chiaPudding,
+        frenchToast,
+        smoothieBowl,
+        cottageCheeseBowl,
+        tunaSalad,
+        quinoaVeggieBowl,
+        capreseSandwich,
+        chickenSoup,
+        hummusPlate,
+        riceAndBeans,
+        turkeyMeatballs,
+        shrimpPasta,
+        mushroomRisotto,
+        tofuTeriyaki,
+        bakedPotatoesCottage
     ]
 }
 

@@ -2,6 +2,8 @@ import SwiftUI
 
 struct RecipeItemView: View {
     let recipe: Recipe
+    var isInPlanningMode: Bool = false
+    var isSelected: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -15,19 +17,25 @@ struct RecipeItemView: View {
                             .foregroundStyle(.secondary)
                     )
                     .overlay(alignment: .topTrailing) {
-                        if recipe.favourite {
+                        if isSelected {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.title2)
+                                .foregroundStyle(.green)
+                                .background(Circle().fill(.ultraThickMaterial).padding(2))
+                                .padding(8)
+                        } else if recipe.favourite {
                             Image(systemName: "heart.fill")
                                 .foregroundStyle(.red)
                                 .padding(8)
                         }
                     }
 
-            Text(recipe.category.rawValue)
-                .font(.caption2)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(.thinMaterial, in: Capsule())
-                .padding(8)
+                Text(recipe.category.rawValue)
+                    .font(.caption2)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(.thinMaterial, in: Capsule())
+                    .padding(8)
             }
 
             Text(recipe.name)
@@ -44,7 +52,10 @@ struct RecipeItemView: View {
         }
         .padding(12)
         .myBackground()
-        .myBorderOverlay()
+        .myBorderOverlay(
+            color: isSelected ? .green : Color(.separator),
+            lineWidth: isSelected ? 2.5 : 0.5
+        )
         .frame(height: 220)
     }
 }

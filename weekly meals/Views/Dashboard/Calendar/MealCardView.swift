@@ -170,7 +170,7 @@ struct MealCardView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-                .frame(height: 56)
+                .frame(height: 48)
                 .padding(.top, 2)
             }
         }
@@ -185,8 +185,8 @@ struct MealCardView: View {
     ScrollView {
         VStack(spacing: 16) {
             MealCardView(slot: .breakfast, recipe: RecipesMock.omelette)
-//            MealCardView(slot: .lunch, recipe: RecipesMock.chickenBowl)
-//            MealCardView(slot: .dinner, recipe: nil)
+            MealCardView(slot: .lunch, recipe: RecipesMock.chickenBowl)
+            MealCardView(slot: .dinner, recipe: nil)
         }
         .padding()
         .background(Color(.systemGroupedBackground))

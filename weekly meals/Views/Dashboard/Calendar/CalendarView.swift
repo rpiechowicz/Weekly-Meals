@@ -79,7 +79,7 @@ struct CalendarView: View {
                             .font(.title3)
                             .symbolRenderingMode(.hierarchical)
                             .foregroundStyle(.secondary)
-                            .padding(6)
+                            .padding(8)
                             .background(.ultraThinMaterial, in: Circle())
                     }
                     .buttonStyle(.plain)
@@ -136,18 +136,19 @@ struct CalendarView: View {
 
                                 Divider()
 
-                                HStack(spacing: 8) {
+                                HStack(alignment: .top, spacing: 8) {
                                     Image(systemName: "hand.rays")
                                         .foregroundStyle(.blue)
                                     Text("Stuknij kartę posiłku, aby zobaczyć szczegóły.")
                                         .font(.footnote)
                                         .foregroundStyle(.secondary)
+                                        .fixedSize(horizontal: false, vertical: true)
                                 }
 
                                 HStack(alignment: .top, spacing: 8) {
                                     Image(systemName: "hand.draw")
                                         .foregroundStyle(.blue)
-                                    Text("Przesuń w prawo aby edytować, w lewo aby usunąć.")
+                                    Text("Przesuń w lewo/prawo aby edytować bądź usuwać dany posiłek.")
                                         .font(.footnote)
                                         .foregroundStyle(.secondary)
                                         .fixedSize(horizontal: false, vertical: true)
@@ -160,7 +161,6 @@ struct CalendarView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 20)
-                .padding(.bottom, 6)
 
                 List {
                     ForEach(MealSlot.allCases) { slot in

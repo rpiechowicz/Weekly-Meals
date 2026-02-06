@@ -27,15 +27,13 @@ struct DatesView: View {
                 .padding(.top, 10)
             }
             .onAppear {
-                DispatchQueue.main.async {
-                    if let today = datesViewModal.dates.first(where: { datesViewModal.isToday($0) }) {
-                        withAnimation(.easeInOut(duration: 0.25)) {
-                            proxy.scrollTo(today, anchor: .center)
-                        }
-                    } else {
-                        withAnimation(.easeInOut(duration: 0.25)) {
-                            proxy.scrollTo(datesViewModal.selectedDate, anchor: .center)
-                        }
+                if let today = datesViewModal.dates.first(where: { datesViewModal.isToday($0) }) {
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        proxy.scrollTo(today, anchor: .center)
+                    }
+                } else {
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        proxy.scrollTo(datesViewModal.selectedDate, anchor: .center)
                     }
                 }
             }

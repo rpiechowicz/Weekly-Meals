@@ -8,6 +8,17 @@ enum RecipesCategory: String, CaseIterable, Identifiable, Codable {
     case dinner = "Kolacje"
 
     var id: String { rawValue }
+
+    /// Mapuje kategorię przepisu na slot posiłku.
+    /// Zwraca nil dla kategorii filtrujących (.all, .favourite).
+    var toMealSlot: MealSlot? {
+        switch self {
+        case .breakfast: .breakfast
+        case .lunch:     .lunch
+        case .dinner:    .dinner
+        case .all, .favourite: nil
+        }
+    }
 }
 
 /// Poziom trudności przepisu
