@@ -9,7 +9,7 @@ enum RecipesMock {
         servings: 2,
         prepTimeMinutes: 15,
         difficulty: .easy,
-        imageURL: nil,
+        imageURL: URL(string: "https://images.unsplash.com/photo-1510693206972-df098062cb71?w=800&q=80"),
         ingredients: [
             Ingredient(name: "Jajka", amount: 3, unit: .piece),
             Ingredient(name: "Papryka", amount: 80, unit: .gram),
@@ -36,7 +36,7 @@ enum RecipesMock {
         servings: 4,
         prepTimeMinutes: 30,
         difficulty: .easy,
-        imageURL: nil,
+        imageURL: URL(string: "https://images.unsplash.com/photo-1547592166-23ac45744acd?w=800&q=80"),
         ingredients: [
             Ingredient(name: "Pomidory", amount: 800, unit: .gram),
             Ingredient(name: "Bulion warzywny", amount: 1, unit: .liter),
@@ -63,7 +63,7 @@ enum RecipesMock {
         servings: 2,
         prepTimeMinutes: 25,
         difficulty: .medium,
-        imageURL: nil,
+        imageURL: URL(string: "https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?w=800&q=80"),
         ingredients: [
             Ingredient(name: "Pierś z kurczaka", amount: 300, unit: .gram),
             Ingredient(name: "Ryż basmati (suchy)", amount: 150, unit: .gram),
@@ -90,7 +90,7 @@ enum RecipesMock {
         servings: 2,
         prepTimeMinutes: 15,
         difficulty: .easy,
-        imageURL: nil,
+        imageURL: URL(string: "https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=800&q=80"),
         ingredients: [
             Ingredient(name: "Banany", amount: 2, unit: .piece),
             Ingredient(name: "Jajka", amount: 2, unit: .piece),
@@ -116,7 +116,7 @@ enum RecipesMock {
         servings: 1,
         prepTimeMinutes: 10,
         difficulty: .easy,
-        imageURL: nil,
+        imageURL: URL(string: "https://images.unsplash.com/photo-1525351484163-7529414344d8?w=800&q=80"),
         ingredients: [
             Ingredient(name: "Pieczywo tostowe", amount: 2, unit: .piece),
             Ingredient(name: "Awokado", amount: 1, unit: .piece),
@@ -143,7 +143,7 @@ enum RecipesMock {
         servings: 2,
         prepTimeMinutes: 15,
         difficulty: .easy,
-        imageURL: nil,
+        imageURL: URL(string: "https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=800&q=80"),
         ingredients: [
             Ingredient(name: "Pomidory", amount: 200, unit: .gram),
             Ingredient(name: "Ogórek", amount: 150, unit: .gram),
@@ -170,7 +170,7 @@ enum RecipesMock {
         servings: 4,
         prepTimeMinutes: 45,
         difficulty: .medium,
-        imageURL: nil,
+        imageURL: URL(string: "https://images.unsplash.com/photo-1622973536968-3ead9e780960?w=800&q=80"),
         ingredients: [
             Ingredient(name: "Makaron spaghetti", amount: 400, unit: .gram),
             Ingredient(name: "Mięso mielone wołowe", amount: 500, unit: .gram),
@@ -198,7 +198,7 @@ enum RecipesMock {
         servings: 4,
         prepTimeMinutes: 35,
         difficulty: .medium,
-        imageURL: nil,
+        imageURL: URL(string: "https://images.unsplash.com/photo-1455619452474-d2be8b1e70cd?w=800&q=80"),
         ingredients: [
             Ingredient(name: "Mleko kokosowe", amount: 400, unit: .milliliter),
             Ingredient(name: "Ciecierzyca", amount: 240, unit: .gram),
@@ -225,7 +225,7 @@ enum RecipesMock {
         servings: 2,
         prepTimeMinutes: 10,
         difficulty: .easy,
-        imageURL: nil,
+        imageURL: URL(string: "https://images.unsplash.com/photo-1517673400267-0251440c45dc?w=800&q=80"),
         ingredients: [
             Ingredient(name: "Płatki owsiane", amount: 100, unit: .gram),
             Ingredient(name: "Mleko", amount: 300, unit: .milliliter),
@@ -249,7 +249,7 @@ enum RecipesMock {
         servings: 2,
         prepTimeMinutes: 20,
         difficulty: .easy,
-        imageURL: nil,
+        imageURL: URL(string: "https://images.unsplash.com/photo-1626700051175-6818013e1d4f?w=800&q=80"),
         ingredients: [
             Ingredient(name: "Tortilla", amount: 2, unit: .piece),
             Ingredient(name: "Kurczak grillowany", amount: 200, unit: .gram),
@@ -274,7 +274,7 @@ enum RecipesMock {
         servings: 2,
         prepTimeMinutes: 30,
         difficulty: .medium,
-        imageURL: nil,
+        imageURL: URL(string: "https://images.unsplash.com/photo-1467003909585-2f8a72700288?w=800&q=80"),
         ingredients: [
             Ingredient(name: "Łosoś", amount: 300, unit: .gram),
             Ingredient(name: "Komosa ryżowa", amount: 150, unit: .gram),
@@ -300,7 +300,7 @@ enum RecipesMock {
         servings: 4,
         prepTimeMinutes: 40,
         difficulty: .easy,
-        imageURL: nil,
+        imageURL: URL(string: "https://images.unsplash.com/photo-1476718406336-bb5a9690ee2a?w=800&q=80"),
         ingredients: [
             Ingredient(name: "Soczewica czerwona", amount: 250, unit: .gram),
             Ingredient(name: "Bulion warzywny", amount: 1, unit: .liter),
@@ -327,7 +327,7 @@ enum RecipesMock {
         servings: 2,
         prepTimeMinutes: 10,
         difficulty: .easy,
-        imageURL: nil,
+        imageURL: URL(string: "https://images.unsplash.com/photo-1482049016688-2d3e1b311543?w=800&q=80"),
         ingredients: [
             Ingredient(name: "Jajka", amount: 4, unit: .piece),
             Ingredient(name: "Masło", amount: 10, unit: .gram),
@@ -353,7 +353,7 @@ enum RecipesMock {
         servings: 3,
         prepTimeMinutes: 25,
         difficulty: .medium,
-        imageURL: nil,
+        imageURL: URL(string: "https://images.unsplash.com/photo-1512058564366-18510be2db19?w=800&q=80"),
         ingredients: [
             Ingredient(name: "Wołowina", amount: 400, unit: .gram),
             Ingredient(name: "Papryka", amount: 200, unit: .gram),
@@ -381,7 +381,7 @@ enum RecipesMock {
         servings: 2,
         prepTimeMinutes: 10,
         difficulty: .easy,
-        imageURL: nil,
+        imageURL: URL(string: "https://images.unsplash.com/photo-1488477181946-6428a0291777?w=800&q=80"),
         ingredients: [
             Ingredient(name: "Jogurt naturalny", amount: 300, unit: .gram),
             Ingredient(name: "Granola", amount: 80, unit: .gram),
@@ -404,7 +404,7 @@ enum RecipesMock {
         servings: 2,
         prepTimeMinutes: 10,
         difficulty: .easy,
-        imageURL: nil,
+        imageURL: URL(string: "https://images.unsplash.com/photo-1546548970-71785318a17b?w=800&q=80"),
         ingredients: [
             Ingredient(name: "Nasiona chia", amount: 60, unit: .gram),
             Ingredient(name: "Mleko", amount: 400, unit: .milliliter),
@@ -427,7 +427,7 @@ enum RecipesMock {
         servings: 2,
         prepTimeMinutes: 15,
         difficulty: .easy,
-        imageURL: nil,
+        imageURL: URL(string: "https://images.unsplash.com/photo-1484723091739-30a097e8f929?w=800&q=80"),
         ingredients: [
             Ingredient(name: "Pieczywo tostowe", amount: 4, unit: .piece),
             Ingredient(name: "Jajka", amount: 2, unit: .piece),
@@ -453,7 +453,7 @@ enum RecipesMock {
         servings: 1,
         prepTimeMinutes: 10,
         difficulty: .easy,
-        imageURL: nil,
+        imageURL: URL(string: "https://images.unsplash.com/photo-1590301157890-4810ed352733?w=800&q=80"),
         ingredients: [
             Ingredient(name: "Banan", amount: 1, unit: .piece),
             Ingredient(name: "Mrożone owoce", amount: 150, unit: .gram),
@@ -476,7 +476,7 @@ enum RecipesMock {
         servings: 1,
         prepTimeMinutes: 10,
         difficulty: .easy,
-        imageURL: nil,
+        imageURL: URL(string: "https://images.unsplash.com/photo-1495214783159-3503fd1b572d?w=800&q=80"),
         ingredients: [
             Ingredient(name: "Twaróg półtłusty", amount: 200, unit: .gram),
             Ingredient(name: "Jogurt naturalny", amount: 50, unit: .gram),
@@ -500,7 +500,7 @@ enum RecipesMock {
         servings: 2,
         prepTimeMinutes: 15,
         difficulty: .easy,
-        imageURL: nil,
+        imageURL: URL(string: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=800&q=80"),
         ingredients: [
             Ingredient(name: "Tuńczyk w sosie własnym", amount: 160, unit: .gram),
             Ingredient(name: "Kukurydza", amount: 150, unit: .gram),
@@ -525,7 +525,7 @@ enum RecipesMock {
         servings: 2,
         prepTimeMinutes: 25,
         difficulty: .easy,
-        imageURL: nil,
+        imageURL: URL(string: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&q=80"),
         ingredients: [
             Ingredient(name: "Komosa ryżowa", amount: 150, unit: .gram),
             Ingredient(name: "Warzywa mieszane", amount: 300, unit: .gram),
@@ -549,7 +549,7 @@ enum RecipesMock {
         servings: 2,
         prepTimeMinutes: 10,
         difficulty: .easy,
-        imageURL: nil,
+        imageURL: URL(string: "https://images.unsplash.com/photo-1592417817098-8fd3d9eb14a5?w=800&q=80"),
         ingredients: [
             Ingredient(name: "Bułka pełnoziarnista", amount: 2, unit: .piece),
             Ingredient(name: "Mozzarella", amount: 125, unit: .gram),
@@ -573,7 +573,7 @@ enum RecipesMock {
         servings: 4,
         prepTimeMinutes: 60,
         difficulty: .medium,
-        imageURL: nil,
+        imageURL: URL(string: "https://images.unsplash.com/photo-1594756202469-9ff9799b2e4e?w=800&q=80"),
         ingredients: [
             Ingredient(name: "Kurczak (skrzydła/udo)", amount: 400, unit: .gram),
             Ingredient(name: "Marchew", amount: 150, unit: .gram),
@@ -600,7 +600,7 @@ enum RecipesMock {
         servings: 2,
         prepTimeMinutes: 10,
         difficulty: .easy,
-        imageURL: nil,
+        imageURL: URL(string: "https://images.unsplash.com/photo-1577805947697-89e18249d767?w=800&q=80"),
         ingredients: [
             Ingredient(name: "Hummus", amount: 200, unit: .gram),
             Ingredient(name: "Warzywa świeże", amount: 300, unit: .gram),
@@ -624,7 +624,7 @@ enum RecipesMock {
         servings: 2,
         prepTimeMinutes: 25,
         difficulty: .easy,
-        imageURL: nil,
+        imageURL: URL(string: "https://images.unsplash.com/photo-1536304929831-ee1ca9d44906?w=800&q=80"),
         ingredients: [
             Ingredient(name: "Ryż biały (suchy)", amount: 150, unit: .gram),
             Ingredient(name: "Fasola czarna (ugotowana)", amount: 240, unit: .gram),
@@ -648,7 +648,7 @@ enum RecipesMock {
         servings: 3,
         prepTimeMinutes: 35,
         difficulty: .medium,
-        imageURL: nil,
+        imageURL: URL(string: "https://images.unsplash.com/photo-1529042410759-befb1204b468?w=800&q=80"),
         ingredients: [
             Ingredient(name: "Mięso mielone z indyka", amount: 500, unit: .gram),
             Ingredient(name: "Ryż (suchy)", amount: 150, unit: .gram),
@@ -675,7 +675,7 @@ enum RecipesMock {
         servings: 2,
         prepTimeMinutes: 25,
         difficulty: .medium,
-        imageURL: nil,
+        imageURL: URL(string: "https://images.unsplash.com/photo-1563379926898-05f4575a45d8?w=800&q=80"),
         ingredients: [
             Ingredient(name: "Makaron spaghetti", amount: 200, unit: .gram),
             Ingredient(name: "Krewetki", amount: 250, unit: .gram),
@@ -701,7 +701,7 @@ enum RecipesMock {
         servings: 3,
         prepTimeMinutes: 35,
         difficulty: .medium,
-        imageURL: nil,
+        imageURL: URL(string: "https://images.unsplash.com/photo-1476124369491-e7addf5db371?w=800&q=80"),
         ingredients: [
             Ingredient(name: "Ryż arborio", amount: 300, unit: .gram),
             Ingredient(name: "Bulion warzywny", amount: 1, unit: .liter),
@@ -729,7 +729,7 @@ enum RecipesMock {
         servings: 2,
         prepTimeMinutes: 25,
         difficulty: .easy,
-        imageURL: nil,
+        imageURL: URL(string: "https://images.unsplash.com/photo-1564834724105-918b73d1b9e0?w=800&q=80"),
         ingredients: [
             Ingredient(name: "Tofu", amount: 300, unit: .gram),
             Ingredient(name: "Sos teriyaki", amount: 60, unit: .milliliter),
@@ -755,7 +755,7 @@ enum RecipesMock {
         servings: 2,
         prepTimeMinutes: 45,
         difficulty: .easy,
-        imageURL: nil,
+        imageURL: URL(string: "https://images.unsplash.com/photo-1568569350062-ebfa3cb195df?w=800&q=80"),
         ingredients: [
             Ingredient(name: "Ziemniaki", amount: 600, unit: .gram),
             Ingredient(name: "Twaróg półtłusty", amount: 200, unit: .gram),

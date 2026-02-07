@@ -7,29 +7,53 @@ struct RecipeItemView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
+            // Image section
             ZStack(alignment: .topLeading) {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color(.secondarySystemFill))
-                    .frame(height: 140)
-                    .overlay(
-                        Image(systemName: "fork.knife.circle")
-                            .font(.system(size: 40))
-                            .foregroundStyle(.secondary)
-                    )
-                    .overlay(alignment: .topTrailing) {
-                        if isSelected {
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.title2)
-                                .foregroundStyle(.green)
-                                .background(Circle().fill(.ultraThickMaterial).padding(2))
-                                .padding(8)
-                        } else if recipe.favourite {
-                            Image(systemName: "heart.fill")
-                                .foregroundStyle(.red)
-                                .padding(8)
-                        }
-                    }
+                if let imageURL = recipe.imageURL {
+                    Color(.secondarySystemFill)
+                        .frame(height: 140)
+                        .overlay(
+                            AsyncImage(url: imageURL) { phase in
+                                switch phase {
+                                case .success(let image):
+                                    image
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                case .failure:
+                                    Image(systemName: "fork.knife.circle")
+                                        .font(.system(size: 40))
+                                        .foregroundStyle(.secondary)
+                                case .empty:
+                                    ProgressView()
+                                @unknown default:
+                                    Image(systemName: "fork.knife.circle")
+                                        .font(.system(size: 40))
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                } else {
+                    recipePlaceholder
+                }
 
+                // Top-trailing badge
+                HStack {
+                    Spacer()
+                    if isSelected {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.title2)
+                            .foregroundStyle(.green)
+                            .background(Circle().fill(.ultraThickMaterial).padding(2))
+                            .padding(8)
+                    } else if recipe.favourite {
+                        Image(systemName: "heart.fill")
+                            .foregroundStyle(.red)
+                            .padding(8)
+                    }
+                }
+
+                // Category badge
                 Text(recipe.category.rawValue)
                     .font(.caption2)
                     .padding(.horizontal, 8)
@@ -37,6 +61,7 @@ struct RecipeItemView: View {
                     .background(.thinMaterial, in: Capsule())
                     .padding(8)
             }
+            .frame(height: 140)
 
             Text(recipe.name)
                 .font(.headline)
@@ -56,11 +81,22 @@ struct RecipeItemView: View {
             color: isSelected ? .green : Color(.separator),
             lineWidth: isSelected ? 2.5 : 0.5
         )
-        .frame(height: 220)
+        .frame(height: 260)
+    }
+
+    private var recipePlaceholder: some View {
+        RoundedRectangle(cornerRadius: 12, style: .continuous)
+            .fill(Color(.secondarySystemFill))
+            .frame(height: 140)
+            .overlay(
+                Image(systemName: "fork.knife.circle")
+                    .font(.system(size: 40))
+                    .foregroundStyle(.secondary)
+            )
     }
 }
 
 
 #Preview {
-    RecipeItemView(recipe: Recipe(name: "Omlet z warzywami", description: "Puszysty omlet z papryką, szpinakiem i serem feta.", category: .breakfast))
+    RecipeItemView(recipe: RecipesMock.omelette)
 }

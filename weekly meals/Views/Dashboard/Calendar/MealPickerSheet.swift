@@ -7,10 +7,31 @@ struct MealPickerSheet: View {
     let recipes: [Recipe]
     var onSelect: (Recipe) -> Void
 
-    @State private var selectedCategory: RecipesCategory = .all
+    @State private var selectedCategory: RecipesCategory
     @State private var searchText: String = ""
 
+    private var slotCategory: RecipesCategory {
+        switch slot {
+        case .breakfast: .breakfast
+        case .lunch:     .lunch
+        case .dinner:    .dinner
+        }
+    }
+
     private var categories: [RecipesCategory] { RecipesCategory.allCases }
+
+    init(slot: MealSlot, recipes: [Recipe], onSelect: @escaping (Recipe) -> Void) {
+        self.slot = slot
+        self.recipes = recipes
+        self.onSelect = onSelect
+        self._selectedCategory = State(initialValue: {
+            switch slot {
+            case .breakfast: return .breakfast
+            case .lunch:     return .lunch
+            case .dinner:    return .dinner
+            }
+        }())
+    }
 
     private var filteredRecipes: [Recipe] {
         var filtered = recipes
@@ -38,7 +59,11 @@ struct MealPickerSheet: View {
         NavigationStack {
             VStack(spacing: 0) {
                 // Filters
-                RecipeFilters(categories: categories, selectedCategory: $selectedCategory)
+                RecipeFilters(
+                    categories: categories,
+                    selectedCategory: $selectedCategory,
+                    disabled: true
+                )
 
                 ScrollView {
                     if filteredRecipes.isEmpty {
@@ -59,7 +84,7 @@ struct MealPickerSheet: View {
                         .padding(.top, 80)
                         .padding(.horizontal)
                     } else {
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: 20)], spacing: 20) {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: 16)], spacing: 16) {
                             ForEach(filteredRecipes) { recipe in
                                 Button {
                                     onSelect(recipe)
@@ -74,7 +99,6 @@ struct MealPickerSheet: View {
                         .padding(.vertical, 12)
                     }
                 }
-                .background(Color(.systemGroupedBackground))
             }
             .navigationTitle("Wybierz posiłek")
             .navigationBarTitleDisplayMode(.inline)

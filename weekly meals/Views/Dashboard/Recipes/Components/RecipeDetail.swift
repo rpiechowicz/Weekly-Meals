@@ -45,11 +45,11 @@ struct RecipeDetailView: View {
                             } placeholder: {
                                 placeholderHeader
                             }
-                            .frame(height: 300)
+                            .frame(height: 275)
                             .clipped()
                         } else {
                             placeholderHeader
-                                .frame(height: 300)
+                                .frame(height: 275)
                         }
                         
                         // Gradient overlay for better text readability

@@ -34,12 +34,12 @@ struct MealPlanSummarySheet: View {
                                         withAnimation { mealPlan.decrementRecipe(recipe) }
                                     }
                                 )
-                                .swipeActions(edge: .trailing) {
+                                .swipeActions(edge: .leading) {
                                     Button("Usuń", role: .destructive) {
                                         withAnimation {
                                             mealPlan.toggleRecipe(recipe)
                                         }
-                                    }
+                                    }.tint(.red)
                                 }
                             }
                         }

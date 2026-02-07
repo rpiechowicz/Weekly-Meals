@@ -63,7 +63,7 @@ struct RecipesView: View {
                             .padding(.top, 80)
                             .padding(.horizontal)
                         } else {
-                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: 12)], spacing: 16) {
+                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: 16)], spacing: 16) {
                                 ForEach(filteredRecipes) { recipe in
                                     Button {
                                         if mealPlan.isActive {
@@ -84,11 +84,12 @@ struct RecipesView: View {
                                 }
                             }
                             .padding(.horizontal, 12)
-                            .padding(.vertical, 16)
+//                            .padding(.vertical, 16)
+                            .padding(.top, 0)
+                            .padding(.bottom, 18)
                             .padding(.bottom, mealPlan.isActive ? 60 : 0)
                         }
                     }
-                    .background(Color(.systemGroupedBackground))
                 }
 
                 if mealPlan.isActive {
