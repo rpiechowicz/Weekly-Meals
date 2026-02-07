@@ -44,6 +44,7 @@ struct MealCardView: View {
     let slot: MealSlot
     let recipe: Recipe? // nil => brak wybranego posiłku
     @Environment(\.colorScheme) var colorScheme
+    @State private var datesViewModel = DatesViewModel()
 
     private var isEmpty: Bool { recipe == nil }
 
