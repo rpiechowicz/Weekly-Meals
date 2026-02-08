@@ -5,24 +5,18 @@ struct MealPickerSheet: View {
 
     let slot: MealSlot
     let recipes: [Recipe]
+    let recipeCounts: [UUID: Int]
     var onSelect: (Recipe) -> Void
 
     @State private var selectedCategory: RecipesCategory
     @State private var searchText: String = ""
 
-    private var slotCategory: RecipesCategory {
-        switch slot {
-        case .breakfast: .breakfast
-        case .lunch:     .lunch
-        case .dinner:    .dinner
-        }
-    }
-
     private var categories: [RecipesCategory] { RecipesCategory.allCases }
 
-    init(slot: MealSlot, recipes: [Recipe], onSelect: @escaping (Recipe) -> Void) {
+    init(slot: MealSlot, recipes: [Recipe], recipeCounts: [UUID: Int] = [:], onSelect: @escaping (Recipe) -> Void) {
         self.slot = slot
         self.recipes = recipes
+        self.recipeCounts = recipeCounts
         self.onSelect = onSelect
         self._selectedCategory = State(initialValue: {
             switch slot {
@@ -33,8 +27,13 @@ struct MealPickerSheet: View {
         }())
     }
 
+    private var uniqueRecipes: [Recipe] {
+        var seen = Set<UUID>()
+        return recipes.filter { seen.insert($0.id).inserted }
+    }
+
     private var filteredRecipes: [Recipe] {
-        var filtered = recipes
+        var filtered = uniqueRecipes
 
         switch selectedCategory {
         case .all:
@@ -86,11 +85,12 @@ struct MealPickerSheet: View {
                     } else {
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: 16)], spacing: 16) {
                             ForEach(filteredRecipes) { recipe in
+                                let count = recipeCounts[recipe.id] ?? 1
                                 Button {
                                     onSelect(recipe)
                                     dismiss()
                                 } label: {
-                                    RecipeItemView(recipe: recipe)
+                                    RecipeItemView(recipe: recipe, badgeCount: count)
                                 }
                                 .buttonStyle(.plain)
                             }

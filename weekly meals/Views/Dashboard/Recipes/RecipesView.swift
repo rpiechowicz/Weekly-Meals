@@ -1,10 +1,13 @@
 import SwiftUI
 
 struct RecipesView: View {
+    @Environment(\.weeklyMealStore) private var mealStore
+    @Environment(\.datesViewModel) private var datesViewModel
     @State private var selectedCategory: RecipesCategory = .all
     @State private var searchText = ""
     @State private var selectedRecipe: Recipe?
     @State private var mealPlan = MealPlanViewModel()
+    @State private var showDeletePlanAlert = false
 
     private var categories: [RecipesCategory] = RecipesCategory.allCases
 
@@ -106,25 +109,45 @@ struct RecipesView: View {
             .searchable(text: $searchText, prompt: "Szukaj przepisów")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        withAnimation {
-                            if mealPlan.isActive {
-                                mealPlan.exitPlanningMode()
-                            } else {
-                                mealPlan.enterPlanningMode()
-                            }
-                        }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: mealPlan.isActive
-                                  ? "xmark.circle.fill"
-                                  : "calendar.badge.plus")
-                            if mealPlan.isActive {
+                    if mealPlan.isActive {
+                        Button {
+                            withAnimation { mealPlan.exitPlanningMode() }
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "xmark.circle.fill")
                                 Text("Anuluj")
                             }
+                            .font(.subheadline)
+                            .foregroundStyle(.red)
                         }
-                        .font(.subheadline)
-                        .foregroundStyle(mealPlan.isActive ? .red : .blue)
+                    } else if mealStore.hasSavedPlan {
+                        // Jest plan → menu z edycją/usuwaniem
+                        Menu {
+                            Button {
+                                withAnimation { mealPlan.loadFromSaved(mealStore.savedPlan) }
+                            } label: {
+                                Label("Edytuj plan", systemImage: "pencil")
+                            }
+
+                            Button(role: .destructive) {
+                                showDeletePlanAlert = true
+                            } label: {
+                                Label("Usuń plan", systemImage: "trash")
+                            }
+                        } label: {
+                            Image(systemName: "list.bullet.circle.fill")
+                                .font(.title3)
+                                .foregroundStyle(.blue)
+                        }
+                    } else {
+                        // Brak planu → bezpośrednio twórz
+                        Button {
+                            withAnimation { mealPlan.enterPlanningMode() }
+                        } label: {
+                            Image(systemName: "calendar.badge.plus")
+                                .font(.title3)
+                                .foregroundStyle(.blue)
+                        }
                     }
                 }
             }
@@ -153,6 +176,15 @@ struct RecipesView: View {
                 if let slot = mealPlan.slotFullAlert {
                     Text("Możesz dodać maksymalnie 7 przepisów do kategorii \(slot.title).")
                 }
+            }
+            .alert("Usuń plan", isPresented: $showDeletePlanAlert) {
+                Button("Usuń", role: .destructive) {
+                    mealStore.clearSavedPlan()
+                    mealStore.clearWeek(dates: datesViewModel.dates)
+                }
+                Button("Anuluj", role: .cancel) { }
+            } message: {
+                Text("Czy na pewno chcesz usunąć zapisany plan posiłków? Usunie też przypisane posiłki z kalendarza.")
             }
         }
     }

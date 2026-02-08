@@ -83,6 +83,13 @@ class MealPlanViewModel {
         isActive = true
     }
 
+    func loadFromSaved(_ plan: SavedMealPlan) {
+        breakfastRecipes = plan.breakfastEntries.map(\.recipe)
+        lunchRecipes = plan.lunchEntries.map(\.recipe)
+        dinnerRecipes = plan.dinnerEntries.map(\.recipe)
+        isActive = true
+    }
+
     func exitPlanningMode() {
         isActive = false
         resetPlan()

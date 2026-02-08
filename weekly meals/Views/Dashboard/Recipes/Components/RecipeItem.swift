@@ -4,6 +4,7 @@ struct RecipeItemView: View {
     let recipe: Recipe
     var isInPlanningMode: Bool = false
     var isSelected: Bool = false
+    var badgeCount: Int = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -60,6 +61,23 @@ struct RecipeItemView: View {
                     .padding(.vertical, 4)
                     .background(.thinMaterial, in: Capsule())
                     .padding(8)
+
+                // Count badge (bottom-right of image)
+                if badgeCount > 1 {
+                    VStack {
+                        Spacer()
+                        HStack {
+                            Spacer()
+                            Text("\(badgeCount)")
+                                .font(.caption2)
+                                .fontWeight(.bold)
+                                .foregroundStyle(.white)
+                                .frame(width: 22, height: 22)
+                                .background(.blue, in: Circle())
+                                .padding(8)
+                        }
+                    }
+                }
             }
             .frame(height: 140)
 

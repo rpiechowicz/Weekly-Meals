@@ -1,6 +1,6 @@
 import SwiftUI
 
-enum MealSlot: String, CaseIterable, Identifiable {
+enum MealSlot: String, CaseIterable, Identifiable, Codable {
     case breakfast
     case lunch
     case dinner
@@ -44,7 +44,6 @@ struct MealCardView: View {
     let slot: MealSlot
     let recipe: Recipe? // nil => brak wybranego posiłku
     @Environment(\.colorScheme) var colorScheme
-    @State private var datesViewModel = DatesViewModel()
 
     private var isEmpty: Bool { recipe == nil }
 
@@ -134,7 +133,7 @@ struct MealCardView: View {
                             .fontWeight(.semibold)
                             .foregroundStyle(.primary)
                             .lineLimit(2)
-                        
+
                         HStack(spacing: 10) {
                             HStack(spacing: 4) {
                                 Image(systemName: "clock")
@@ -142,7 +141,7 @@ struct MealCardView: View {
                             }
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                                                        
+
                             HStack(spacing: 4) {
                                 Image(systemName: "flame.fill")
                                 Text("\(Int(recipe.nutritionPerServing.kcal)) kcal")
@@ -154,7 +153,7 @@ struct MealCardView: View {
 
                     Spacer(minLength: 0)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
                 .padding(.top, 2)
             } else {
                 // Empty state inside card
@@ -171,7 +170,7 @@ struct MealCardView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-                .frame(height: 48)
+                .frame(height: 56)
                 .padding(.top, 2)
             }
         }

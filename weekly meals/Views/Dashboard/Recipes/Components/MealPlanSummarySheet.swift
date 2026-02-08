@@ -4,42 +4,39 @@ struct MealPlanSummarySheet: View {
     let mealPlan: MealPlanViewModel
     var onSave: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.weeklyMealStore) private var mealStore
+    @Environment(\.datesViewModel) private var datesViewModel
+
+    private var canSave: Bool {
+        mealPlan.totalCount > 0
+    }
 
     var body: some View {
         NavigationStack {
             List {
                 ForEach(MealSlot.allCases) { slot in
                     Section {
-                        let recipes = mealPlan.uniqueRecipes(for: slot)
-                        if recipes.isEmpty {
-                            HStack(spacing: 10) {
-                                Image(systemName: "plus.circle.dashed")
-                                    .foregroundStyle(.secondary)
-                                Text("Brak wybranych posiłków")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                            }
-                            .padding(.vertical, 4)
+                        let unique = mealPlan.uniqueRecipes(for: slot)
+                        if unique.isEmpty {
+                            emptyRow
                         } else {
-                            ForEach(recipes) { recipe in
+                            ForEach(unique) { recipe in
                                 MealPlanSummaryRow(
                                     recipe: recipe,
                                     slot: slot,
                                     count: mealPlan.recipeCount(recipe),
                                     canAdd: mealPlan.canAdd(to: slot),
-                                    onIncrement: {
-                                        withAnimation { mealPlan.incrementRecipe(recipe) }
-                                    },
-                                    onDecrement: {
-                                        withAnimation { mealPlan.decrementRecipe(recipe) }
-                                    }
+                                    onIncrement: { mealPlan.incrementRecipe(recipe) },
+                                    onDecrement: { mealPlan.decrementRecipe(recipe) }
                                 )
-                                .swipeActions(edge: .leading) {
-                                    Button("Usuń", role: .destructive) {
+                                .swipeActions(edge: .trailing) {
+                                    Button(role: .destructive) {
                                         withAnimation {
                                             mealPlan.toggleRecipe(recipe)
                                         }
-                                    }.tint(.red)
+                                    } label: {
+                                        Label("Usuń", systemImage: "trash")
+                                    }
                                 }
                             }
                         }
@@ -66,18 +63,47 @@ struct MealPlanSummarySheet: View {
                     Button("Zamknij") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Zapisz") {
-                        dismiss()
-                        mealPlan.savePlan()
-                    }
-                    .disabled(mealPlan.totalCount == 0)
+                    Button("Zapisz") { saveTapped() }
+                        .disabled(!canSave)
                 }
             }
         }
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
     }
+
+    // MARK: - Empty Row
+
+    private var emptyRow: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "plus.circle.dashed")
+                .foregroundStyle(.secondary)
+            Text("Brak wybranych posiłków")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 4)
+    }
+
+    // MARK: - Save
+
+    private func saveTapped() {
+        let plan = SavedMealPlan(
+            breakfastEntries: mealPlan.recipes(for: .breakfast).map { PlanEntry(recipe: $0) },
+            lunchEntries: mealPlan.recipes(for: .lunch).map { PlanEntry(recipe: $0) },
+            dinnerEntries: mealPlan.recipes(for: .dinner).map { PlanEntry(recipe: $0) }
+        )
+        mealStore.saveMealPlan(plan)
+        // Wyczyść z kalendarza przepisy, których nie ma w nowym planie
+        // i zsynchronizuj flagi isSelected
+        mealStore.cleanupCalendarAndSync(with: plan)
+        dismiss()
+        mealPlan.savePlan()
+        onSave?()
+    }
 }
+
+// MARK: - Summary Row (oryginalny widok z +/-)
 
 private struct MealPlanSummaryRow: View {
     let recipe: Recipe
@@ -105,14 +131,8 @@ private struct MealPlanSummaryRow: View {
                     .lineLimit(1)
 
                 HStack(spacing: 8) {
-                    HStack(spacing: 3) {
-                        Image(systemName: "clock")
-                        Text("\(recipe.prepTimeMinutes) min")
-                    }
-                    HStack(spacing: 3) {
-                        Image(systemName: "flame.fill")
-                        Text("\(Int(recipe.nutritionPerServing.kcal)) kcal")
-                    }
+                    Label("\(recipe.prepTimeMinutes) min", systemImage: "clock")
+                    Label("\(Int(recipe.nutritionPerServing.kcal)) kcal", systemImage: "flame.fill")
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -120,10 +140,9 @@ private struct MealPlanSummaryRow: View {
 
             Spacer(minLength: 0)
 
+            // Licznik +/-
             HStack(spacing: 8) {
-                Button {
-                    onDecrement()
-                } label: {
+                Button { onDecrement() } label: {
                     Image(systemName: "minus.circle.fill")
                         .font(.title3)
                         .foregroundStyle(count <= 1 ? .gray : .red)
@@ -136,9 +155,7 @@ private struct MealPlanSummaryRow: View {
                     .monospacedDigit()
                     .frame(minWidth: 20)
 
-                Button {
-                    onIncrement()
-                } label: {
+                Button { onIncrement() } label: {
                     Image(systemName: "plus.circle.fill")
                         .font(.title3)
                         .foregroundStyle(canAdd ? .green : .gray)

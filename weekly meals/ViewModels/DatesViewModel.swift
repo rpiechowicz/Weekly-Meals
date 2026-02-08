@@ -73,6 +73,12 @@ class DatesViewModel {
         currentWeekOffset += 1
     }
     
+    /// Sprawdza czy data jest dzisiaj lub w przyszłości (można edytować)
+    func isEditable(_ date: Date) -> Bool {
+        let calendar = Calendar.current
+        return calendar.startOfDay(for: date) >= calendar.startOfDay(for: Date())
+    }
+
     /// Wraca do bieżącego tygodnia
     func goToCurrentWeek() {
         currentWeekOffset = 0
