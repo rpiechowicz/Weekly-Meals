@@ -15,6 +15,6 @@ struct TipTap<Content: View>: View {
             content()
         }
         .padding(14)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 }

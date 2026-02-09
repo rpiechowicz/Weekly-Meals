@@ -53,6 +53,10 @@ struct CalendarView: View {
                     recipes: mealStore.savedPlan.availableRecipes(for: slot),
                     recipeCounts: availableCounts(for: slot)
                 ) { selected in
+                    // Zwolnij poprzedni przepis z tego slotu (jeśli był)
+                    if let previous = recipe(for: slot) {
+                        mealStore.markAsAvailable(previous, slot: slot)
+                    }
                     mealStore.setRecipe(selected, for: datesViewModel.selectedDate, slot: slot)
                     mealStore.markAsSelected(selected, slot: slot)
                 }
@@ -90,14 +94,13 @@ struct CalendarView: View {
 
     private var pastDayBadge: some View {
         HStack(spacing: 4) {
-            Image(systemName: "lock.fill")
-            Text("Przeszły")
+            Image(systemName: "lock.circle.fill")
         }
-        .font(.caption)
+        .font(.title3)
+        .symbolRenderingMode(.hierarchical)
         .foregroundStyle(.secondary)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(.ultraThinMaterial, in: Capsule())
+        .padding(4)
+        .background(.ultraThinMaterial, in: Circle())
     }
 
     private var infoButton: some View {
@@ -108,13 +111,14 @@ struct CalendarView: View {
                 .font(.title3)
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(.secondary)
-                .padding(8)
+                .padding(4)
                 .background(.ultraThinMaterial, in: Circle())
         }
         .buttonStyle(.plain)
         .popover(isPresented: $showTipPopover, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
             infoPopoverContent
                 .padding()
+                .padding(.vertical, 8)
                 .presentationCompactAdaptation(.none)
         }
     }
@@ -187,16 +191,16 @@ struct CalendarView: View {
     private var mealList: some View {
         List {
             ForEach(MealSlot.allCases) { slot in
-                MealCardView(slot: slot, recipe: recipe(for: slot))
+                MealCardView(slot: slot, recipe: recipe(for: slot), isEditable: isDayEditable)
                     .contentShape(Rectangle())
                     .onTapGesture { handleTap(slot) }
-                    .swipeActions(edge: .trailing) {
+                    .swipeActions(edge: .leading) {
                         if recipe(for: slot) != nil && isDayEditable {
                             Button("Edytuj") { slotToPick = slot }
                                 .tint(slot.accentColor)
                         }
                     }
-                    .swipeActions(edge: .leading) {
+                    .swipeActions(edge: .trailing) {
                         if recipe(for: slot) != nil && isDayEditable {
                             Button("Usuń") { clearRecipe(for: slot) }
                                 .tint(.red)

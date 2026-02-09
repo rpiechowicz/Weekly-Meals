@@ -43,6 +43,7 @@ enum MealSlot: String, CaseIterable, Identifiable, Codable {
 struct MealCardView: View {
     let slot: MealSlot
     let recipe: Recipe? // nil => brak wybranego posiłku
+    var isEditable: Bool = true
     @Environment(\.colorScheme) var colorScheme
 
     private var isEmpty: Bool { recipe == nil }
@@ -155,8 +156,8 @@ struct MealCardView: View {
                 }
                 .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
                 .padding(.top, 2)
-            } else {
-                // Empty state inside card
+            } else if isEditable {
+                // Empty state — editable day
                 ZStack {
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
                         .stroke(style: StrokeStyle(lineWidth: 1, dash: [5]))
@@ -171,6 +172,18 @@ struct MealCardView: View {
                     }
                 }
                 .frame(height: 56)
+                .padding(.top, 2)
+            } else {
+                // Empty state — past day (non-editable)
+                HStack(spacing: 10) {
+                    Image(systemName: "minus.circle")
+                        .foregroundStyle(.tertiary)
+                    Text("Brak posiłku")
+                        .font(.subheadline)
+                        .foregroundStyle(.tertiary)
+                }
+                .frame(height: 56)
+                .frame(maxWidth: .infinity)
                 .padding(.top, 2)
             }
         }

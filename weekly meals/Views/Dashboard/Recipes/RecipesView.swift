@@ -43,11 +43,11 @@ struct RecipesView: View {
         NavigationStack {
             ZStack(alignment: .bottom) {
                 VStack(spacing: 0) {
-                    // Category Filters
-                    RecipeFilters(categories: categories, selectedCategory: $selectedCategory)
-
                     // Recipes List
                     ScrollView {
+                        // Category Filters
+                        RecipeFilters(categories: categories, selectedCategory: $selectedCategory)
+
                         if filteredRecipes.isEmpty {
                             VStack(spacing: 16) {
                                 Image(systemName: "fork.knife.circle")
@@ -80,7 +80,7 @@ struct RecipesView: View {
                                         RecipeItemView(
                                             recipe: recipe,
                                             isInPlanningMode: mealPlan.isActive,
-                                            isSelected: mealPlan.isActive && mealPlan.isSelected(recipe)
+                                            isSelected: mealPlan.isActive && mealPlan.selectedRecipeIDs.contains(recipe.id)
                                         )
                                     }
                                     .buttonStyle(.plain)
@@ -160,9 +160,7 @@ struct RecipesView: View {
                 .presentationDragIndicator(.visible)
             }
             .sheet(isPresented: $mealPlan.showSummarySheet) {
-                MealPlanSummarySheet(mealPlan: mealPlan) {
-                    mealPlan.exitPlanningMode()
-                }
+                MealPlanSummarySheet(mealPlan: mealPlan)
             }
             .alert(
                 "Limit osiągnięty",

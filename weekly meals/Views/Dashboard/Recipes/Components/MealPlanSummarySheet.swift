@@ -37,6 +37,7 @@ struct MealPlanSummarySheet: View {
                                     } label: {
                                         Label("Usuń", systemImage: "trash")
                                     }
+                                    .tint(.red)
                                 }
                             }
                         }

@@ -25,6 +25,15 @@ class MealPlanViewModel {
         breakfastRecipes.count + lunchRecipes.count + dinnerRecipes.count
     }
 
+    /// Zbiór ID wszystkich wybranych przepisów (do szybkiego sprawdzania w UI)
+    var selectedRecipeIDs: Set<UUID> {
+        Set(
+            breakfastRecipes.map(\.id) +
+            lunchRecipes.map(\.id) +
+            dinnerRecipes.map(\.id)
+        )
+    }
+
     // MARK: - Actions
 
     func isSelected(_ recipe: Recipe) -> Bool {
@@ -84,10 +93,10 @@ class MealPlanViewModel {
     }
 
     func loadFromSaved(_ plan: SavedMealPlan) {
+        isActive = true
         breakfastRecipes = plan.breakfastEntries.map(\.recipe)
         lunchRecipes = plan.lunchEntries.map(\.recipe)
         dinnerRecipes = plan.dinnerEntries.map(\.recipe)
-        isActive = true
     }
 
     func exitPlanningMode() {
