@@ -1,4 +1,4 @@
-import Foundation
+import SwiftUI
 
 struct ProductConstants {
     // Działy w sklepie (kategorie wysokiego poziomu)
@@ -224,5 +224,49 @@ struct ProductConstants {
             .filter { $0.value == department }
             .map { $0.key }
             .sorted()
+    }
+
+    // MARK: - Department Icon & Color
+
+    static func departmentIcon(for department: String) -> String {
+        switch department {
+        case Department.vegetables:    return "leaf.fill"
+        case Department.fruits:        return "carrot.fill"
+        case Department.meat:          return "fork.knife"
+        case Department.fish:          return "fish.fill"
+        case Department.bakery:        return "storefront.fill"
+        case Department.dairy:         return "cup.and.saucer.fill"
+        case Department.grains:        return "takeoutbag.and.cup.and.straw.fill"
+        case Department.canned:        return "shippingbox.fill"
+        case Department.beverages:     return "waterbottle.fill"
+        case Department.snacks:        return "bag.fill"
+        case Department.household:     return "sparkles"
+        case Department.frozen:        return "snowflake"
+        case Department.spices:        return "flame.fill"
+        case Department.oils:          return "drop.fill"
+        case Department.bakerySweets:  return "birthday.cake.fill"
+        default:                       return "basket.fill"
+        }
+    }
+
+    static func departmentColor(for department: String) -> Color {
+        switch department {
+        case Department.vegetables:    return .green
+        case Department.fruits:        return .red
+        case Department.meat:          return .brown
+        case Department.fish:          return .cyan
+        case Department.bakery:        return .orange
+        case Department.dairy:         return .blue
+        case Department.grains:        return .yellow
+        case Department.canned:        return .gray
+        case Department.beverages:     return .blue
+        case Department.snacks:        return .pink
+        case Department.household:     return .purple
+        case Department.frozen:        return .cyan
+        case Department.spices:        return .red
+        case Department.oils:          return .yellow
+        case Department.bakerySweets:  return .pink
+        default:                       return .secondary
+        }
     }
 }

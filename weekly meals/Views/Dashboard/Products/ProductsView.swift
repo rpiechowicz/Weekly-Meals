@@ -3,6 +3,7 @@ import SwiftUI
 struct ProductsView: View {
     @Environment(\.weeklyMealStore) private var mealStore
     @Environment(\.datesViewModel) private var datesViewModel
+    @Environment(\.colorScheme) private var colorScheme
     @State private var boughtItems: Set<String> = []
     @State private var showClearAlert = false
 
@@ -27,6 +28,11 @@ struct ProductsView: View {
 
     private var boughtCount: Int {
         shoppingItems.filter { isBought($0) }.count
+    }
+
+    private var progress: Double {
+        guard !shoppingItems.isEmpty else { return 0 }
+        return Double(boughtCount) / Double(shoppingItems.count)
     }
 
     // MARK: - Body
@@ -74,58 +80,171 @@ struct ProductsView: View {
     // MARK: - Shopping List
 
     private var shoppingList: some View {
-        List {
-            // Pasek postępu
-            if !shoppingItems.isEmpty {
-                Section {
-                    HStack {
-                        Text("\(boughtCount)/\(shoppingItems.count) kupione")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        if boughtCount == shoppingItems.count {
-                            Label("Gotowe!", systemImage: "checkmark.seal.fill")
-                                .font(.subheadline)
-                                .foregroundStyle(.green)
-                        }
-                    }
-                }
-            }
+        ScrollView {
+            VStack(spacing: 12) {
+                progressCard
 
-            ForEach(groupedByDepartment, id: \.department) { department, items in
-                Section(department) {
-                    ForEach(items) { item in
-                        shoppingRow(item)
-                    }
+                ForEach(groupedByDepartment, id: \.department) { department, items in
+                    departmentSection(department: department, items: items)
                 }
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .padding(.bottom, 16)
         }
+        .scrollContentBackground(.hidden)
+        .background(Color(.systemGroupedBackground))
     }
 
-    private func shoppingRow(_ item: ShoppingItem) -> some View {
+    // MARK: - Progress Card
+
+    private var progressCard: some View {
+        VStack(spacing: 12) {
+            HStack {
+                Image(systemName: "cart.fill")
+                    .font(.title3)
+                    .foregroundStyle(.green)
+
+                Text("Lista zakupów")
+                    .font(.headline)
+
+                Spacer()
+
+                Text("\(boughtCount) z \(shoppingItems.count)")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+
+            ProgressView(value: progress)
+                .tint(boughtCount == shoppingItems.count ? .green : .blue)
+                .scaleEffect(y: 1.5)
+
+            if boughtCount == shoppingItems.count {
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark.seal.fill")
+                    Text("Wszystko kupione!")
+                }
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundStyle(.green)
+                .frame(maxWidth: .infinity)
+                .padding(.top, 4)
+            }
+        }
+        .padding(16)
+        .myBackground()
+        .myBorderOverlay()
+    }
+
+    // MARK: - Department Section
+
+    private func departmentSection(department: String, items: [ShoppingItem]) -> some View {
+        let icon = ProductConstants.departmentIcon(for: department)
+        let color = ProductConstants.departmentColor(for: department)
+        let boughtInSection = items.filter { isBought($0) }.count
+        let allBought = boughtInSection == items.count
+
+        return VStack(alignment: .leading, spacing: 0) {
+            // Header
+            HStack(spacing: 10) {
+                ZStack {
+                    Circle()
+                        .fill(color.opacity(colorScheme == .dark ? 0.25 : 0.15))
+                    Image(systemName: icon)
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(color)
+                }
+                .frame(width: 28, height: 28)
+
+                Text(department)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(allBought ? .secondary : .primary)
+
+                Spacer()
+
+                Text("\(boughtInSection)/\(items.count)")
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundStyle(allBought ? .green : .secondary)
+                    .monospacedDigit()
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule()
+                            .fill(allBought
+                                  ? Color.green.opacity(colorScheme == .dark ? 0.2 : 0.1)
+                                  : Color(.tertiarySystemFill))
+                    )
+            }
+            .padding(.horizontal, 14)
+            .padding(.top, 14)
+            .padding(.bottom, 8)
+
+            // Items
+            VStack(spacing: 0) {
+                ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                    shoppingRow(item, color: color)
+
+                    if index < items.count - 1 {
+                        Divider()
+                            .padding(.leading, 44)
+                            .padding(.trailing, 14)
+                    }
+                }
+            }
+            .padding(.bottom, 6)
+        }
+        .myBackground()
+        .myBorderOverlay()
+    }
+
+    // MARK: - Shopping Row
+
+    private func shoppingRow(_ item: ShoppingItem, color: Color) -> some View {
         let bought = isBought(item)
 
-        return HStack(spacing: 12) {
-            Button {
+        return Button {
+            withAnimation(.easeInOut(duration: 0.2)) {
                 toggleBought(item)
-            } label: {
+            }
+        } label: {
+            HStack(spacing: 12) {
                 Image(systemName: bought ? "checkmark.circle.fill" : "circle")
                     .font(.title3)
-                    .foregroundStyle(bought ? .green : .secondary)
+                    .foregroundStyle(bought ? .green : Color(.tertiaryLabel))
+                    .contentTransition(.symbolEffect(.replace))
+
+                Text(item.name)
+                    .font(.subheadline)
+                    .fontWeight(bought ? .regular : .medium)
+                    .strikethrough(bought)
+                    .foregroundStyle(bought ? .secondary : .primary)
+                    .lineLimit(1)
+
+                Spacer(minLength: 4)
+
+                Text("\(item.formattedAmount) \(item.unit.rawValue)")
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundStyle(bought ? Color.secondary : color)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule()
+                            .fill(bought
+                                  ? Color(.tertiarySystemFill).opacity(0.5)
+                                  : color.opacity(colorScheme == .dark ? 0.18 : 0.1))
+                    )
             }
-            .buttonStyle(.plain)
-
-            Text(item.name)
-                .strikethrough(bought)
-                .foregroundStyle(bought ? .secondary : .primary)
-
-            Spacer()
-
-            Text("\(item.formattedAmount) \(item.unit.rawValue)")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .contentShape(Rectangle())
         }
-        .padding(.vertical, 2)
+        .buttonStyle(.plain)
     }
 
     // MARK: - Toolbar
