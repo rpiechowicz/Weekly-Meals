@@ -11,6 +11,8 @@ import SwiftUI
 struct weekly_mealsApp: App {
     @State private var mealStore = WeeklyMealStore()
     @State private var datesViewModel = DatesViewModel()
+    @State private var settingsStore = SettingsStore()
+    @State private var recipeCatalogStore = RecipeCatalogStore()
 
     var body: some Scene {
         WindowGroup {
@@ -18,6 +20,9 @@ struct weekly_mealsApp: App {
             DashboardView()
                 .environment(\.weeklyMealStore, mealStore)
                 .environment(\.datesViewModel, datesViewModel)
+                .environment(\.settingsStore, settingsStore)
+                .environment(\.recipeCatalogStore, recipeCatalogStore)
+                .preferredColorScheme(settingsStore.selectedTheme.colorScheme)
         }
     }
 }

@@ -328,3 +328,80 @@ extension EnvironmentValues {
         set { self[DatesViewModelKey.self] = newValue }
     }
 }
+
+// MARK: - Recipes Data Layer (MVP scaffolding)
+
+protocol RecipeRepository {
+    func fetchRecipes() async throws -> [Recipe]
+    func setFavorite(recipeId: UUID, isFavorite: Bool) async throws
+}
+
+@MainActor
+final class MockRecipeRepository: RecipeRepository {
+    private var recipes: [Recipe] = RecipesMock.all
+
+    func fetchRecipes() async throws -> [Recipe] {
+        recipes
+    }
+
+    func setFavorite(recipeId: UUID, isFavorite: Bool) async throws {
+        guard let index = recipes.firstIndex(where: { $0.id == recipeId }) else { return }
+        recipes[index].favourite = isFavorite
+    }
+}
+
+@MainActor
+@Observable
+final class RecipeCatalogStore {
+    private let repository: RecipeRepository
+    private(set) var recipes: [Recipe] = []
+    private(set) var didLoad: Bool = false
+    var isLoading: Bool = false
+    var errorMessage: String?
+
+    init(repository: RecipeRepository = MockRecipeRepository()) {
+        self.repository = repository
+    }
+
+    func loadIfNeeded() async {
+        guard !didLoad else { return }
+        await reload()
+    }
+
+    func reload() async {
+        isLoading = true
+        errorMessage = nil
+        do {
+            recipes = try await repository.fetchRecipes()
+            didLoad = true
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        isLoading = false
+    }
+
+    func toggleFavorite(recipeId: UUID) async {
+        guard let index = recipes.firstIndex(where: { $0.id == recipeId }) else { return }
+        let previous = recipes[index].favourite
+        let next = !previous
+
+        recipes[index].favourite = next
+        do {
+            try await repository.setFavorite(recipeId: recipeId, isFavorite: next)
+        } catch {
+            recipes[index].favourite = previous
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
+private struct RecipeCatalogStoreKey: EnvironmentKey {
+    @MainActor static let defaultValue = RecipeCatalogStore()
+}
+
+extension EnvironmentValues {
+    var recipeCatalogStore: RecipeCatalogStore {
+        get { self[RecipeCatalogStoreKey.self] }
+        set { self[RecipeCatalogStoreKey.self] = newValue }
+    }
+}

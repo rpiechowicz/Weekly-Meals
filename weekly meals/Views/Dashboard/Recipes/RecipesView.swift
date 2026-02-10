@@ -3,6 +3,7 @@ import SwiftUI
 struct RecipesView: View {
     @Environment(\.weeklyMealStore) private var mealStore
     @Environment(\.datesViewModel) private var datesViewModel
+    @Environment(\.recipeCatalogStore) private var recipeCatalogStore
     @State private var selectedCategory: RecipesCategory = .all
     @State private var searchText = ""
     @State private var selectedRecipe: Recipe?
@@ -11,12 +12,9 @@ struct RecipesView: View {
 
     private var categories: [RecipesCategory] = RecipesCategory.allCases
 
-    // Mock data - później zastąpisz prawdziwymi danymi
-    private var recipes = RecipesMock.all
-
     // Filtered recipes based on category and search
     private var filteredRecipes: [Recipe] {
-        var filtered = recipes
+        var filtered = recipeCatalogStore.recipes
 
         // Filter by category (handle favourites separately)
         switch selectedCategory {
@@ -106,6 +104,9 @@ struct RecipesView: View {
                 }
             }
             .navigationTitle("Przepisy")
+            .task {
+                await recipeCatalogStore.loadIfNeeded()
+            }
             .searchable(text: $searchText, prompt: "Szukaj przepisów")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -153,7 +154,15 @@ struct RecipesView: View {
             }
             .sheet(item: $selectedRecipe) { selected in
                 NavigationStack {
-                    RecipeDetailView(recipe: selected)
+                    RecipeDetailView(
+                        recipe: selected,
+                        onToggleFavorite: {
+                            Task {
+                                await recipeCatalogStore.toggleFavorite(recipeId: selected.id)
+                                selectedRecipe = recipeCatalogStore.recipes.first(where: { $0.id == selected.id })
+                            }
+                        }
+                    )
                         .navigationBarTitleDisplayMode(.inline)
                 }
                 .presentationDetents([.large])

@@ -3,6 +3,7 @@ import SwiftUI
 struct RecipeDetailView: View {
     @Environment(\.dismiss) private var dismiss
     let recipe: Recipe
+    var onToggleFavorite: (() -> Void)?
     
     private var placeholderHeader: some View {
         LinearGradient(
@@ -68,18 +69,17 @@ struct RecipeDetailView: View {
                                 Text(recipe.name)
                                     .font(.title)
                                     .fontWeight(.bold)
-                                
+
                                 Spacer()
-                                
-                                if recipe.favourite {
-                                    Image(systemName: "heart.fill")
+
+                                Button {
+                                    onToggleFavorite?()
+                                } label: {
+                                    Image(systemName: recipe.favourite ? "heart.fill" : "heart")
                                         .font(.title3)
-                                        .foregroundStyle(.red)
-                                } else {
-                                    Image(systemName: "heart")
-                                        .font(.title3)
-                                        .foregroundStyle(.gray)
+                                        .foregroundStyle(recipe.favourite ? .red : .gray)
                                 }
+                                .buttonStyle(.plain)
                             }
                             
                             Text(recipe.category.rawValue)
@@ -218,4 +218,3 @@ struct RecipeDetailView: View {
 #Preview("Recipe Detail") {
     RecipeDetailView(recipe: RecipesMock.chickenBowl)
 }
-
