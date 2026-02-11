@@ -4,13 +4,29 @@ struct RecipesView: View {
     @Environment(\.weeklyMealStore) private var mealStore
     @Environment(\.datesViewModel) private var datesViewModel
     @Environment(\.recipeCatalogStore) private var recipeCatalogStore
+    @Environment(\.shoppingListStore) private var shoppingListStore
     @State private var selectedCategory: RecipesCategory = .all
     @State private var searchText = ""
     @State private var selectedRecipe: Recipe?
     @State private var mealPlan = MealPlanViewModel()
     @State private var showDeletePlanAlert = false
+    @State private var showPastDayProtectionAlert = false
+    @State private var pastDayProtectionMessage = ""
 
     private var categories: [RecipesCategory] = RecipesCategory.allCases
+
+    private func pastDayAssignmentsCount(for recipe: Recipe) -> Int {
+        let pastDates = datesViewModel.dates.filter { !datesViewModel.isEditable($0) }
+        guard !pastDates.isEmpty else { return 0 }
+
+        return pastDates.reduce(into: 0) { result, date in
+            for slot in MealSlot.allCases {
+                if mealStore.recipe(for: date, slot: slot)?.id == recipe.id {
+                    result += 1
+                }
+            }
+        }
+    }
 
     // Filtered recipes based on category and search
     private var filteredRecipes: [Recipe] {
@@ -46,6 +62,15 @@ struct RecipesView: View {
                         // Category Filters
                         RecipeFilters(categories: categories, selectedCategory: $selectedCategory)
 
+                        if let errorMessage = recipeCatalogStore.errorMessage {
+                            Text(errorMessage)
+                                .font(.footnote)
+                                .foregroundStyle(.red)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 12)
+                                .padding(.top, 8)
+                        }
+
                         if filteredRecipes.isEmpty {
                             VStack(spacing: 16) {
                                 Image(systemName: "fork.knife.circle")
@@ -68,6 +93,14 @@ struct RecipesView: View {
                                 ForEach(filteredRecipes) { recipe in
                                     Button {
                                         if mealPlan.isActive {
+                                            if mealPlan.isSelected(recipe) {
+                                                let pastAssignments = pastDayAssignmentsCount(for: recipe)
+                                                if pastAssignments > 0 {
+                                                    pastDayProtectionMessage = "Nie możesz odznaczyć tego przepisu, bo jest przypisany do dnia z przeszłości (\(pastAssignments) raz(y)). Najpierw usuń go z tych dni w Kalendarzu."
+                                                    showPastDayProtectionAlert = true
+                                                    return
+                                                }
+                                            }
                                             withAnimation(.easeInOut(duration: 0.2)) {
                                                 mealPlan.toggleRecipe(recipe)
                                             }
@@ -186,12 +219,23 @@ struct RecipesView: View {
             }
             .alert("Usuń plan", isPresented: $showDeletePlanAlert) {
                 Button("Usuń", role: .destructive) {
-                    mealStore.clearSavedPlan()
-                    mealStore.clearWeek(dates: datesViewModel.dates)
+                    Task {
+                        await mealStore.clearWeekFromBackend(
+                            weekStart: datesViewModel.weekStartISO,
+                            dates: datesViewModel.dates
+                        )
+                        mealStore.clearSavedPlan()
+                        await shoppingListStore.load(weekStart: datesViewModel.weekStartISO, force: true)
+                    }
                 }
                 Button("Anuluj", role: .cancel) { }
             } message: {
                 Text("Czy na pewno chcesz usunąć zapisany plan posiłków? Usunie też przypisane posiłki z kalendarza.")
+            }
+            .alert("Nie można odznaczyć przepisu", isPresented: $showPastDayProtectionAlert) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(pastDayProtectionMessage)
             }
         }
     }

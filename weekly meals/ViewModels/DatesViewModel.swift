@@ -25,6 +25,23 @@ class DatesViewModel {
             calendar.date(byAdding: .day, value: dayOffset, to: monday)
         }
     }
+
+    /// `weekStart` w formacie backendowym `yyyy-MM-dd` (poniedziałek wybranego tygodnia)
+    var weekStartISO: String {
+        guard let monday = dates.first else {
+            return Self.weekStartFormatter.string(from: Date())
+        }
+        return Self.weekStartFormatter.string(from: monday)
+    }
+
+    private static let weekStartFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = .current
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
     
     /// Sprawdza czy podana data to dzisiaj
     func isToday(_ date: Date) -> Bool {

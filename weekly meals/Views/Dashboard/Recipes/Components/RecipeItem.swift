@@ -5,6 +5,8 @@ struct RecipeItemView: View {
     var isInPlanningMode: Bool = false
     var isSelected: Bool = false
     var badgeCount: Int = 0
+    var availabilityBadgeText: String? = nil
+    var availabilityBadgeColor: Color = .green
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -62,8 +64,29 @@ struct RecipeItemView: View {
                     .background(.thinMaterial, in: Capsule())
                     .padding(8)
 
-                // Count badge (bottom-right of image)
-                if badgeCount > 1 {
+                // Availability/count badge (bottom-right of image)
+                if let availabilityBadgeText {
+                    VStack {
+                        Spacer()
+                        HStack {
+                            Spacer()
+                            Text(availabilityBadgeText)
+                                .font(.caption)
+                                .fontWeight(.bold)
+                                .monospacedDigit()
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .background(availabilityBadgeColor, in: Capsule())
+                                .overlay(
+                                    Capsule()
+                                        .stroke(Color.white.opacity(0.28), lineWidth: 0.8)
+                                )
+                                .shadow(color: .black.opacity(0.25), radius: 3, x: 0, y: 1)
+                                .padding(8)
+                        }
+                    }
+                } else if badgeCount > 1 {
                     VStack {
                         Spacer()
                         HStack {

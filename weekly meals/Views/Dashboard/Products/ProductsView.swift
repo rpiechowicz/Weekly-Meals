@@ -1,23 +1,12 @@
 import SwiftUI
 
 struct ProductsView: View {
-    @Environment(\.weeklyMealStore) private var mealStore
+    @Environment(\.shoppingListStore) private var shoppingListStore
     @Environment(\.datesViewModel) private var datesViewModel
     @Environment(\.colorScheme) private var colorScheme
-    @State private var boughtItems: Set<String> = []
-    @State private var showClearAlert = false
-
-    // MARK: - Computed
-
-    private var weekRecipes: [Recipe] {
-        if mealStore.hasSavedPlan {
-            return mealStore.savedPlan.allRecipes()
-        }
-        return mealStore.allRecipes(for: datesViewModel.dates)
-    }
 
     private var shoppingItems: [ShoppingItem] {
-        Self.aggregateIngredients(from: weekRecipes)
+        shoppingListStore.items
     }
 
     private var groupedByDepartment: [(department: String, items: [ShoppingItem])] {
@@ -27,7 +16,7 @@ struct ProductsView: View {
     }
 
     private var boughtCount: Int {
-        shoppingItems.filter { isBought($0) }.count
+        shoppingItems.filter(\.isChecked).count
     }
 
     private var progress: Double {
@@ -35,53 +24,43 @@ struct ProductsView: View {
         return Double(boughtCount) / Double(shoppingItems.count)
     }
 
-    // MARK: - Body
-
     var body: some View {
         NavigationStack {
             Group {
-                if shoppingItems.isEmpty {
+                if shoppingListStore.isLoading && shoppingItems.isEmpty {
+                    ProgressView("Ładowanie listy zakupów...")
+                } else if shoppingItems.isEmpty {
                     emptyState
                 } else {
                     shoppingList
                 }
             }
             .navigationTitle("Produkty")
-            .toolbar {
-                if !shoppingItems.isEmpty {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        clearButton
-                    }
-                }
-            }
-            .alert("Wyczyść plan tygodnia", isPresented: $showClearAlert) {
-                Button("Anuluj", role: .cancel) { }
-                Button("Wyczyść", role: .destructive) {
-                    mealStore.clearWeek(dates: datesViewModel.dates)
-                    mealStore.clearSavedPlan()
-                    boughtItems.removeAll()
-                }
-            } message: {
-                Text("Czy na pewno chcesz usunąć plan posiłków na ten tydzień? Tej akcji nie można cofnąć.")
+            .task(id: datesViewModel.weekStartISO) {
+                await shoppingListStore.load(weekStart: datesViewModel.weekStartISO)
             }
         }
     }
-
-    // MARK: - Empty State
 
     private var emptyState: some View {
         ContentUnavailableView(
             "Brak produktów",
             systemImage: "basket",
-            description: Text("Zaplanuj posiłki w zakładce Przepisy, aby zobaczyć listę zakupów.")
+            description: Text("Brak pozycji dla tygodnia \(datesViewModel.weekStartISO).")
         )
     }
-
-    // MARK: - Shopping List
 
     private var shoppingList: some View {
         ScrollView {
             VStack(spacing: 12) {
+                if let errorMessage = shoppingListStore.errorMessage, !errorMessage.isEmpty {
+                    Text(errorMessage)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 4)
+                }
+
                 progressCard
 
                 ForEach(groupedByDepartment, id: \.department) { department, items in
@@ -95,8 +74,6 @@ struct ProductsView: View {
         .scrollContentBackground(.hidden)
         .background(Color(.systemGroupedBackground))
     }
-
-    // MARK: - Progress Card
 
     private var progressCard: some View {
         VStack(spacing: 12) {
@@ -121,7 +98,7 @@ struct ProductsView: View {
                 .tint(boughtCount == shoppingItems.count ? .green : .blue)
                 .scaleEffect(y: 1.5)
 
-            if boughtCount == shoppingItems.count {
+            if boughtCount == shoppingItems.count && !shoppingItems.isEmpty {
                 HStack(spacing: 6) {
                     Image(systemName: "checkmark.seal.fill")
                     Text("Wszystko kupione!")
@@ -138,16 +115,13 @@ struct ProductsView: View {
         .myBorderOverlay()
     }
 
-    // MARK: - Department Section
-
     private func departmentSection(department: String, items: [ShoppingItem]) -> some View {
         let icon = ProductConstants.departmentIcon(for: department)
         let color = ProductConstants.departmentColor(for: department)
-        let boughtInSection = items.filter { isBought($0) }.count
+        let boughtInSection = items.filter(\.isChecked).count
         let allBought = boughtInSection == items.count
 
         return VStack(alignment: .leading, spacing: 0) {
-            // Header
             HStack(spacing: 10) {
                 ZStack {
                     Circle()
@@ -175,16 +149,17 @@ struct ProductsView: View {
                     .padding(.vertical, 4)
                     .background(
                         Capsule()
-                            .fill(allBought
-                                  ? Color.green.opacity(colorScheme == .dark ? 0.2 : 0.1)
-                                  : Color(.tertiarySystemFill))
+                            .fill(
+                                allBought
+                                ? Color.green.opacity(colorScheme == .dark ? 0.2 : 0.1)
+                                : Color(.tertiarySystemFill)
+                            )
                     )
             }
             .padding(.horizontal, 14)
             .padding(.top, 14)
             .padding(.bottom, 8)
 
-            // Items
             VStack(spacing: 0) {
                 ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                     shoppingRow(item, color: color)
@@ -202,14 +177,14 @@ struct ProductsView: View {
         .myBorderOverlay()
     }
 
-    // MARK: - Shopping Row
-
     private func shoppingRow(_ item: ShoppingItem, color: Color) -> some View {
-        let bought = isBought(item)
+        let bought = item.isChecked
 
         return Button {
             withAnimation(.easeInOut(duration: 0.2)) {
-                toggleBought(item)
+                _ = Task {
+                    await shoppingListStore.toggleChecked(item)
+                }
             }
         } label: {
             HStack(spacing: 12) {
@@ -227,7 +202,7 @@ struct ProductsView: View {
 
                 Spacer(minLength: 4)
 
-                Text("\(item.formattedAmount) \(item.unit.rawValue)")
+                Text("\(item.formattedAmount) \(item.unit)")
                     .font(.caption)
                     .fontWeight(.medium)
                     .foregroundStyle(bought ? Color.secondary : color)
@@ -235,9 +210,11 @@ struct ProductsView: View {
                     .padding(.vertical, 4)
                     .background(
                         Capsule()
-                            .fill(bought
-                                  ? Color(.tertiarySystemFill).opacity(0.5)
-                                  : color.opacity(colorScheme == .dark ? 0.18 : 0.1))
+                            .fill(
+                                bought
+                                ? Color(.tertiarySystemFill).opacity(0.5)
+                                : color.opacity(colorScheme == .dark ? 0.18 : 0.1)
+                            )
                     )
             }
             .padding(.horizontal, 14)
@@ -247,76 +224,6 @@ struct ProductsView: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: - Toolbar
-
-    private var clearButton: some View {
-        Button {
-            showClearAlert = true
-        } label: {
-            Image(systemName: "trash")
-                .foregroundStyle(.red)
-        }
-    }
-
-    // MARK: - Bought State
-
-    private func itemKey(_ item: ShoppingItem) -> String {
-        "\(item.name)|\(item.unit.rawValue)"
-    }
-
-    private func isBought(_ item: ShoppingItem) -> Bool {
-        boughtItems.contains(itemKey(item))
-    }
-
-    private func toggleBought(_ item: ShoppingItem) {
-        let key = itemKey(item)
-        if boughtItems.contains(key) {
-            boughtItems.remove(key)
-        } else {
-            boughtItems.insert(key)
-        }
-    }
-
-    // MARK: - Aggregation
-
-    static func aggregateIngredients(from recipes: [Recipe]) -> [ShoppingItem] {
-        var aggregated: [String: ShoppingItem] = [:]
-
-        for recipe in recipes {
-            for ingredient in recipe.ingredients {
-                let key = "\(ingredient.name)|\(ingredient.unit.rawValue)"
-                if var existing = aggregated[key] {
-                    existing.totalAmount += ingredient.amount
-                    aggregated[key] = existing
-                } else {
-                    aggregated[key] = ShoppingItem(
-                        name: ingredient.name,
-                        totalAmount: ingredient.amount,
-                        unit: ingredient.unit,
-                        department: ProductConstants.department(for: ingredient.name)
-                    )
-                }
-            }
-        }
-
-        return aggregated.values.sorted { $0.name < $1.name }
-    }
-}
-
-// MARK: - ShoppingItem
-
-struct ShoppingItem: Identifiable {
-    let id = UUID()
-    var name: String
-    var totalAmount: Double
-    var unit: IngredientUnit
-    var department: String
-
-    var formattedAmount: String {
-        totalAmount.truncatingRemainder(dividingBy: 1) == 0
-            ? String(format: "%.0f", totalAmount)
-            : String(format: "%.1f", totalAmount)
-    }
 }
 
 #Preview {

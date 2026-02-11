@@ -6,6 +6,7 @@ struct MealPickerSheet: View {
     let slot: MealSlot
     let recipes: [Recipe]
     let recipeCounts: [UUID: Int]
+    let totalRecipeCounts: [UUID: Int]
     var onSelect: (Recipe) -> Void
 
     @State private var selectedCategory: RecipesCategory
@@ -13,10 +14,17 @@ struct MealPickerSheet: View {
 
     private var categories: [RecipesCategory] { RecipesCategory.allCases }
 
-    init(slot: MealSlot, recipes: [Recipe], recipeCounts: [UUID: Int] = [:], onSelect: @escaping (Recipe) -> Void) {
+    init(
+        slot: MealSlot,
+        recipes: [Recipe],
+        recipeCounts: [UUID: Int] = [:],
+        totalRecipeCounts: [UUID: Int] = [:],
+        onSelect: @escaping (Recipe) -> Void
+    ) {
         self.slot = slot
         self.recipes = recipes
         self.recipeCounts = recipeCounts
+        self.totalRecipeCounts = totalRecipeCounts
         self.onSelect = onSelect
         self._selectedCategory = State(initialValue: {
             switch slot {
@@ -85,14 +93,22 @@ struct MealPickerSheet: View {
                     } else {
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: 16)], spacing: 16) {
                             ForEach(filteredRecipes) { recipe in
-                                let count = recipeCounts[recipe.id] ?? 1
+                                let count = recipeCounts[recipe.id] ?? 0
+                                let total = totalRecipeCounts[recipe.id] ?? 1
                                 Button {
                                     onSelect(recipe)
                                     dismiss()
                                 } label: {
-                                    RecipeItemView(recipe: recipe, badgeCount: count)
+                                    RecipeItemView(
+                                        recipe: recipe,
+                                        badgeCount: 0,
+                                        availabilityBadgeText: "\(count)/\(total)",
+                                        availabilityBadgeColor: count > 0 ? .green : .orange
+                                    )
+                                    .opacity(count > 0 ? 1 : 0.55)
                                 }
                                 .buttonStyle(.plain)
+                                .disabled(count <= 0)
                             }
                         }
                         .padding(.horizontal, 16)

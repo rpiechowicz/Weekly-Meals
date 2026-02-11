@@ -27,12 +27,28 @@ struct CalendarView: View {
         mealStore.recipe(for: datesViewModel.selectedDate, slot: slot)
     }
 
-    private func availableCounts(for slot: MealSlot) -> [UUID: Int] {
+    private func availableCounts(for slot: MealSlot, includeCurrentFor date: Date? = nil) -> [UUID: Int] {
         var counts: [UUID: Int] = [:]
         for recipe in mealStore.savedPlan.availableRecipes(for: slot) {
             counts[recipe.id, default: 0] += 1
         }
+        if let date,
+           let current = mealStore.recipe(for: date, slot: slot) {
+            counts[current.id, default: 0] += 1
+        }
         return counts
+    }
+
+    private func totalCounts(for slot: MealSlot) -> [UUID: Int] {
+        var counts: [UUID: Int] = [:]
+        for entry in mealStore.savedPlan.entries(for: slot) {
+            counts[entry.recipe.id, default: 0] += 1
+        }
+        return counts
+    }
+
+    private func pickerRecipes(for slot: MealSlot) -> [Recipe] {
+        mealStore.savedPlan.entries(for: slot).map(\.recipe)
     }
 
     // MARK: - Body
@@ -43,22 +59,52 @@ struct CalendarView: View {
                 @Bindable var bindableDates = datesViewModel
                 DatesView(datesViewModal: bindableDates)
 
+                if let errorMessage = mealStore.errorMessage, !errorMessage.isEmpty {
+                    Text(errorMessage)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                        .padding(.horizontal, 20)
+                        .padding(.top, 4)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
                 dayHeader
                 mealList
             }
             .navigationTitle("Kalendarz")
+            .task(id: datesViewModel.weekStartISO) {
+                await mealStore.loadWeekPlanFromBackend(
+                    weekStart: datesViewModel.weekStartISO,
+                    dates: datesViewModel.dates
+                )
+            }
             .sheet(item: $slotToPick) { slot in
                 MealPickerSheet(
                     slot: slot,
-                    recipes: mealStore.savedPlan.availableRecipes(for: slot),
-                    recipeCounts: availableCounts(for: slot)
+                    recipes: pickerRecipes(for: slot),
+                    recipeCounts: availableCounts(for: slot, includeCurrentFor: datesViewModel.selectedDate),
+                    totalRecipeCounts: totalCounts(for: slot)
                 ) { selected in
                     // Zwolnij poprzedni przepis z tego slotu (jeśli był)
-                    if let previous = recipe(for: slot) {
+                    let previous = recipe(for: slot)
+                    if let previous {
                         mealStore.markAsAvailable(previous, slot: slot)
                     }
-                    mealStore.setRecipe(selected, for: datesViewModel.selectedDate, slot: slot)
                     mealStore.markAsSelected(selected, slot: slot)
+                    Task {
+                        let success = await mealStore.upsertWeekSlot(
+                            recipe: selected,
+                            for: datesViewModel.selectedDate,
+                            slot: slot,
+                            weekStart: datesViewModel.weekStartISO
+                        )
+                        if !success {
+                            mealStore.markAsAvailable(selected, slot: slot)
+                            if let previous {
+                                mealStore.markAsSelected(previous, slot: slot)
+                            }
+                        }
+                    }
                 }
             }
             .sheet(item: $detailRecipe) { recipe in
@@ -227,13 +273,19 @@ struct CalendarView: View {
     }
 
     private func clearRecipe(for slot: MealSlot) {
-        if let recipe = recipe(for: slot) {
-            mealStore.markAsAvailable(recipe, slot: slot)
+        let previous = recipe(for: slot)
+        if let previous {
+            mealStore.markAsAvailable(previous, slot: slot)
         }
-        var transaction = Transaction()
-        transaction.disablesAnimations = true
-        withTransaction(transaction) {
-            mealStore.clearRecipe(for: datesViewModel.selectedDate, slot: slot)
+        Task {
+            let success = await mealStore.removeWeekSlot(
+                for: datesViewModel.selectedDate,
+                slot: slot,
+                weekStart: datesViewModel.weekStartISO
+            )
+            if !success, let previous {
+                mealStore.markAsSelected(previous, slot: slot)
+            }
         }
     }
 }

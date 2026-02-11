@@ -6,9 +6,20 @@ struct MealPlanSummarySheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.weeklyMealStore) private var mealStore
     @Environment(\.datesViewModel) private var datesViewModel
+    @Environment(\.shoppingListStore) private var shoppingListStore
+    @State private var showProtectedRecipeAlert = false
+    @State private var protectedRecipeAlertMessage = ""
 
     private var canSave: Bool {
         mealPlan.totalCount > 0
+    }
+
+    private func usedCount(for recipe: Recipe, slot: MealSlot) -> Int {
+        datesViewModel.dates.reduce(into: 0) { result, date in
+            if mealStore.recipe(for: date, slot: slot)?.id == recipe.id {
+                result += 1
+            }
+        }
     }
 
     var body: some View {
@@ -21,23 +32,39 @@ struct MealPlanSummarySheet: View {
                             emptyRow
                         } else {
                             ForEach(unique) { recipe in
+                                let inUse = usedCount(for: recipe, slot: slot)
+                                let recipeCount = mealPlan.recipeCount(recipe)
                                 MealPlanSummaryRow(
                                     recipe: recipe,
                                     slot: slot,
-                                    count: mealPlan.recipeCount(recipe),
-                                    canAdd: mealPlan.canAdd(to: slot),
-                                    onIncrement: { mealPlan.incrementRecipe(recipe) },
-                                    onDecrement: { mealPlan.decrementRecipe(recipe) }
+                                    count: recipeCount,
+                                    minCount: inUse
                                 )
-                                .swipeActions(edge: .trailing) {
-                                    Button(role: .destructive) {
+                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                    Button {
                                         withAnimation {
-                                            mealPlan.toggleRecipe(recipe)
+                                            mealPlan.incrementRecipe(recipe)
                                         }
                                     } label: {
-                                        Label("Usuń", systemImage: "trash")
+                                        Label("Dodaj", systemImage: "plus")
                                     }
-                                    .tint(.red)
+                                    .tint(.green)
+                                    .disabled(!mealPlan.canAdd(to: slot))
+                                }
+                                .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                                    Button {
+                                        withAnimation {
+                                            if mealPlan.recipeCount(recipe) > inUse {
+                                                mealPlan.decrementRecipe(recipe)
+                                            } else {
+                                                protectedRecipeAlertMessage = "Nie możesz odjąć tego przepisu, bo jest już przypisany w kalendarzu (\(inUse) raz(y)). Najpierw usuń go z dnia w Kalendarzu."
+                                                showProtectedRecipeAlert = true
+                                            }
+                                        }
+                                    } label: {
+                                        Label("Odejmij", systemImage: "minus")
+                                    }
+                                    .tint(.orange)
                                 }
                             }
                         }
@@ -68,6 +95,11 @@ struct MealPlanSummarySheet: View {
                         .disabled(!canSave)
                 }
             }
+            .alert("Nie można odjąć przepisu", isPresented: $showProtectedRecipeAlert) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(protectedRecipeAlertMessage)
+            }
         }
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
@@ -95,9 +127,12 @@ struct MealPlanSummarySheet: View {
             dinnerEntries: mealPlan.recipes(for: .dinner).map { PlanEntry(recipe: $0) }
         )
         mealStore.saveMealPlan(plan)
-        // Wyczyść z kalendarza przepisy, których nie ma w nowym planie
-        // i zsynchronizuj flagi isSelected
+        // Aktualizacja planu nie może automatycznie przypisywać posiłków do kolejnych dni.
+        // Dni ustawiamy wyłącznie ręcznie w CalendarView.
         mealStore.cleanupCalendarAndSync(with: plan)
+        Task {
+            await shoppingListStore.load(weekStart: datesViewModel.weekStartISO, force: true)
+        }
         dismiss()
         mealPlan.savePlan()
         onSave?()
@@ -110,61 +145,110 @@ private struct MealPlanSummaryRow: View {
     let recipe: Recipe
     let slot: MealSlot
     let count: Int
-    let canAdd: Bool
-    let onIncrement: () -> Void
-    let onDecrement: () -> Void
+    let minCount: Int
+    
+    private var freeCount: Int {
+        max(0, count - minCount)
+    }
 
     var body: some View {
-        HStack(spacing: 12) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(slot.accentColor.opacity(0.15))
-                Image(systemName: "fork.knife.circle.fill")
-                    .font(.title3)
-                    .foregroundStyle(slot.accentColor)
+        HStack(alignment: .top, spacing: 12) {
+            Group {
+                if let imageURL = recipe.imageURL {
+                    AsyncImage(url: imageURL) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                        case .empty:
+                            ProgressView()
+                        case .failure:
+                            Image(systemName: "fork.knife.circle.fill")
+                                .font(.title3)
+                                .foregroundStyle(slot.accentColor)
+                        @unknown default:
+                            Image(systemName: "fork.knife.circle.fill")
+                                .font(.title3)
+                                .foregroundStyle(slot.accentColor)
+                        }
+                    }
+                } else {
+                    Image(systemName: "fork.knife.circle.fill")
+                        .font(.title3)
+                        .foregroundStyle(slot.accentColor)
+                }
             }
-            .frame(width: 40, height: 40)
+            .frame(width: 54, height: 54)
+            .background(Color(.secondarySystemFill))
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(recipe.name)
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                    .lineLimit(1)
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(recipe.name)
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .lineLimit(1)
+                    Spacer(minLength: 8)
+                    HStack(spacing: 4) {
+                        Image(systemName: "number")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        Text("\(count)")
+                            .font(.subheadline)
+                            .fontWeight(.bold)
+                            .monospacedDigit()
+                            .foregroundStyle(.primary)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule()
+                            .fill(Color(.tertiarySystemFill))
+                    )
+                    .overlay(
+                        Capsule()
+                            .stroke(Color.white.opacity(0.08), lineWidth: 0.8)
+                    )
+                }
 
-                HStack(spacing: 8) {
-                    Label("\(recipe.prepTimeMinutes) min", systemImage: "clock")
-                    Label("\(Int(recipe.nutritionPerServing.kcal)) kcal", systemImage: "flame.fill")
+                HStack(spacing: 10) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "clock")
+                        Text("\(recipe.prepTimeMinutes) min")
+                    }
+                    HStack(spacing: 4) {
+                        Image(systemName: "flame.fill")
+                        Text("\(Int(recipe.nutritionPerServing.kcal)) kcal")
+                    }
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            }
 
-            Spacer(minLength: 0)
-
-            // Licznik +/-
-            HStack(spacing: 8) {
-                Button { onDecrement() } label: {
-                    Image(systemName: "minus.circle.fill")
-                        .font(.title3)
-                        .foregroundStyle(count <= 1 ? .gray : .red)
+                HStack(spacing: 6) {
+                    statusChip(title: "Przypisane", value: minCount, color: .orange)
+                    statusChip(title: "Wolne", value: freeCount, color: freeCount > 0 ? .green : .orange)
                 }
-                .disabled(count <= 1)
-
-                Text("\(count)")
-                    .font(.subheadline)
-                    .fontWeight(.bold)
-                    .monospacedDigit()
-                    .frame(minWidth: 20)
-
-                Button { onIncrement() } label: {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.title3)
-                        .foregroundStyle(canAdd ? .green : .gray)
-                }
-                .disabled(!canAdd)
             }
-            .buttonStyle(.plain)
         }
+        .padding(.vertical, 8)
+    }
+
+    @ViewBuilder
+    private func statusChip(title: String, value: Int, color: Color) -> some View {
+        HStack(spacing: 4) {
+            Text(title)
+            Text("\(value)")
+                .monospacedDigit()
+                .fontWeight(.semibold)
+        }
+        .font(.caption2)
+        .foregroundStyle(color)
+        .padding(.horizontal, 8)
         .padding(.vertical, 4)
+        .background(
+            Capsule()
+                .fill(color.opacity(0.14))
+        )
     }
 }
