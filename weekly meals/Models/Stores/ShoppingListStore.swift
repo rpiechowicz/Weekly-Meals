@@ -4,11 +4,13 @@ import Observation
 protocol ShoppingListRepository {
     func fetchShoppingList(weekStart: String) async throws -> [ShoppingItem]
     func setChecked(weekStart: String, productKey: String, isChecked: Bool) async throws
+    func observeShoppingListChanges(_ onChange: @escaping (_ weekStart: String) -> Void)
 }
 
 protocol ShoppingListTransportClient {
     func fetchShoppingList(weekStart: String) async throws -> [BackendShoppingItemDTO]
     func setChecked(weekStart: String, productKey: String, isChecked: Bool) async throws
+    func observeShoppingListChanges(_ onChange: @escaping (_ weekStart: String) -> Void)
 }
 
 struct BackendShoppingItemDTO: Codable {
@@ -27,6 +29,13 @@ struct BackendHouseholdDTO: Codable {
 
 struct BackendShoppingItemCheckDTO: Codable {
     let id: String
+    let productKey: String
+    let isChecked: Bool
+}
+
+struct BackendShoppingListChangedDTO: Codable {
+    let householdId: String
+    let weekStart: String
     let productKey: String
     let isChecked: Bool
 }
@@ -134,6 +143,25 @@ final class WebSocketShoppingListTransportClient: ShoppingListTransportClient {
         }
         throw RecipeDataError.serverError(message: envelope.error ?? "Nieznany błąd weeklyPlans:setShoppingItemChecked.")
     }
+
+    func observeShoppingListChanges(_ onChange: @escaping (_ weekStart: String) -> Void) {
+        socket.off(event: "weeklyPlans:shoppingListChanged")
+        socket.on(event: "weeklyPlans:shoppingListChanged") { [weak self] items in
+            guard let self else { return }
+            guard let first = items.first,
+                  JSONSerialization.isValidJSONObject(first),
+                  let data = try? JSONSerialization.data(withJSONObject: first),
+                  let event = try? JSONDecoder().decode(BackendShoppingListChangedDTO.self, from: data)
+            else { return }
+
+            let expectedHouseholdId = self.resolvedHouseholdId ?? self.householdId
+            if let expectedHouseholdId, event.householdId != expectedHouseholdId {
+                return
+            }
+
+            onChange(event.weekStart)
+        }
+    }
 }
 
 final class ApiShoppingListRepository: ShoppingListRepository {
@@ -151,6 +179,10 @@ final class ApiShoppingListRepository: ShoppingListRepository {
     func setChecked(weekStart: String, productKey: String, isChecked: Bool) async throws {
         try await client.setChecked(weekStart: weekStart, productKey: productKey, isChecked: isChecked)
     }
+
+    func observeShoppingListChanges(_ onChange: @escaping (_ weekStart: String) -> Void) {
+        client.observeShoppingListChanges(onChange)
+    }
 }
 
 @MainActor
@@ -164,6 +196,13 @@ final class ShoppingListStore {
 
     init(repository: ShoppingListRepository) {
         self.repository = repository
+        self.repository.observeShoppingListChanges { [weak self] changedWeekStart in
+            guard let self else { return }
+            Task { @MainActor in
+                guard let currentWeekStart = self.weekStart, currentWeekStart == changedWeekStart else { return }
+                await self.load(weekStart: currentWeekStart, force: true)
+            }
+        }
     }
 
     func load(weekStart: String, force: Bool = false) async {

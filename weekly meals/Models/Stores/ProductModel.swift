@@ -15,6 +15,7 @@ enum ProductCategory: String, CaseIterable, Codable {
     case frozen = "Mrożonki"
     case spices = "Przyprawy i sosy"
     case oils = "Olej i tłuszcze"
+    case alcohols = "Alkohole"
     case bakerySweets = "Cukiernia"
     case other = "Inne"
     
@@ -39,6 +40,7 @@ extension ProductCategory {
         case .frozen: return ProductConstants.Department.frozen
         case .spices: return ProductConstants.Department.spices
         case .oils: return ProductConstants.Department.oils
+        case .alcohols: return ProductConstants.Department.alcohols
         case .bakerySweets: return ProductConstants.Department.bakerySweets
         case .other: return ProductConstants.Department.other
         }
@@ -87,6 +89,7 @@ struct Product: Identifiable, Hashable, Codable {
             case ProductConstants.Department.frozen: return .frozen
             case ProductConstants.Department.spices: return .spices
             case ProductConstants.Department.oils: return .oils
+            case ProductConstants.Department.alcohols: return .alcohols
             case ProductConstants.Department.bakerySweets: return .bakerySweets
             default: return .other
             }

@@ -10,8 +10,45 @@ struct ProductsView: View {
     }
 
     private var groupedByDepartment: [(department: String, items: [ShoppingItem])] {
-        Dictionary(grouping: shoppingItems, by: \.department)
-            .sorted { $0.key < $1.key }
+        let departmentOrder: [String: Int] = [
+            ProductConstants.Department.vegetables: 1,
+            ProductConstants.Department.fruits: 2,
+            ProductConstants.Department.meat: 3,
+            ProductConstants.Department.fish: 4,
+            ProductConstants.Department.dairy: 5,
+            ProductConstants.Department.bakery: 6,
+            ProductConstants.Department.grains: 7,
+            ProductConstants.Department.canned: 8,
+            ProductConstants.Department.spices: 9,
+            ProductConstants.Department.oils: 10,
+            ProductConstants.Department.alcohols: 11,
+            ProductConstants.Department.beverages: 12,
+            ProductConstants.Department.snacks: 13,
+            ProductConstants.Department.frozen: 14,
+            ProductConstants.Department.bakerySweets: 15,
+            ProductConstants.Department.household: 16,
+            ProductConstants.Department.other: 99
+        ]
+        let normalizedOther = ProductConstants.Department.other
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+
+        return Dictionary(grouping: shoppingItems, by: \.department)
+            .sorted {
+                let leftKey = $0.key.trimmingCharacters(in: .whitespacesAndNewlines)
+                let rightKey = $1.key.trimmingCharacters(in: .whitespacesAndNewlines)
+
+                let leftIsOther = leftKey.lowercased() == normalizedOther
+                let rightIsOther = rightKey.lowercased() == normalizedOther
+                if leftIsOther != rightIsOther {
+                    return !leftIsOther
+                }
+
+                let leftRank = departmentOrder[leftKey] ?? 999
+                let rightRank = departmentOrder[rightKey] ?? 999
+                if leftRank != rightRank { return leftRank < rightRank }
+                return leftKey < rightKey
+            }
             .map { (department: $0.key, items: $0.value) }
     }
 

@@ -73,6 +73,7 @@ struct CalendarView: View {
             }
             .navigationTitle("Kalendarz")
             .task(id: datesViewModel.weekStartISO) {
+                await mealStore.loadSavedPlanFromBackend(weekStart: datesViewModel.weekStartISO)
                 await mealStore.loadWeekPlanFromBackend(
                     weekStart: datesViewModel.weekStartISO,
                     dates: datesViewModel.dates

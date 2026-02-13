@@ -92,6 +92,9 @@ class WeeklyMealStore {
     private(set) var plans: [String: DayMealPlan] = [:]
     private(set) var savedPlan: SavedMealPlan = SavedMealPlan()
     private let weeklyPlanRepository: WeeklyPlanRepository?
+    private var observedWeekStart: String?
+    private var observedWeekDates: [Date] = []
+    private var observedSavedPlanWeekStart: String?
     var errorMessage: String?
 
     var hasSavedPlan: Bool { !savedPlan.isEmpty }
@@ -113,6 +116,18 @@ class WeeklyMealStore {
 
     init(weeklyPlanRepository: WeeklyPlanRepository? = nil) {
         self.weeklyPlanRepository = weeklyPlanRepository
+        self.weeklyPlanRepository?.observeWeekPlanChanges { [weak self] weekStart in
+            guard let self else { return }
+            Task { @MainActor in
+                await self.handleRemoteWeekPlanChanged(weekStart: weekStart)
+            }
+        }
+        self.weeklyPlanRepository?.observeSavedPlanChanges { [weak self] weekStart in
+            guard let self else { return }
+            Task { @MainActor in
+                await self.handleRemoteSavedPlanChanged(weekStart: weekStart)
+            }
+        }
         load()
         loadSavedPlan()
     }
@@ -157,6 +172,8 @@ class WeeklyMealStore {
     @MainActor
     func loadWeekPlanFromBackend(weekStart: String, dates: [Date]) async {
         guard let weeklyPlanRepository else { return }
+        observedWeekStart = weekStart
+        observedWeekDates = dates
         do {
             let slots = try await weeklyPlanRepository.fetchWeekPlan(weekStart: weekStart)
             clearWeek(dates: dates)
@@ -300,6 +317,109 @@ class WeeklyMealStore {
 
     func clearSavedPlan() {
         savedPlan = SavedMealPlan()
+        saveSavedPlan()
+    }
+
+    @MainActor
+    func loadSavedPlanFromBackend(weekStart: String) async {
+        guard let weeklyPlanRepository else { return }
+        observedSavedPlanWeekStart = weekStart
+        do {
+            let dto = try await weeklyPlanRepository.fetchSavedPlan(weekStart: weekStart)
+            let mapped = mapSavedPlan(dto: dto)
+            savedPlan = mapped
+            syncSavedPlanSelectionFlagsWithCalendar()
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    func saveMealPlanToBackend(_ plan: SavedMealPlan, weekStart: String) async {
+        saveMealPlan(plan)
+        guard let weeklyPlanRepository else { return }
+
+        do {
+            let breakfast = plan.breakfastEntries.map { $0.recipe.id.uuidString }
+            let lunch = plan.lunchEntries.map { $0.recipe.id.uuidString }
+            let dinner = plan.dinnerEntries.map { $0.recipe.id.uuidString }
+            let dto = try await weeklyPlanRepository.saveSavedPlan(
+                weekStart: weekStart,
+                breakfastRecipeIds: breakfast,
+                lunchRecipeIds: lunch,
+                dinnerRecipeIds: dinner
+            )
+            let mapped = mapSavedPlan(dto: dto)
+            savedPlan = mapped
+            cleanupCalendarAndSync(with: mapped)
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    func clearSavedPlanFromBackend(weekStart: String) async {
+        await saveMealPlanToBackend(SavedMealPlan(), weekStart: weekStart)
+    }
+
+    /// Resetuje lokalny cache planów i zapisany plan.
+    /// Używane przy zmianie kontekstu gospodarstwa, aby nie przenosić starych danych.
+    func resetLocalPlanningState() {
+        plans = [:]
+        savedPlan = SavedMealPlan()
+        observedWeekStart = nil
+        observedWeekDates = []
+        observedSavedPlanWeekStart = nil
+        save()
+        saveSavedPlan()
+    }
+
+    @MainActor
+    private func handleRemoteWeekPlanChanged(weekStart: String) async {
+        guard weekStart == observedWeekStart else { return }
+        guard !observedWeekDates.isEmpty else { return }
+        await loadWeekPlanFromBackend(weekStart: weekStart, dates: observedWeekDates)
+    }
+
+    @MainActor
+    private func handleRemoteSavedPlanChanged(weekStart: String) async {
+        guard weekStart == observedSavedPlanWeekStart else { return }
+        await loadSavedPlanFromBackend(weekStart: weekStart)
+    }
+
+    private func mapSavedPlan(dto: BackendSharedMealPlanDTO) -> SavedMealPlan {
+        func expand(mealType: String) -> [PlanEntry] {
+            dto.items
+                .filter { $0.mealType.uppercased() == mealType }
+                .flatMap { item -> [PlanEntry] in
+                    guard let recipe = item.recipe.toAppRecipe(), item.quantity > 0 else { return [] }
+                    return Array(repeating: PlanEntry(recipe: recipe), count: item.quantity)
+                }
+        }
+
+        return SavedMealPlan(
+            breakfastEntries: expand(mealType: "BREAKFAST"),
+            lunchEntries: expand(mealType: "LUNCH"),
+            dinnerEntries: expand(mealType: "DINNER")
+        )
+    }
+
+    private func syncSavedPlanSelectionFlagsWithCalendar() {
+        var usedBreakfast: [UUID: Int] = [:]
+        var usedLunch: [UUID: Int] = [:]
+        var usedDinner: [UUID: Int] = [:]
+
+        for dayPlan in plans.values {
+            if let b = dayPlan.breakfast { usedBreakfast[b.id, default: 0] += 1 }
+            if let l = dayPlan.lunch { usedLunch[l.id, default: 0] += 1 }
+            if let d = dayPlan.dinner { usedDinner[d.id, default: 0] += 1 }
+        }
+
+        syncEntries(&savedPlan.breakfastEntries, usedCounts: usedBreakfast)
+        syncEntries(&savedPlan.lunchEntries, usedCounts: usedLunch)
+        syncEntries(&savedPlan.dinnerEntries, usedCounts: usedDinner)
         saveSavedPlan()
     }
 
@@ -489,22 +609,28 @@ extension EnvironmentValues {
 // MARK: - Recipes Data Layer (MVP scaffolding)
 
 protocol RecipeRepository {
-    func fetchRecipes() async throws -> [Recipe]
+    func fetchRecipes(page: Int, limit: Int) async throws -> [Recipe]
+    func fetchRecipeById(_ recipeId: UUID) async throws -> Recipe
     func setFavorite(recipeId: UUID, isFavorite: Bool) async throws
 }
 
 protocol RecipeTransportClient {
-    func fetchRecipes() async throws -> [BackendRecipeDTO]
+    func fetchRecipes(page: Int, limit: Int) async throws -> [BackendRecipeDTO]
+    func fetchRecipeById(recipeId: String) async throws -> BackendRecipeDTO
     func setFavorite(recipeId: String, isFavorite: Bool) async throws
 }
 
 protocol RecipeSocketClient {
     func emitWithAck<T: Decodable>(event: String, payload: [String: Any], as: T.Type) async throws -> T
+    func on(event: String, handler: @escaping ([Any]) -> Void)
+    func off(event: String)
 }
 
 final class SocketIORecipeSocketClient: RecipeSocketClient {
     private let manager: SocketManager
     private let socket: SocketIOClient
+    private let ackTimeoutSeconds: Double = 6
+    private let maxAckAttempts: Int = 3
 
     init(baseURL: URL) {
         self.manager = SocketManager(
@@ -534,9 +660,9 @@ final class SocketIORecipeSocketClient: RecipeSocketClient {
         throw RecipeDataError.serverError(message: "Brak połączenia WebSocket z serwerem.")
     }
 
-    private func requestAck(event: String, payload: [String: Any]) async throws -> [Any] {
+    private func requestAck(event: String, payload: [String: Any], timeout: Double) async throws -> [Any] {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<[Any], Error>) in
-            socket.emitWithAck(event, payload).timingOut(after: 10) { items in
+            socket.emitWithAck(event, payload).timingOut(after: timeout) { items in
                 if let first = items.first as? String, first == "NO ACK" {
                     continuation.resume(throwing: RecipeDataError.serverError(message: "Brak ACK dla eventu \(event)."))
                     return
@@ -547,37 +673,56 @@ final class SocketIORecipeSocketClient: RecipeSocketClient {
     }
 
     func emitWithAck<T: Decodable>(event: String, payload: [String: Any], as: T.Type) async throws -> T {
-        try await ensureConnected()
+        var lastError: Error?
 
-        let raw: [Any]
-        do {
-            raw = try await requestAck(event: event, payload: payload)
-        } catch {
-            // Jednorazowy retry po krótkiej pauzie (częsty przypadek: event wysłany tuż po reconnect).
-            try await Task.sleep(nanoseconds: 250_000_000)
-            try await ensureConnected()
-            raw = try await requestAck(event: event, payload: payload)
-        }
+        for attempt in 1...maxAckAttempts {
+            do {
+                try await ensureConnected()
+                let raw = try await requestAck(event: event, payload: payload, timeout: ackTimeoutSeconds)
 
-        guard let first = raw.first else {
-            throw RecipeDataError.serverError(message: "Pusta odpowiedź dla eventu \(event).")
-        }
-        guard JSONSerialization.isValidJSONObject(first) else {
-            throw RecipeDataError.serverError(message: "Nieprawidłowy format odpowiedzi dla eventu \(event).")
-        }
+                guard let first = raw.first else {
+                    throw RecipeDataError.serverError(message: "Pusta odpowiedź dla eventu \(event).")
+                }
+                guard JSONSerialization.isValidJSONObject(first) else {
+                    throw RecipeDataError.serverError(message: "Nieprawidłowy format odpowiedzi dla eventu \(event).")
+                }
 
-        let payloadObject = first
-        return try await withCheckedThrowingContinuation { continuation in
-            DispatchQueue.global(qos: .utility).async {
-                do {
-                    let data = try JSONSerialization.data(withJSONObject: payloadObject)
-                    let decoded = try JSONDecoder().decode(T.self, from: data)
-                    continuation.resume(returning: decoded)
-                } catch {
-                    continuation.resume(throwing: error)
+                let payloadObject = first
+                return try await withCheckedThrowingContinuation { continuation in
+                    DispatchQueue.global(qos: .utility).async {
+                        do {
+                            let data = try JSONSerialization.data(withJSONObject: payloadObject)
+                            let decoded = try JSONDecoder().decode(T.self, from: data)
+                            continuation.resume(returning: decoded)
+                        } catch {
+                            continuation.resume(throwing: error)
+                        }
+                    }
+                }
+            } catch {
+                lastError = error
+                if attempt < maxAckAttempts {
+                    let backoffMs = UInt64(250 * attempt)
+                    try await Task.sleep(nanoseconds: backoffMs * 1_000_000)
+                    continue
                 }
             }
         }
+
+        if let lastError {
+            throw lastError
+        }
+        throw RecipeDataError.serverError(message: "Nie udało się wykonać eventu \(event).")
+    }
+
+    func on(event: String, handler: @escaping ([Any]) -> Void) {
+        socket.on(event) { data, _ in
+            handler(data)
+        }
+    }
+
+    func off(event: String) {
+        socket.off(event)
     }
 }
 
@@ -635,6 +780,49 @@ struct BackendRecipeDTO: Codable {
     let isFavorite: Bool?
     let ingredients: [BackendRecipeIngredientDTO]
     let sourceInstructions: [BackendRecipeInstructionDTO]?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case title
+        case description
+        case mealType
+        case difficulty
+        case prepTimeMinutes
+        case servings
+        case imageUrl
+        case nutritionKcal
+        case nutritionProtein
+        case nutritionFat
+        case nutritionCarbs
+        case nutritionFiber
+        case nutritionSalt
+        case isActive
+        case isFavorite
+        case ingredients
+        case sourceInstructions
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        title = try container.decode(String.self, forKey: .title)
+        description = try container.decodeIfPresent(String.self, forKey: .description)
+        mealType = try container.decode(String.self, forKey: .mealType)
+        difficulty = try container.decode(String.self, forKey: .difficulty)
+        prepTimeMinutes = try container.decode(Int.self, forKey: .prepTimeMinutes)
+        servings = try container.decode(Int.self, forKey: .servings)
+        imageUrl = try container.decodeIfPresent(String.self, forKey: .imageUrl)
+        nutritionKcal = try container.decode(Double.self, forKey: .nutritionKcal)
+        nutritionProtein = try container.decode(Double.self, forKey: .nutritionProtein)
+        nutritionFat = try container.decode(Double.self, forKey: .nutritionFat)
+        nutritionCarbs = try container.decode(Double.self, forKey: .nutritionCarbs)
+        nutritionFiber = try container.decode(Double.self, forKey: .nutritionFiber)
+        nutritionSalt = try container.decode(Double.self, forKey: .nutritionSalt)
+        isActive = try container.decode(Bool.self, forKey: .isActive)
+        isFavorite = try container.decodeIfPresent(Bool.self, forKey: .isFavorite)
+        ingredients = try container.decodeIfPresent([BackendRecipeIngredientDTO].self, forKey: .ingredients) ?? []
+        sourceInstructions = try container.decodeIfPresent([BackendRecipeInstructionDTO].self, forKey: .sourceInstructions)
+    }
 }
 
 struct BackendRecipeInstructionDTO: Codable {
@@ -717,6 +905,10 @@ final class UnconfiguredRecipeSocketClient: RecipeSocketClient {
     func emitWithAck<T: Decodable>(event: String, payload: [String: Any], as: T.Type) async throws -> T {
         throw RecipeDataError.transportNotConfigured
     }
+
+    func on(event: String, handler: @escaping ([Any]) -> Void) {}
+
+    func off(event: String) {}
 }
 
 final class WebSocketRecipeTransportClient: RecipeTransportClient {
@@ -730,10 +922,17 @@ final class WebSocketRecipeTransportClient: RecipeTransportClient {
         self.householdId = householdId
     }
 
-    func fetchRecipes() async throws -> [BackendRecipeDTO] {
-        var payload: [String: Any] = ["userId": userId]
-        if let householdId {
-            payload["householdId"] = householdId
+    func fetchRecipes(page: Int, limit: Int) async throws -> [BackendRecipeDTO] {
+        var payload: [String: Any] = [
+            "userId": userId,
+            "filters": [
+                "page": page,
+                "limit": limit
+            ]
+        ]
+        if let householdId, var filters = payload["filters"] as? [String: Any] {
+            filters["householdId"] = householdId
+            payload["filters"] = filters
         }
 
         let envelope: WsEnvelope<[BackendRecipeDTO]> = try await socket.emitWithAck(
@@ -747,13 +946,37 @@ final class WebSocketRecipeTransportClient: RecipeTransportClient {
         throw RecipeDataError.serverError(message: envelope.error ?? "Nieznany błąd recipes:findAll.")
     }
 
+    func fetchRecipeById(recipeId: String) async throws -> BackendRecipeDTO {
+        var payload: [String: Any] = [
+            "userId": userId,
+            "id": recipeId
+        ]
+        if let householdId {
+            payload["householdId"] = householdId
+        }
+
+        let envelope: WsEnvelope<BackendRecipeDTO> = try await socket.emitWithAck(
+            event: "recipes:findById",
+            payload: payload,
+            as: WsEnvelope<BackendRecipeDTO>.self
+        )
+        if envelope.ok, let data = envelope.data {
+            return data
+        }
+        throw RecipeDataError.serverError(message: envelope.error ?? "Nieznany błąd recipes:findById.")
+    }
+
     func setFavorite(recipeId: String, isFavorite: Bool) async throws {
+        guard let householdId, !householdId.isEmpty else {
+            throw RecipeDataError.serverError(message: "Brak gospodarstwa do zapisu ulubionych.")
+        }
         let envelope: WsEnvelope<BackendRecipeDTO> = try await socket.emitWithAck(
             event: "recipes:setFavorite",
             payload: [
                 "userId": userId,
                 "data": [
                     "recipeId": recipeId,
+                    "householdId": householdId,
                     "isFavorite": isFavorite
                 ]
             ],
@@ -773,9 +996,19 @@ final class ApiRecipeRepository: RecipeRepository {
         self.client = client
     }
 
-    func fetchRecipes() async throws -> [Recipe] {
-        let dtos = try await client.fetchRecipes()
+    func fetchRecipes(page: Int, limit: Int) async throws -> [Recipe] {
+        let dtos = try await client.fetchRecipes(page: page, limit: limit)
         return dtos.compactMap { $0.toAppRecipe() }
+    }
+
+    func fetchRecipeById(_ recipeId: UUID) async throws -> Recipe {
+        let id = recipeId.uuidString
+        guard !id.isEmpty else { throw RecipeDataError.invalidRecipeId }
+        let dto = try await client.fetchRecipeById(recipeId: id)
+        guard let mapped = dto.toAppRecipe() else {
+            throw RecipeDataError.serverError(message: "Nie udało się zmapować recipes:findById.")
+        }
+        return mapped
     }
 
     func setFavorite(recipeId: UUID, isFavorite: Bool) async throws {
@@ -787,11 +1020,28 @@ final class ApiRecipeRepository: RecipeRepository {
 
 @Observable
 final class RecipeCatalogStore {
+    private struct RecipeCatalogCachePayload: Codable {
+        let recipes: [Recipe]
+        let savedAt: Date
+    }
+
     private let repository: RecipeRepository
     private(set) var recipes: [Recipe] = []
     private(set) var didLoad: Bool = false
     var isLoading: Bool = false
+    var isLoadingMore: Bool = false
+    var hasMore: Bool = true
     var errorMessage: String?
+    private var currentPage: Int = 0
+    private let pageSize: Int = 24
+    private let cacheMaxAge: TimeInterval = 60 * 30 // 30 min
+    private let maxFetchAttempts: Int = 3
+
+    private var cacheURL: URL {
+        FileManager.default
+            .urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("recipes_catalog_cache.json")
+    }
 
     init(
         repository: RecipeRepository = ApiRecipeRepository(
@@ -806,19 +1056,69 @@ final class RecipeCatalogStore {
 
     func loadIfNeeded() async {
         guard !didLoad else { return }
+        if loadCacheIfFresh() {
+            didLoad = true
+            Task { await reload() }
+            return
+        }
         await reload()
     }
 
     func reload() async {
         isLoading = true
+        isLoadingMore = false
         errorMessage = nil
         do {
-            recipes = try await repository.fetchRecipes()
+            let firstPage = try await fetchPageWithRetry(page: 1)
+            recipes = firstPage
+            currentPage = 1
+            hasMore = firstPage.count >= pageSize
             didLoad = true
+            saveCache()
         } catch {
             errorMessage = error.localizedDescription
         }
         isLoading = false
+    }
+
+    func loadNextPageIfNeeded(currentItemId: UUID?, threshold: Int = 6) async {
+        guard let currentItemId else { return }
+        guard hasMore, !isLoading, !isLoadingMore, didLoad else { return }
+        guard let index = recipes.firstIndex(where: { $0.id == currentItemId }) else { return }
+        let triggerIndex = max(0, recipes.count - max(1, threshold))
+        guard index >= triggerIndex else { return }
+
+        isLoadingMore = true
+        defer { isLoadingMore = false }
+
+        do {
+            let nextPage = currentPage + 1
+            let items = try await fetchPageWithRetry(page: nextPage)
+            recipes.append(contentsOf: items)
+            currentPage = nextPage
+            hasMore = items.count >= pageSize
+            saveCache()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    func loadRecipeDetail(recipeId: UUID) async -> Recipe? {
+        guard let index = recipes.firstIndex(where: { $0.id == recipeId }) else { return nil }
+        let current = recipes[index]
+        if !current.ingredients.isEmpty || !current.preparationSteps.isEmpty {
+            return current
+        }
+
+        do {
+            let detailed = try await repository.fetchRecipeById(recipeId)
+            recipes[index] = detailed
+            return detailed
+        } catch {
+            errorMessage = error.localizedDescription
+            return current
+        }
     }
 
     func toggleFavorite(recipeId: UUID) async {
@@ -829,10 +1129,47 @@ final class RecipeCatalogStore {
         recipes[index].favourite = next
         do {
             try await repository.setFavorite(recipeId: recipeId, isFavorite: next)
+            saveCache()
         } catch {
             recipes[index].favourite = previous
             errorMessage = error.localizedDescription
         }
+    }
+
+    private func saveCache() {
+        do {
+            let payload = RecipeCatalogCachePayload(recipes: recipes, savedAt: Date())
+            let data = try JSONEncoder().encode(payload)
+            try data.write(to: cacheURL, options: .atomic)
+        } catch {
+            // intentionally ignore cache write failures
+        }
+    }
+
+    private func loadCacheIfFresh() -> Bool {
+        guard let data = try? Data(contentsOf: cacheURL) else { return false }
+        guard let payload = try? JSONDecoder().decode(RecipeCatalogCachePayload.self, from: data) else { return false }
+        guard Date().timeIntervalSince(payload.savedAt) <= cacheMaxAge else { return false }
+        recipes = payload.recipes
+        currentPage = max(1, Int(ceil(Double(payload.recipes.count) / Double(pageSize))))
+        hasMore = payload.recipes.count % pageSize == 0
+        return !payload.recipes.isEmpty
+    }
+
+    private func fetchPageWithRetry(page: Int) async throws -> [Recipe] {
+        var lastError: Error?
+        for attempt in 1...maxFetchAttempts {
+            do {
+                return try await repository.fetchRecipes(page: page, limit: pageSize)
+            } catch {
+                lastError = error
+                if attempt < maxFetchAttempts {
+                    let backoffMs = UInt64(200 * attempt)
+                    try await Task.sleep(nanoseconds: backoffMs * 1_000_000)
+                }
+            }
+        }
+        throw lastError ?? RecipeDataError.serverError(message: "Nie udało się pobrać listy przepisów.")
     }
 }
 

@@ -22,7 +22,11 @@ struct FeatureCard: View {
                 Text(subtitle)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                    .lineLimit(3)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             Spacer()
         }
         .padding(14)

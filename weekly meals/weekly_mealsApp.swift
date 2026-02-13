@@ -9,48 +9,51 @@ import SwiftUI
 
 @main
 struct weekly_mealsApp: App {
-    @State private var mealStore: WeeklyMealStore
-    @State private var datesViewModel = DatesViewModel()
-    @State private var recipeCatalogStore: RecipeCatalogStore
-    @State private var shoppingListStore: ShoppingListStore
-
-    init() {
-        let userId = "edbc139a-636b-4aaf-953f-9b4644eb8b55"
-        let householdId = "f6478b3a-5f76-47fd-94cd-e85c2564e366"
-        let socketClient = SocketIORecipeSocketClient(
-            baseURL: URL(string: "http://localhost:3000")!
-        )
-        let transport = WebSocketRecipeTransportClient(
-            socket: socketClient,
-            userId: userId,
-            householdId: householdId
-        )
-        let repository = ApiRecipeRepository(client: transport)
-        let weeklyPlanTransport = WebSocketWeeklyPlanTransportClient(
-            socket: socketClient,
-            userId: userId,
-            householdId: householdId
-        )
-        let weeklyPlanRepository = ApiWeeklyPlanRepository(client: weeklyPlanTransport)
-        let shoppingTransport = WebSocketShoppingListTransportClient(
-            socket: socketClient,
-            userId: userId,
-            householdId: householdId
-        )
-        let shoppingRepository = ApiShoppingListRepository(client: shoppingTransport)
-        _mealStore = State(initialValue: WeeklyMealStore(weeklyPlanRepository: weeklyPlanRepository))
-        _recipeCatalogStore = State(initialValue: RecipeCatalogStore(repository: repository))
-        _shoppingListStore = State(initialValue: ShoppingListStore(repository: shoppingRepository))
-    }
+    @State private var sessionStore = SessionStore()
+    @AppStorage("settings.theme") private var themeRawValue: String = AppTheme.system.rawValue
 
     var body: some Scene {
         WindowGroup {
-//            AuthView()
-            DashboardView()
-                .environment(\.weeklyMealStore, mealStore)
-                .environment(\.datesViewModel, datesViewModel)
-                .environment(\.recipeCatalogStore, recipeCatalogStore)
-                .environment(\.shoppingListStore, shoppingListStore)
+            Group {
+                if sessionStore.isAuthenticated,
+                   let mealStore = sessionStore.weeklyMealStore,
+                   let recipeCatalogStore = sessionStore.recipeCatalogStore,
+                   let shoppingListStore = sessionStore.shoppingListStore {
+                    DashboardView()
+                        .environment(\.weeklyMealStore, mealStore)
+                        .environment(\.datesViewModel, sessionStore.datesViewModel)
+                        .environment(\.recipeCatalogStore, recipeCatalogStore)
+                        .environment(\.shoppingListStore, shoppingListStore)
+                } else if sessionStore.isAuthenticated {
+                    NoHouseholdView(
+                        isLoading: sessionStore.isSigningIn,
+                        errorMessage: sessionStore.authError,
+                        onCreate: { name in
+                            Task {
+                                await sessionStore.createHousehold(name: name)
+                            }
+                        },
+                        onLogout: {
+                            sessionStore.logout()
+                        }
+                    )
+                } else {
+                    AuthView(
+                        isLoading: sessionStore.isSigningIn,
+                        errorMessage: sessionStore.authError,
+                        onLoginTap: { displayName, email in
+                            Task {
+                                await sessionStore.loginDev(displayName: displayName, email: email)
+                            }
+                        }
+                    )
+                }
+            }
+            .environment(\.sessionStore, sessionStore)
+            .preferredColorScheme((AppTheme(rawValue: themeRawValue) ?? .system).colorScheme)
+            .onOpenURL { url in
+                sessionStore.handleIncomingURL(url)
+            }
         }
     }
 }

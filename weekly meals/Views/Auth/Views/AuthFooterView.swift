@@ -3,7 +3,7 @@ import SwiftUI
 struct AuthFooterView: View {
     var body: some View {
         VStack(spacing: 6) {
-            Text("Logowanie wyłącznie przez Apple – szybkie i bezpieczne.")
+            Text("Tryb developerski: szybkie logowanie lokalne. Apple Sign-In podłączymy na końcu.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

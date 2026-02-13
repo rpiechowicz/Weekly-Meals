@@ -12,6 +12,8 @@ struct RecipesView: View {
     @State private var showDeletePlanAlert = false
     @State private var showPastDayProtectionAlert = false
     @State private var pastDayProtectionMessage = ""
+    @State private var debouncedSearchText = ""
+    @State private var searchDebounceTask: Task<Void, Never>?
 
     private var categories: [RecipesCategory] = RecipesCategory.allCases
 
@@ -43,14 +45,18 @@ struct RecipesView: View {
         }
 
         // Filter by search text
-        if !searchText.isEmpty {
+        if !debouncedSearchText.isEmpty {
             filtered = filtered.filter { recipe in
-                recipe.name.localizedCaseInsensitiveContains(searchText) ||
-                recipe.description.localizedCaseInsensitiveContains(searchText)
+                recipe.name.localizedCaseInsensitiveContains(debouncedSearchText) ||
+                recipe.description.localizedCaseInsensitiveContains(debouncedSearchText)
             }
         }
 
         return filtered
+    }
+
+    private var shouldShowSkeleton: Bool {
+        recipeCatalogStore.isLoading && recipeCatalogStore.recipes.isEmpty
     }
 
     var body: some View {
@@ -71,7 +77,19 @@ struct RecipesView: View {
                                 .padding(.top, 8)
                         }
 
-                        if filteredRecipes.isEmpty {
+                        if shouldShowSkeleton {
+                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: 16)], spacing: 16) {
+                                ForEach(0..<6, id: \.self) { _ in
+                                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                        .fill(Color.white.opacity(0.06))
+                                        .frame(height: 250)
+                                        .redacted(reason: .placeholder)
+                                }
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.top, 4)
+                            .padding(.bottom, 16)
+                        } else if filteredRecipes.isEmpty {
                             VStack(spacing: 16) {
                                 Image(systemName: "fork.knife.circle")
                                     .font(.system(size: 64))
@@ -105,7 +123,9 @@ struct RecipesView: View {
                                                 mealPlan.toggleRecipe(recipe)
                                             }
                                         } else {
-                                            selectedRecipe = recipe
+                                            Task { @MainActor in
+                                                selectedRecipe = await recipeCatalogStore.loadRecipeDetail(recipeId: recipe.id) ?? recipe
+                                            }
                                         }
                                     } label: {
                                         RecipeItemView(
@@ -115,6 +135,9 @@ struct RecipesView: View {
                                         )
                                     }
                                     .buttonStyle(.plain)
+                                    .task {
+                                        await recipeCatalogStore.loadNextPageIfNeeded(currentItemId: recipe.id, threshold: 8)
+                                    }
                                 }
                             }
                             .padding(.horizontal, 12)
@@ -122,6 +145,12 @@ struct RecipesView: View {
                             .padding(.top, 0)
                             .padding(.bottom, 18)
                             .padding(.bottom, mealPlan.isActive ? 60 : 0)
+
+                            if recipeCatalogStore.isLoadingMore {
+                                ProgressView()
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.bottom, 16)
+                            }
                         }
                     }
                 }
@@ -138,7 +167,23 @@ struct RecipesView: View {
             }
             .navigationTitle("Przepisy")
             .task {
+                debouncedSearchText = searchText
                 await recipeCatalogStore.loadIfNeeded()
+                await mealStore.loadSavedPlanFromBackend(weekStart: datesViewModel.weekStartISO)
+            }
+            .task(id: datesViewModel.weekStartISO) {
+                await mealStore.loadSavedPlanFromBackend(weekStart: datesViewModel.weekStartISO)
+            }
+            .onChange(of: searchText) { _, newValue in
+                searchDebounceTask?.cancel()
+                searchDebounceTask = Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 250_000_000)
+                    guard !Task.isCancelled else { return }
+                    debouncedSearchText = newValue
+                }
+            }
+            .onDisappear {
+                searchDebounceTask?.cancel()
             }
             .searchable(text: $searchText, prompt: "Szukaj przepisów")
             .toolbar {
@@ -224,7 +269,7 @@ struct RecipesView: View {
                             weekStart: datesViewModel.weekStartISO,
                             dates: datesViewModel.dates
                         )
-                        mealStore.clearSavedPlan()
+                        await mealStore.clearSavedPlanFromBackend(weekStart: datesViewModel.weekStartISO)
                         await shoppingListStore.load(weekStart: datesViewModel.weekStartISO, force: true)
                     }
                 }

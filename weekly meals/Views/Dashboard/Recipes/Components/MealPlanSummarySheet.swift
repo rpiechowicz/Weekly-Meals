@@ -126,11 +126,8 @@ struct MealPlanSummarySheet: View {
             lunchEntries: mealPlan.recipes(for: .lunch).map { PlanEntry(recipe: $0) },
             dinnerEntries: mealPlan.recipes(for: .dinner).map { PlanEntry(recipe: $0) }
         )
-        mealStore.saveMealPlan(plan)
-        // Aktualizacja planu nie może automatycznie przypisywać posiłków do kolejnych dni.
-        // Dni ustawiamy wyłącznie ręcznie w CalendarView.
-        mealStore.cleanupCalendarAndSync(with: plan)
         Task {
+            await mealStore.saveMealPlanToBackend(plan, weekStart: datesViewModel.weekStartISO)
             await shoppingListStore.load(weekStart: datesViewModel.weekStartISO, force: true)
         }
         dismiss()
