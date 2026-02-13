@@ -92,6 +92,7 @@ class WeeklyMealStore {
     private(set) var plans: [String: DayMealPlan] = [:]
     private(set) var savedPlan: SavedMealPlan = SavedMealPlan()
     private let weeklyPlanRepository: WeeklyPlanRepository?
+    private let currentUserId: String?
     private var observedWeekStart: String?
     private var observedWeekDates: [Date] = []
     private var observedSavedPlanWeekStart: String?
@@ -114,18 +115,19 @@ class WeeklyMealStore {
 
     // MARK: - Init
 
-    init(weeklyPlanRepository: WeeklyPlanRepository? = nil) {
+    init(weeklyPlanRepository: WeeklyPlanRepository? = nil, currentUserId: String? = nil) {
         self.weeklyPlanRepository = weeklyPlanRepository
-        self.weeklyPlanRepository?.observeWeekPlanChanges { [weak self] weekStart in
+        self.currentUserId = currentUserId
+        self.weeklyPlanRepository?.observeWeekPlanChanges { [weak self] event in
             guard let self else { return }
             Task { @MainActor in
-                await self.handleRemoteWeekPlanChanged(weekStart: weekStart)
+                await self.handleRemoteWeekPlanChanged(event: event)
             }
         }
-        self.weeklyPlanRepository?.observeSavedPlanChanges { [weak self] weekStart in
+        self.weeklyPlanRepository?.observeSavedPlanChanges { [weak self] event in
             guard let self else { return }
             Task { @MainActor in
-                await self.handleRemoteSavedPlanChanged(weekStart: weekStart)
+                await self.handleRemoteSavedPlanChanged(event: event)
             }
         }
         load()
@@ -184,6 +186,9 @@ class WeeklyMealStore {
                 plans[key] = dayPlan
             }
             save()
+            // Recompute availability flags based on the freshly loaded calendar state.
+            // Without this, another device can keep stale "selected" entries and show 0/x as blocked.
+            syncSavedPlanSelectionFlagsWithCalendar()
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
@@ -242,22 +247,19 @@ class WeeklyMealStore {
 
     @MainActor
     func clearWeekFromBackend(weekStart: String, dates: [Date]) async {
-        guard weeklyPlanRepository != nil else {
+        guard let weeklyPlanRepository else {
             clearWeek(dates: dates)
             return
         }
 
-        var hadError = false
-        for date in dates {
-            for slot in MealSlot.allCases {
-                guard recipe(for: date, slot: slot) != nil else { continue }
-                let success = await removeWeekSlot(for: date, slot: slot, weekStart: weekStart)
-                if !success { hadError = true }
-            }
-        }
-
-        if !hadError {
+        do {
+            try await weeklyPlanRepository.clearWeekPlan(weekStart: weekStart)
+            clearWeek(dates: dates)
+            savedPlan = SavedMealPlan()
+            saveSavedPlan()
             errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 
@@ -377,16 +379,35 @@ class WeeklyMealStore {
     }
 
     @MainActor
-    private func handleRemoteWeekPlanChanged(weekStart: String) async {
-        guard weekStart == observedWeekStart else { return }
+    private func handleRemoteWeekPlanChanged(event: BackendWeekChangedDTO) async {
+        let changedByOtherUser = event.changedByUserId != nil && event.changedByUserId != currentUserId
+        guard event.weekStart == observedWeekStart else { return }
         guard !observedWeekDates.isEmpty else { return }
-        await loadWeekPlanFromBackend(weekStart: weekStart, dates: observedWeekDates)
+        await loadWeekPlanFromBackend(weekStart: event.weekStart, dates: observedWeekDates)
+        if changedByOtherUser {
+            PlanChangeNotificationService.notifyRemotePlanChange(
+                action: event.action,
+                weekStart: event.weekStart,
+                changedByDisplayName: event.changedByDisplayName
+            )
+        }
     }
 
     @MainActor
-    private func handleRemoteSavedPlanChanged(weekStart: String) async {
-        guard weekStart == observedSavedPlanWeekStart else { return }
-        await loadSavedPlanFromBackend(weekStart: weekStart)
+    private func handleRemoteSavedPlanChanged(event: BackendSavedPlanChangedDTO) async {
+        let changedByOtherUser = event.changedByUserId != nil && event.changedByUserId != currentUserId
+        guard event.weekStart == observedSavedPlanWeekStart else { return }
+        await loadSavedPlanFromBackend(weekStart: event.weekStart)
+        if changedByOtherUser {
+            if event.action?.uppercased() == "CLEAR_PLAN" {
+                return
+            }
+            PlanChangeNotificationService.notifyRemotePlanChange(
+                action: event.action,
+                weekStart: event.weekStart,
+                changedByDisplayName: event.changedByDisplayName
+            )
+        }
     }
 
     private func mapSavedPlan(dto: BackendSharedMealPlanDTO) -> SavedMealPlan {

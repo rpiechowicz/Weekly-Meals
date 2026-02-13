@@ -190,7 +190,8 @@ final class SessionStore {
         )
 
         self.weeklyMealStore = WeeklyMealStore(
-            weeklyPlanRepository: ApiWeeklyPlanRepository(client: weeklyPlanTransport)
+            weeklyPlanRepository: ApiWeeklyPlanRepository(client: weeklyPlanTransport),
+            currentUserId: userId
         )
         self.recipeCatalogStore = RecipeCatalogStore(
             repository: ApiRecipeRepository(client: recipeTransport)

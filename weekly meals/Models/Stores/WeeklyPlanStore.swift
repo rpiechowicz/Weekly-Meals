@@ -10,20 +10,22 @@ protocol WeeklyPlanRepository {
     func fetchWeekPlan(weekStart: String) async throws -> [WeekPlanSlot]
     func upsertWeekSlot(weekStart: String, date: Date, mealSlot: MealSlot, recipeId: UUID) async throws
     func removeWeekSlot(weekStart: String, date: Date, mealSlot: MealSlot) async throws
-    func observeWeekPlanChanges(_ onChange: @escaping (_ weekStart: String) -> Void)
+    func clearWeekPlan(weekStart: String) async throws
+    func observeWeekPlanChanges(_ onChange: @escaping (_ event: BackendWeekChangedDTO) -> Void)
     func fetchSavedPlan(weekStart: String) async throws -> BackendSharedMealPlanDTO
     func saveSavedPlan(weekStart: String, breakfastRecipeIds: [String], lunchRecipeIds: [String], dinnerRecipeIds: [String]) async throws -> BackendSharedMealPlanDTO
-    func observeSavedPlanChanges(_ onChange: @escaping (_ weekStart: String) -> Void)
+    func observeSavedPlanChanges(_ onChange: @escaping (_ event: BackendSavedPlanChangedDTO) -> Void)
 }
 
 protocol WeeklyPlanTransportClient {
     func fetchWeekPlan(weekStart: String) async throws -> [BackendWeeklyPlanItemDTO]
     func upsertWeekSlot(weekStart: String, dayOfWeek: String, mealType: String, recipeId: String) async throws
     func removeWeekSlot(weekStart: String, dayOfWeek: String, mealType: String) async throws
-    func observeWeekPlanChanges(_ onChange: @escaping (_ weekStart: String) -> Void)
+    func clearWeekPlan(weekStart: String) async throws
+    func observeWeekPlanChanges(_ onChange: @escaping (_ event: BackendWeekChangedDTO) -> Void)
     func fetchSavedPlan(weekStart: String) async throws -> BackendSharedMealPlanDTO
     func saveSavedPlan(weekStart: String, breakfastRecipeIds: [String], lunchRecipeIds: [String], dinnerRecipeIds: [String]) async throws -> BackendSharedMealPlanDTO
-    func observeSavedPlanChanges(_ onChange: @escaping (_ weekStart: String) -> Void)
+    func observeSavedPlanChanges(_ onChange: @escaping (_ event: BackendSavedPlanChangedDTO) -> Void)
 }
 
 struct BackendWeeklyPlanDTO: Codable {
@@ -54,15 +56,24 @@ private struct BackendPlanItemAckDTO: Codable {
     let id: String
 }
 
-private struct BackendWeekChangedDTO: Codable {
+private struct BackendClearWeekPlanAckDTO: Codable {
+    let success: Bool
+}
+
+struct BackendWeekChangedDTO: Codable {
     let householdId: String
     let weekStart: String
     let action: String?
+    let changedByUserId: String?
+    let changedByDisplayName: String?
 }
 
-private struct BackendSavedPlanChangedDTO: Codable {
+struct BackendSavedPlanChangedDTO: Codable {
     let householdId: String
     let weekStart: String
+    let changedByUserId: String?
+    let changedByDisplayName: String?
+    let action: String?
 }
 
 private final class WeekDateMapper {
@@ -253,7 +264,24 @@ final class WebSocketWeeklyPlanTransportClient: WeeklyPlanTransportClient {
         throw RecipeDataError.serverError(message: envelope.error ?? "Nieznany błąd weeklyPlans:removeWeekSlot.")
     }
 
-    func observeWeekPlanChanges(_ onChange: @escaping (_ weekStart: String) -> Void) {
+    func clearWeekPlan(weekStart: String) async throws {
+        let householdId = try await resolveHouseholdId()
+        let envelope: WsEnvelope<BackendClearWeekPlanAckDTO> = try await socket.emitWithAck(
+            event: "weeklyPlans:clearWeekPlan",
+            payload: [
+                "userId": userId,
+                "householdId": householdId,
+                "weekStart": weekStart
+            ],
+            as: WsEnvelope<BackendClearWeekPlanAckDTO>.self
+        )
+        if envelope.ok {
+            return
+        }
+        throw RecipeDataError.serverError(message: envelope.error ?? "Nieznany błąd weeklyPlans:clearWeekPlan.")
+    }
+
+    func observeWeekPlanChanges(_ onChange: @escaping (_ event: BackendWeekChangedDTO) -> Void) {
         socket.off(event: "weeklyPlans:weekChanged")
         socket.on(event: "weeklyPlans:weekChanged") { [weak self] items in
             guard let self else { return }
@@ -268,7 +296,7 @@ final class WebSocketWeeklyPlanTransportClient: WeeklyPlanTransportClient {
                 return
             }
 
-            onChange(event.weekStart)
+            onChange(event)
         }
     }
 
@@ -313,7 +341,7 @@ final class WebSocketWeeklyPlanTransportClient: WeeklyPlanTransportClient {
         throw RecipeDataError.serverError(message: envelope.error ?? "Nieznany błąd weeklyPlans:saveSavedPlan.")
     }
 
-    func observeSavedPlanChanges(_ onChange: @escaping (_ weekStart: String) -> Void) {
+    func observeSavedPlanChanges(_ onChange: @escaping (_ event: BackendSavedPlanChangedDTO) -> Void) {
         socket.off(event: "weeklyPlans:savedPlanChanged")
         socket.on(event: "weeklyPlans:savedPlanChanged") { [weak self] items in
             guard let self else { return }
@@ -328,7 +356,7 @@ final class WebSocketWeeklyPlanTransportClient: WeeklyPlanTransportClient {
                 return
             }
 
-            onChange(event.weekStart)
+            onChange(event)
         }
     }
 }
@@ -375,7 +403,11 @@ final class ApiWeeklyPlanRepository: WeeklyPlanRepository {
         )
     }
 
-    func observeWeekPlanChanges(_ onChange: @escaping (_ weekStart: String) -> Void) {
+    func clearWeekPlan(weekStart: String) async throws {
+        try await client.clearWeekPlan(weekStart: weekStart)
+    }
+
+    func observeWeekPlanChanges(_ onChange: @escaping (_ event: BackendWeekChangedDTO) -> Void) {
         client.observeWeekPlanChanges(onChange)
     }
 
@@ -392,7 +424,7 @@ final class ApiWeeklyPlanRepository: WeeklyPlanRepository {
         )
     }
 
-    func observeSavedPlanChanges(_ onChange: @escaping (_ weekStart: String) -> Void) {
+    func observeSavedPlanChanges(_ onChange: @escaping (_ event: BackendSavedPlanChangedDTO) -> Void) {
         client.observeSavedPlanChanges(onChange)
     }
 }
