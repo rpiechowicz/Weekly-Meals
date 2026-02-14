@@ -633,12 +633,14 @@ protocol RecipeRepository {
     func fetchRecipes(page: Int, limit: Int) async throws -> [Recipe]
     func fetchRecipeById(_ recipeId: UUID) async throws -> Recipe
     func setFavorite(recipeId: UUID, isFavorite: Bool) async throws
+    func observeFavoritesChanges(_ onChange: @escaping (_ recipeId: UUID, _ isFavorite: Bool) -> Void)
 }
 
 protocol RecipeTransportClient {
     func fetchRecipes(page: Int, limit: Int) async throws -> [BackendRecipeDTO]
     func fetchRecipeById(recipeId: String) async throws -> BackendRecipeDTO
     func setFavorite(recipeId: String, isFavorite: Bool) async throws
+    func observeFavoritesChanges(_ onChange: @escaping (_ recipeId: String, _ isFavorite: Bool) -> Void)
 }
 
 protocol RecipeSocketClient {
@@ -853,6 +855,13 @@ struct BackendRecipeInstructionDTO: Codable {
     let instruction: String?
 }
 
+private struct BackendFavoritesChangedDTO: Codable {
+    let householdId: String
+    let recipeId: String
+    let isFavorite: Bool
+    let changedByUserId: String?
+}
+
 extension BackendRecipeDTO {
     var appCategory: RecipesCategory? {
         switch mealType.uppercased() {
@@ -1008,6 +1017,23 @@ final class WebSocketRecipeTransportClient: RecipeTransportClient {
         }
         throw RecipeDataError.serverError(message: envelope.error ?? "Nieznany błąd recipes:setFavorite.")
     }
+
+    func observeFavoritesChanges(_ onChange: @escaping (_ recipeId: String, _ isFavorite: Bool) -> Void) {
+        socket.off(event: "recipes:favoritesChanged")
+        socket.on(event: "recipes:favoritesChanged") { [weak self] items in
+            guard let self else { return }
+            guard let first = items.first,
+                  JSONSerialization.isValidJSONObject(first),
+                  let data = try? JSONSerialization.data(withJSONObject: first),
+                  let event = try? JSONDecoder().decode(BackendFavoritesChangedDTO.self, from: data)
+            else { return }
+
+            if let householdId = self.householdId, event.householdId != householdId {
+                return
+            }
+            onChange(event.recipeId, event.isFavorite)
+        }
+    }
 }
 
 final class ApiRecipeRepository: RecipeRepository {
@@ -1036,6 +1062,13 @@ final class ApiRecipeRepository: RecipeRepository {
         let id = recipeId.uuidString
         guard !id.isEmpty else { throw RecipeDataError.invalidRecipeId }
         try await client.setFavorite(recipeId: id, isFavorite: isFavorite)
+    }
+
+    func observeFavoritesChanges(_ onChange: @escaping (_ recipeId: UUID, _ isFavorite: Bool) -> Void) {
+        client.observeFavoritesChanges { recipeId, isFavorite in
+            guard let uuid = UUID(uuidString: recipeId) else { return }
+            onChange(uuid, isFavorite)
+        }
     }
 }
 
@@ -1073,6 +1106,15 @@ final class RecipeCatalogStore {
         )
     ) {
         self.repository = repository
+        self.repository.observeFavoritesChanges { [weak self] recipeId, isFavorite in
+            guard let self else { return }
+            Task { @MainActor in
+                if let index = self.recipes.firstIndex(where: { $0.id == recipeId }) {
+                    self.recipes[index].favourite = isFavorite
+                    self.saveCache()
+                }
+            }
+        }
     }
 
     func loadIfNeeded() async {

@@ -75,6 +75,29 @@ struct weekly_mealsApp: App {
             .onOpenURL { url in
                 sessionStore.handleIncomingURL(url)
             }
+            .alert(
+                "Dołączyć do gospodarstwa?",
+                isPresented: Binding(
+                    get: { sessionStore.invitationPrompt != nil },
+                    set: { isPresented in
+                        if !isPresented {
+                            sessionStore.dismissInvitationPrompt()
+                        }
+                    }
+                ),
+                presenting: sessionStore.invitationPrompt
+            ) { prompt in
+                Button("Nie teraz", role: .cancel) {
+                    sessionStore.dismissInvitationPrompt()
+                }
+                Button("Dołącz") {
+                    Task {
+                        await sessionStore.acceptPendingInvitation(token: prompt.token)
+                    }
+                }
+            } message: { prompt in
+                Text(prompt.message)
+            }
         }
     }
 }

@@ -173,21 +173,19 @@ struct CalendarView: View {
     // MARK: - Info Popover
 
     private var infoPopoverContent: some View {
-        VStack(alignment: .trailing, spacing: 0) {
-            TipTap {
-                HStack(alignment: .firstTextBaseline) {
-                    Text("Informacje")
-                        .font(.headline)
-                    Spacer()
-                }
-
-                nutritionSummary
-
-                Divider()
-
-                tipRow(icon: "hand.rays", text: "Stuknij kartę posiłku, aby zobaczyć szczegóły.")
-                tipRow(icon: "hand.draw", text: "Przesuń w lewo/prawo aby edytować bądź usuwać dany posiłek.")
+        InfoPopoverContent {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Informacje")
+                    .font(.headline)
+                Spacer()
             }
+
+            nutritionSummary
+
+            Divider()
+
+            InfoTipRow(icon: "hand.rays", text: "Stuknij kartę posiłku, aby zobaczyć szczegóły.")
+            InfoTipRow(icon: "hand.draw", text: "Przesuń w lewo/prawo aby edytować bądź usuwać dany posiłek.")
         }
     }
 
@@ -220,17 +218,6 @@ struct CalendarView: View {
         .padding(.vertical, 8)
         .padding(.horizontal, 12)
         .background(.ultraThinMaterial, in: Capsule())
-    }
-
-    private func tipRow(icon: String, text: String) -> some View {
-        HStack(alignment: .top, spacing: 8) {
-            Image(systemName: icon)
-                .foregroundStyle(.blue)
-            Text(text)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
     }
 
     // MARK: - Meal List

@@ -54,6 +54,47 @@ private struct BackendMembershipDTO: Codable {
     let role: String
 }
 
+private struct BackendHouseholdMembersChangedDTO: Codable {
+    let householdId: String
+    let action: String?
+    let changedByUserId: String?
+    let changedByDisplayName: String?
+}
+
+private struct BackendInvitationPreviewDTO: Codable {
+    struct HouseholdDTO: Codable {
+        let id: String
+        let name: String
+    }
+
+    let token: String
+    let status: String
+    let household: HouseholdDTO?
+    let invitedByDisplayName: String?
+    let expiresAt: String?
+}
+
+struct InvitationPromptState: Identifiable {
+    let id = UUID()
+    let token: String
+    let householdName: String
+    let invitedByDisplayName: String?
+    let expiresAtText: String?
+
+    var message: String {
+        var parts: [String] = []
+        if let invitedByDisplayName, !invitedByDisplayName.isEmpty {
+            parts.append("\(invitedByDisplayName) zaprasza Cię do gospodarstwa „\(householdName)”.")
+        } else {
+            parts.append("Otrzymano zaproszenie do gospodarstwa „\(householdName)”.")
+        }
+        if let expiresAtText, !expiresAtText.isEmpty {
+            parts.append("Ważne do: \(expiresAtText).")
+        }
+        return parts.joined(separator: " ")
+    }
+}
+
 @MainActor
 @Observable
 final class SessionStore {
@@ -75,11 +116,14 @@ final class SessionStore {
     var currentUserId: String?
     var currentHouseholdId: String?
     var currentHouseholdName: String?
+    var invitationPrompt: InvitationPromptState?
+    var householdRealtimeVersion: Int = 0
 
     var weeklyMealStore: WeeklyMealStore?
     var recipeCatalogStore: RecipeCatalogStore?
     var shoppingListStore: ShoppingListStore?
     var datesViewModel = DatesViewModel()
+    private var realtimeSocket: RecipeSocketClient?
 
     init() {
         restoreSession()
@@ -172,6 +216,7 @@ final class SessionStore {
         currentHouseholdId = householdId
         currentHouseholdName = householdName
         let socketClient = SocketIORecipeSocketClient(baseURL: baseURL)
+        self.realtimeSocket = socketClient
 
         let recipeTransport = WebSocketRecipeTransportClient(
             socket: socketClient,
@@ -200,13 +245,34 @@ final class SessionStore {
             repository: ApiShoppingListRepository(client: shoppingTransport)
         )
         self.datesViewModel = DatesViewModel()
+        observeHouseholdRealtime()
     }
 
     private func clearRuntimeStores() {
+        realtimeSocket?.off(event: "households:membersChanged")
+        realtimeSocket = nil
         weeklyMealStore = nil
         recipeCatalogStore = nil
         shoppingListStore = nil
         datesViewModel = DatesViewModel()
+    }
+
+    private func observeHouseholdRealtime() {
+        realtimeSocket?.off(event: "households:membersChanged")
+        realtimeSocket?.on(event: "households:membersChanged") { [weak self] items in
+            guard let self else { return }
+            guard let first = items.first,
+                  JSONSerialization.isValidJSONObject(first),
+                  let data = try? JSONSerialization.data(withJSONObject: first),
+                  let event = try? JSONDecoder().decode(BackendHouseholdMembersChangedDTO.self, from: data)
+            else { return }
+
+            Task { @MainActor in
+                guard let currentHouseholdId = self.currentHouseholdId, !currentHouseholdId.isEmpty else { return }
+                guard event.householdId == currentHouseholdId else { return }
+                self.householdRealtimeVersion &+= 1
+            }
+        }
     }
 
     func createHousehold(name: String) async {
@@ -318,6 +384,33 @@ final class SessionStore {
         return url
     }
 
+    private func previewInvitation(token: String) async throws -> BackendInvitationPreviewDTO {
+        guard let userId = currentUserId, !userId.isEmpty else {
+            throw RecipeDataError.serverError(message: "Zaloguj się, aby dołączyć do gospodarstwa.")
+        }
+
+        let trimmedToken = token.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedToken.isEmpty else {
+            throw RecipeDataError.serverError(message: "Nieprawidłowy token zaproszenia.")
+        }
+
+        let socketClient = SocketIORecipeSocketClient(baseURL: baseURL)
+        let envelope: WsEnvelope<BackendInvitationPreviewDTO> = try await socketClient.emitWithAck(
+            event: "households:previewInvitation",
+            payload: [
+                "userId": userId,
+                "data": ["token": trimmedToken]
+            ],
+            as: WsEnvelope<BackendInvitationPreviewDTO>.self
+        )
+
+        guard envelope.ok, let data = envelope.data else {
+            throw RecipeDataError.serverError(message: envelope.error ?? "Nie udało się sprawdzić zaproszenia.")
+        }
+
+        return data
+    }
+
     func acceptInvitation(token: String) async throws {
         guard let userId = currentUserId, !userId.isEmpty else {
             throw RecipeDataError.serverError(message: "Brak użytkownika sesji.")
@@ -365,6 +458,21 @@ final class SessionStore {
         isAuthenticated = true
     }
 
+    func acceptPendingInvitation(token: String) async {
+        invitationPrompt = nil
+        do {
+            try await acceptInvitation(token: token)
+        } catch is CancellationError {
+            return
+        } catch {
+            authError = error.localizedDescription
+        }
+    }
+
+    func dismissInvitationPrompt() {
+        invitationPrompt = nil
+    }
+
     func handleIncomingURL(_ url: URL) {
         guard url.scheme == "weeklymeals", url.host == "invite" else { return }
         guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return }
@@ -372,13 +480,44 @@ final class SessionStore {
 
         Task {
             do {
-                try await acceptInvitation(token: token)
+                let preview = try await previewInvitation(token: token)
+                switch preview.status {
+                case "PENDING":
+                    let expiry = Self.formatInvitationExpiry(preview.expiresAt)
+                    invitationPrompt = InvitationPromptState(
+                        token: preview.token,
+                        householdName: preview.household?.name ?? "Gospodarstwo",
+                        invitedByDisplayName: preview.invitedByDisplayName,
+                        expiresAtText: expiry
+                    )
+                case "ALREADY_MEMBER":
+                    authError = "Jesteś już członkiem tego gospodarstwa."
+                case "EXPIRED":
+                    authError = "To zaproszenie wygasło."
+                case "REDEEMED":
+                    authError = "Ten link zaproszenia jest jednorazowy. Poproś o nowy link."
+                case "NOT_FOUND":
+                    authError = "Nie znaleziono zaproszenia. Sprawdź link."
+                default:
+                    authError = "Nie można użyć tego zaproszenia."
+                }
             } catch is CancellationError {
                 return
             } catch {
                 authError = error.localizedDescription
             }
         }
+    }
+
+    private static func formatInvitationExpiry(_ iso8601: String?) -> String? {
+        guard let iso8601, !iso8601.isEmpty else { return nil }
+        let formatter = ISO8601DateFormatter()
+        guard let date = formatter.date(from: iso8601) else { return nil }
+        let output = DateFormatter()
+        output.locale = Locale(identifier: "pl_PL")
+        output.dateStyle = .medium
+        output.timeStyle = .short
+        return output.string(from: date)
     }
 
     private func persistSession(_ response: DevLoginResponse) {

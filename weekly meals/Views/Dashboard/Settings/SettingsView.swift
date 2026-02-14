@@ -1,11 +1,11 @@
 import SwiftUI
-import UIKit
 
 private struct HouseholdMember: Identifiable, Hashable {
     let id: String
     let displayName: String
     let email: String?
     let avatarUrl: String?
+    let role: String
 }
 
 private struct BackendHouseholdMemberDTO: Decodable {
@@ -43,11 +43,16 @@ struct SettingsView: View {
     @State private var isLoadingMembers = false
     @State private var invitationLink: URL?
     @State private var isCreatingInvitation = false
-    @State private var didCopyInviteLink = false
     private let apiBaseURL = URL(string: "http://localhost:3000")
 
     private var hasHousehold: Bool {
         !persistedHouseholdName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var canCreateInvitations: Bool {
+        guard let currentUserId = sessionStore.currentUserId else { return false }
+        guard let me = householdMembers.first(where: { $0.id == currentUserId }) else { return false }
+        return me.role.uppercased() == "OWNER"
     }
 
     private var householdSummary: String {
@@ -276,35 +281,21 @@ struct SettingsView: View {
                                 VStack(alignment: .leading, spacing: 3) {
                                     Text(persistedHouseholdName)
                                         .font(.headline)
-                                    Text("Udostępnij zaproszenie lub opuść gospodarstwo.")
+                                    Text(canCreateInvitations ? "Udostępnij zaproszenie do gospodarstwa." : "Tylko właściciel może udostępniać zaproszenia.")
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                 }
                                 Spacer()
-                                if let invitationLink {
-                                    HStack(spacing: 8) {
-                                        ShareLink(item: invitationLink) {
-                                            Image(systemName: "square.and.arrow.up")
-                                                .font(.subheadline)
-                                        }
-                                        .buttonStyle(.bordered)
-
-                                        Button {
-                                            UIPasteboard.general.string = invitationLink.absoluteString
-                                            didCopyInviteLink = true
-                                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
-                                                didCopyInviteLink = false
-                                            }
-                                        } label: {
-                                            Image(systemName: "doc.on.doc")
-                                                .font(.subheadline)
-                                        }
-                                        .buttonStyle(.bordered)
+                                if canCreateInvitations, let invitationLink {
+                                    ShareLink(item: invitationLink) {
+                                        Image(systemName: "square.and.arrow.up")
+                                            .font(.subheadline)
                                     }
-                                } else if isCreatingInvitation {
+                                    .buttonStyle(.bordered)
+                                } else if canCreateInvitations, isCreatingInvitation {
                                     ProgressView()
                                         .controlSize(.small)
-                                } else {
+                                } else if canCreateInvitations {
                                     Button {
                                         Task { await createInvitationLink() }
                                     } label: {
@@ -316,13 +307,6 @@ struct SettingsView: View {
                             }
 
                             Divider()
-
-                            if didCopyInviteLink {
-                                Text("Skopiowano link zaproszenia")
-                                    .font(.caption)
-                                    .foregroundStyle(.green)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                            }
 
                             Button(role: .destructive) {
                                 Task {
@@ -341,10 +325,11 @@ struct SettingsView: View {
                                     } else {
                                         Image(systemName: "rectangle.portrait.and.arrow.right")
                                     }
-                                    Text(sessionStore.isSigningIn ? "Opuszczanie..." : "Opuść gospodarstwo")
+                                    Text(sessionStore.isSigningIn ? "Opuszczanie..." : "Opuść")
                                 }
                             }
                             .buttonStyle(.plain)
+                            .font(.footnote.weight(.medium))
                             .foregroundStyle(.red)
                             .disabled(sessionStore.isSigningIn)
 
@@ -434,8 +419,22 @@ struct SettingsView: View {
             .navigationTitle("Gospodarstwo")
             .task(id: showHouseholdSheet) {
                 if showHouseholdSheet {
-                    await createInvitationLink()
                     await loadHouseholdMembers()
+                    if canCreateInvitations {
+                        await createInvitationLink()
+                    } else {
+                        invitationLink = nil
+                    }
+                }
+            }
+            .task(id: sessionStore.householdRealtimeVersion) {
+                if showHouseholdSheet {
+                    await loadHouseholdMembers()
+                    if canCreateInvitations, invitationLink == nil {
+                        await createInvitationLink()
+                    } else if !canCreateInvitations {
+                        invitationLink = nil
+                    }
                 }
             }
             .toolbar {
@@ -515,8 +514,12 @@ struct SettingsView: View {
                     id: $0.user.id,
                     displayName: $0.user.displayName,
                     email: $0.user.email,
-                    avatarUrl: $0.user.avatarUrl
+                    avatarUrl: $0.user.avatarUrl,
+                    role: $0.role
                 )
+            }
+            if !canCreateInvitations {
+                sessionStore.authError = nil
             }
         } catch is CancellationError {
             // Sheet/task lifecycle cancellation is expected; do not surface as UI error.
