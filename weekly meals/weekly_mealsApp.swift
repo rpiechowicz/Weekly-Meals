@@ -9,13 +9,25 @@ import SwiftUI
 import UserNotifications
 
 final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
+    weak var sessionStore: SessionStore?
+
     func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil
     ) -> Bool {
         UNUserNotificationCenter.current().delegate = self
         PlanChangeNotificationService.requestAuthorizationIfNeeded()
+        application.registerForRemoteNotifications()
         return true
+    }
+
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        let token = deviceToken.map { String(format: "%02.2hhx", $0) }.joined()
+        sessionStore?.updatePushDeviceToken(token)
+    }
+
+    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        // Ignore in simulator/dev without APNs entitlement.
     }
 
     func userNotificationCenter(
@@ -72,6 +84,9 @@ struct weekly_mealsApp: App {
             }
             .environment(\.sessionStore, sessionStore)
             .preferredColorScheme((AppTheme(rawValue: themeRawValue) ?? .system).colorScheme)
+            .onAppear {
+                appDelegate.sessionStore = sessionStore
+            }
             .onOpenURL { url in
                 sessionStore.handleIncomingURL(url)
             }

@@ -66,6 +66,8 @@ struct BackendWeekChangedDTO: Codable {
     let action: String?
     let changedByUserId: String?
     let changedByDisplayName: String?
+    let dayOfWeek: String?
+    let mealType: String?
 }
 
 struct BackendSavedPlanChangedDTO: Codable {

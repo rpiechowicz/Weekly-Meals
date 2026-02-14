@@ -41,6 +41,10 @@ private struct HouseholdLeaveAckDTO: Codable {
     let success: Bool
 }
 
+private struct PushDeviceRegisterAckDTO: Codable {
+    let success: Bool
+}
+
 private struct BackendInvitationDTO: Codable {
     let id: String
     let token: String
@@ -106,6 +110,7 @@ final class SessionStore {
         static let displayName = "settings.user.displayName"
         static let email = "settings.user.email"
         static let householdName = "settings.household.name"
+        static let pushDeviceToken = "notifications.pushDeviceToken"
     }
 
     private let baseURL = URL(string: "http://localhost:3000")!
@@ -124,8 +129,10 @@ final class SessionStore {
     var shoppingListStore: ShoppingListStore?
     var datesViewModel = DatesViewModel()
     private var realtimeSocket: RecipeSocketClient?
+    private var pendingPushDeviceToken: String?
 
     init() {
+        pendingPushDeviceToken = UserDefaults.standard.string(forKey: Keys.pushDeviceToken)
         restoreSession()
     }
 
@@ -171,6 +178,7 @@ final class SessionStore {
                 currentHouseholdId = nil
                 currentHouseholdName = nil
             }
+            await registerPushDeviceIfPossible()
             isAuthenticated = true
         } catch {
             authError = error.localizedDescription
@@ -187,6 +195,16 @@ final class SessionStore {
         currentUserId = nil
         currentHouseholdId = nil
         currentHouseholdName = nil
+    }
+
+    func updatePushDeviceToken(_ token: String) {
+        let normalized = token.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty else { return }
+        pendingPushDeviceToken = normalized
+        UserDefaults.standard.set(normalized, forKey: Keys.pushDeviceToken)
+        Task { [weak self] in
+            await self?.registerPushDeviceIfPossible()
+        }
     }
 
     private func restoreSession() {
@@ -207,6 +225,9 @@ final class SessionStore {
                 householdId: householdId,
                 householdName: (householdName?.isEmpty == false ? householdName : nil)
             )
+        }
+        Task { [weak self] in
+            await self?.registerPushDeviceIfPossible()
         }
         isAuthenticated = true
     }
@@ -309,6 +330,7 @@ final class SessionStore {
             persistHousehold(id: household.id, name: household.name)
             bootstrapSession(userId: userId, householdId: household.id, householdName: household.name)
             weeklyMealStore?.resetLocalPlanningState()
+            await registerPushDeviceIfPossible()
             isAuthenticated = true
         } catch {
             authError = error.localizedDescription
@@ -455,6 +477,7 @@ final class SessionStore {
         persistHousehold(id: household.id, name: household.name)
         bootstrapSession(userId: userId, householdId: household.id, householdName: household.name)
         weeklyMealStore?.resetLocalPlanningState()
+        await registerPushDeviceIfPossible()
         isAuthenticated = true
     }
 
@@ -518,6 +541,33 @@ final class SessionStore {
         output.dateStyle = .medium
         output.timeStyle = .short
         return output.string(from: date)
+    }
+
+    private func registerPushDeviceIfPossible() async {
+        guard let userId = currentUserId, !userId.isEmpty else { return }
+        guard let token = pendingPushDeviceToken, !token.isEmpty else { return }
+
+        do {
+            let socketClient = SocketIORecipeSocketClient(baseURL: baseURL)
+            let envelope: WsEnvelope<PushDeviceRegisterAckDTO> = try await socketClient.emitWithAck(
+                event: "notifications:registerDevice",
+                payload: [
+                    "userId": userId,
+                    "data": [
+                        "deviceToken": token,
+                        "platform": "IOS",
+                        "appBundleId": Bundle.main.bundleIdentifier ?? "weeklymeals",
+                    ],
+                ],
+                as: WsEnvelope<PushDeviceRegisterAckDTO>.self
+            )
+
+            if !envelope.ok {
+                throw RecipeDataError.serverError(message: envelope.error ?? "Nie udało się zarejestrować urządzenia.")
+            }
+        } catch {
+            // App should continue normally even when push registration fails.
+        }
     }
 
     private func persistSession(_ response: DevLoginResponse) {

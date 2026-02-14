@@ -388,7 +388,9 @@ class WeeklyMealStore {
             PlanChangeNotificationService.notifyRemotePlanChange(
                 action: event.action,
                 weekStart: event.weekStart,
-                changedByDisplayName: event.changedByDisplayName
+                changedByDisplayName: event.changedByDisplayName,
+                dayOfWeek: event.dayOfWeek,
+                mealType: event.mealType
             )
         }
     }
