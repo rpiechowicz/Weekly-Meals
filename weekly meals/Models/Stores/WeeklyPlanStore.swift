@@ -15,6 +15,7 @@ protocol WeeklyPlanRepository {
     func fetchSavedPlan(weekStart: String) async throws -> BackendSharedMealPlanDTO
     func saveSavedPlan(weekStart: String, breakfastRecipeIds: [String], lunchRecipeIds: [String], dinnerRecipeIds: [String]) async throws -> BackendSharedMealPlanDTO
     func observeSavedPlanChanges(_ onChange: @escaping (_ event: BackendSavedPlanChangedDTO) -> Void)
+    func observeRealtimeReconnect(_ onReconnect: @escaping () -> Void)
 }
 
 protocol WeeklyPlanTransportClient {
@@ -26,6 +27,7 @@ protocol WeeklyPlanTransportClient {
     func fetchSavedPlan(weekStart: String) async throws -> BackendSharedMealPlanDTO
     func saveSavedPlan(weekStart: String, breakfastRecipeIds: [String], lunchRecipeIds: [String], dinnerRecipeIds: [String]) async throws -> BackendSharedMealPlanDTO
     func observeSavedPlanChanges(_ onChange: @escaping (_ event: BackendSavedPlanChangedDTO) -> Void)
+    func observeRealtimeReconnect(_ onReconnect: @escaping () -> Void)
 }
 
 struct BackendWeeklyPlanDTO: Codable {
@@ -68,6 +70,7 @@ struct BackendWeekChangedDTO: Codable {
     let changedByDisplayName: String?
     let dayOfWeek: String?
     let mealType: String?
+    let changeVersion: Int64?
 }
 
 struct BackendSavedPlanChangedDTO: Codable {
@@ -76,6 +79,7 @@ struct BackendSavedPlanChangedDTO: Codable {
     let changedByUserId: String?
     let changedByDisplayName: String?
     let action: String?
+    let changeVersion: Int64?
 }
 
 private final class WeekDateMapper {
@@ -361,6 +365,13 @@ final class WebSocketWeeklyPlanTransportClient: WeeklyPlanTransportClient {
             onChange(event)
         }
     }
+
+    func observeRealtimeReconnect(_ onReconnect: @escaping () -> Void) {
+        socket.observeConnection { isConnected in
+            guard isConnected else { return }
+            onReconnect()
+        }
+    }
 }
 
 final class ApiWeeklyPlanRepository: WeeklyPlanRepository {
@@ -428,5 +439,9 @@ final class ApiWeeklyPlanRepository: WeeklyPlanRepository {
 
     func observeSavedPlanChanges(_ onChange: @escaping (_ event: BackendSavedPlanChangedDTO) -> Void) {
         client.observeSavedPlanChanges(onChange)
+    }
+
+    func observeRealtimeReconnect(_ onReconnect: @escaping () -> Void) {
+        client.observeRealtimeReconnect(onReconnect)
     }
 }

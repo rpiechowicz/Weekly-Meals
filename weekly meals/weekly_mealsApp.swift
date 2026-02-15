@@ -44,6 +44,7 @@ struct weekly_mealsApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var sessionStore = SessionStore()
     @AppStorage("settings.theme") private var themeRawValue: String = AppTheme.system.rawValue
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
         WindowGroup {
@@ -86,6 +87,11 @@ struct weekly_mealsApp: App {
             .preferredColorScheme((AppTheme(rawValue: themeRawValue) ?? .system).colorScheme)
             .onAppear {
                 appDelegate.sessionStore = sessionStore
+            }
+            .onChange(of: scenePhase) { _, newValue in
+                if newValue == .active {
+                    sessionStore.refreshRealtimeStoresOnForeground()
+                }
             }
             .onOpenURL { url in
                 sessionStore.handleIncomingURL(url)

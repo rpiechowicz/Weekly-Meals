@@ -136,6 +136,11 @@ final class SessionStore {
         restoreSession()
     }
 
+    func refreshRealtimeStoresOnForeground() {
+        weeklyMealStore?.refreshObservedState()
+        shoppingListStore?.refreshCurrentWeek()
+    }
+
     func loginDev(displayName: String, email: String?) async {
         let trimmedName = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedName.isEmpty else {

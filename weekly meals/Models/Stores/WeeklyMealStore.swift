@@ -96,6 +96,10 @@ class WeeklyMealStore {
     private var observedWeekStart: String?
     private var observedWeekDates: [Date] = []
     private var observedSavedPlanWeekStart: String?
+    private var lastWeekChangeVersionByWeek: [String: Int64] = [:]
+    private var lastSavedPlanChangeVersionByWeek: [String: Int64] = [:]
+    private var pendingWeekReloadTask: Task<Void, Never>?
+    private var pendingSavedPlanReloadTask: Task<Void, Never>?
     var errorMessage: String?
 
     var hasSavedPlan: Bool { !savedPlan.isEmpty }
@@ -128,6 +132,12 @@ class WeeklyMealStore {
             guard let self else { return }
             Task { @MainActor in
                 await self.handleRemoteSavedPlanChanged(event: event)
+            }
+        }
+        self.weeklyPlanRepository?.observeRealtimeReconnect { [weak self] in
+            guard let self else { return }
+            Task { @MainActor in
+                self.scheduleRefreshForObservedState()
             }
         }
         load()
@@ -374,8 +384,18 @@ class WeeklyMealStore {
         observedWeekStart = nil
         observedWeekDates = []
         observedSavedPlanWeekStart = nil
+        lastWeekChangeVersionByWeek = [:]
+        lastSavedPlanChangeVersionByWeek = [:]
+        pendingWeekReloadTask?.cancel()
+        pendingSavedPlanReloadTask?.cancel()
+        pendingWeekReloadTask = nil
+        pendingSavedPlanReloadTask = nil
         save()
         saveSavedPlan()
+    }
+
+    func refreshObservedState() {
+        scheduleRefreshForObservedState()
     }
 
     @MainActor
@@ -383,7 +403,12 @@ class WeeklyMealStore {
         let changedByOtherUser = event.changedByUserId != nil && event.changedByUserId != currentUserId
         guard event.weekStart == observedWeekStart else { return }
         guard !observedWeekDates.isEmpty else { return }
-        await loadWeekPlanFromBackend(weekStart: event.weekStart, dates: observedWeekDates)
+        if let changeVersion = event.changeVersion {
+            let previous = lastWeekChangeVersionByWeek[event.weekStart] ?? 0
+            guard changeVersion > previous else { return }
+            lastWeekChangeVersionByWeek[event.weekStart] = changeVersion
+        }
+        scheduleWeekReload(weekStart: event.weekStart, dates: observedWeekDates)
         if changedByOtherUser {
             PlanChangeNotificationService.notifyRemotePlanChange(
                 action: event.action,
@@ -399,7 +424,12 @@ class WeeklyMealStore {
     private func handleRemoteSavedPlanChanged(event: BackendSavedPlanChangedDTO) async {
         let changedByOtherUser = event.changedByUserId != nil && event.changedByUserId != currentUserId
         guard event.weekStart == observedSavedPlanWeekStart else { return }
-        await loadSavedPlanFromBackend(weekStart: event.weekStart)
+        if let changeVersion = event.changeVersion {
+            let previous = lastSavedPlanChangeVersionByWeek[event.weekStart] ?? 0
+            guard changeVersion > previous else { return }
+            lastSavedPlanChangeVersionByWeek[event.weekStart] = changeVersion
+        }
+        scheduleSavedPlanReload(weekStart: event.weekStart)
         if changedByOtherUser {
             if event.action?.uppercased() == "CLEAR_PLAN" {
                 return
@@ -409,6 +439,33 @@ class WeeklyMealStore {
                 weekStart: event.weekStart,
                 changedByDisplayName: event.changedByDisplayName
             )
+        }
+    }
+
+    private func scheduleWeekReload(weekStart: String, dates: [Date]) {
+        pendingWeekReloadTask?.cancel()
+        pendingWeekReloadTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 250_000_000)
+            guard let self else { return }
+            await self.loadWeekPlanFromBackend(weekStart: weekStart, dates: dates)
+        }
+    }
+
+    private func scheduleSavedPlanReload(weekStart: String) {
+        pendingSavedPlanReloadTask?.cancel()
+        pendingSavedPlanReloadTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 250_000_000)
+            guard let self else { return }
+            await self.loadSavedPlanFromBackend(weekStart: weekStart)
+        }
+    }
+
+    private func scheduleRefreshForObservedState() {
+        if let observedWeekStart, !observedWeekDates.isEmpty {
+            scheduleWeekReload(weekStart: observedWeekStart, dates: observedWeekDates)
+        }
+        if let observedSavedPlanWeekStart {
+            scheduleSavedPlanReload(weekStart: observedSavedPlanWeekStart)
         }
     }
 
@@ -636,6 +693,7 @@ protocol RecipeRepository {
     func fetchRecipeById(_ recipeId: UUID) async throws -> Recipe
     func setFavorite(recipeId: UUID, isFavorite: Bool) async throws
     func observeFavoritesChanges(_ onChange: @escaping (_ recipeId: UUID, _ isFavorite: Bool) -> Void)
+    func observeRealtimeReconnect(_ onReconnect: @escaping () -> Void)
 }
 
 protocol RecipeTransportClient {
@@ -643,12 +701,14 @@ protocol RecipeTransportClient {
     func fetchRecipeById(recipeId: String) async throws -> BackendRecipeDTO
     func setFavorite(recipeId: String, isFavorite: Bool) async throws
     func observeFavoritesChanges(_ onChange: @escaping (_ recipeId: String, _ isFavorite: Bool) -> Void)
+    func observeRealtimeReconnect(_ onReconnect: @escaping () -> Void)
 }
 
 protocol RecipeSocketClient {
     func emitWithAck<T: Decodable>(event: String, payload: [String: Any], as: T.Type) async throws -> T
     func on(event: String, handler: @escaping ([Any]) -> Void)
     func off(event: String)
+    func observeConnection(_ handler: @escaping (_ isConnected: Bool) -> Void)
 }
 
 final class SocketIORecipeSocketClient: RecipeSocketClient {
@@ -656,6 +716,8 @@ final class SocketIORecipeSocketClient: RecipeSocketClient {
     private let socket: SocketIOClient
     private let ackTimeoutSeconds: Double = 6
     private let maxAckAttempts: Int = 3
+    private var connectionObservers: [UUID: (Bool) -> Void] = [:]
+    private let connectionObserversQueue = DispatchQueue(label: "weeklymeals.socket.connection-observers")
 
     init(baseURL: URL) {
         self.manager = SocketManager(
@@ -667,7 +729,33 @@ final class SocketIORecipeSocketClient: RecipeSocketClient {
             ]
         )
         self.socket = manager.defaultSocket
+        registerConnectionLifecycleEvents()
         self.socket.connect()
+    }
+
+    private func registerConnectionLifecycleEvents() {
+        socket.on(clientEvent: .connect) { [weak self] _, _ in
+            self?.notifyConnectionObservers(isConnected: true)
+        }
+        socket.on(clientEvent: .reconnect) { [weak self] _, _ in
+            self?.notifyConnectionObservers(isConnected: true)
+        }
+        socket.on(clientEvent: .disconnect) { [weak self] _, _ in
+            self?.notifyConnectionObservers(isConnected: false)
+        }
+        socket.on(clientEvent: .error) { [weak self] _, _ in
+            self?.notifyConnectionObservers(isConnected: false)
+        }
+    }
+
+    private func notifyConnectionObservers(isConnected: Bool) {
+        connectionObserversQueue.async { [weak self] in
+            guard let self else { return }
+            let handlers = self.connectionObservers.values
+            for handler in handlers {
+                handler(isConnected)
+            }
+        }
     }
 
     private func ensureConnected() async throws {
@@ -748,6 +836,13 @@ final class SocketIORecipeSocketClient: RecipeSocketClient {
 
     func off(event: String) {
         socket.off(event)
+    }
+
+    func observeConnection(_ handler: @escaping (Bool) -> Void) {
+        let id = UUID()
+        connectionObserversQueue.async { [weak self] in
+            self?.connectionObservers[id] = handler
+        }
     }
 }
 
@@ -941,6 +1036,8 @@ final class UnconfiguredRecipeSocketClient: RecipeSocketClient {
     func on(event: String, handler: @escaping ([Any]) -> Void) {}
 
     func off(event: String) {}
+
+    func observeConnection(_ handler: @escaping (Bool) -> Void) {}
 }
 
 final class WebSocketRecipeTransportClient: RecipeTransportClient {
@@ -1036,6 +1133,13 @@ final class WebSocketRecipeTransportClient: RecipeTransportClient {
             onChange(event.recipeId, event.isFavorite)
         }
     }
+
+    func observeRealtimeReconnect(_ onReconnect: @escaping () -> Void) {
+        socket.observeConnection { isConnected in
+            guard isConnected else { return }
+            onReconnect()
+        }
+    }
 }
 
 final class ApiRecipeRepository: RecipeRepository {
@@ -1072,6 +1176,10 @@ final class ApiRecipeRepository: RecipeRepository {
             onChange(uuid, isFavorite)
         }
     }
+
+    func observeRealtimeReconnect(_ onReconnect: @escaping () -> Void) {
+        client.observeRealtimeReconnect(onReconnect)
+    }
 }
 
 @Observable
@@ -1092,6 +1200,7 @@ final class RecipeCatalogStore {
     private let pageSize: Int = 24
     private let cacheMaxAge: TimeInterval = 60 * 30 // 30 min
     private let maxFetchAttempts: Int = 3
+    private var pendingRealtimeReloadTask: Task<Void, Never>?
 
     private var cacheURL: URL {
         FileManager.default
@@ -1114,6 +1223,18 @@ final class RecipeCatalogStore {
                 if let index = self.recipes.firstIndex(where: { $0.id == recipeId }) {
                     self.recipes[index].favourite = isFavorite
                     self.saveCache()
+                }
+            }
+        }
+        self.repository.observeRealtimeReconnect { [weak self] in
+            guard let self else { return }
+            Task { @MainActor in
+                guard self.didLoad else { return }
+                self.pendingRealtimeReloadTask?.cancel()
+                self.pendingRealtimeReloadTask = Task { @MainActor [weak self] in
+                    try? await Task.sleep(nanoseconds: 300_000_000)
+                    guard let self else { return }
+                    await self.reload()
                 }
             }
         }

@@ -4,13 +4,15 @@ import Observation
 protocol ShoppingListRepository {
     func fetchShoppingList(weekStart: String) async throws -> [ShoppingItem]
     func setChecked(weekStart: String, productKey: String, isChecked: Bool) async throws
-    func observeShoppingListChanges(_ onChange: @escaping (_ weekStart: String) -> Void)
+    func observeShoppingListChanges(_ onChange: @escaping (_ event: BackendShoppingListChangedDTO) -> Void)
+    func observeRealtimeReconnect(_ onReconnect: @escaping () -> Void)
 }
 
 protocol ShoppingListTransportClient {
     func fetchShoppingList(weekStart: String) async throws -> [BackendShoppingItemDTO]
     func setChecked(weekStart: String, productKey: String, isChecked: Bool) async throws
-    func observeShoppingListChanges(_ onChange: @escaping (_ weekStart: String) -> Void)
+    func observeShoppingListChanges(_ onChange: @escaping (_ event: BackendShoppingListChangedDTO) -> Void)
+    func observeRealtimeReconnect(_ onReconnect: @escaping () -> Void)
 }
 
 struct BackendShoppingItemDTO: Codable {
@@ -36,8 +38,9 @@ struct BackendShoppingItemCheckDTO: Codable {
 struct BackendShoppingListChangedDTO: Codable {
     let householdId: String
     let weekStart: String
-    let productKey: String
-    let isChecked: Bool
+    let productKey: String?
+    let isChecked: Bool?
+    let changeVersion: Int64?
 }
 
 private extension BackendShoppingItemDTO {
@@ -144,7 +147,7 @@ final class WebSocketShoppingListTransportClient: ShoppingListTransportClient {
         throw RecipeDataError.serverError(message: envelope.error ?? "Nieznany błąd weeklyPlans:setShoppingItemChecked.")
     }
 
-    func observeShoppingListChanges(_ onChange: @escaping (_ weekStart: String) -> Void) {
+    func observeShoppingListChanges(_ onChange: @escaping (_ event: BackendShoppingListChangedDTO) -> Void) {
         socket.off(event: "weeklyPlans:shoppingListChanged")
         socket.on(event: "weeklyPlans:shoppingListChanged") { [weak self] items in
             guard let self else { return }
@@ -159,7 +162,14 @@ final class WebSocketShoppingListTransportClient: ShoppingListTransportClient {
                 return
             }
 
-            onChange(event.weekStart)
+            onChange(event)
+        }
+    }
+
+    func observeRealtimeReconnect(_ onReconnect: @escaping () -> Void) {
+        socket.observeConnection { isConnected in
+            guard isConnected else { return }
+            onReconnect()
         }
     }
 }
@@ -180,8 +190,12 @@ final class ApiShoppingListRepository: ShoppingListRepository {
         try await client.setChecked(weekStart: weekStart, productKey: productKey, isChecked: isChecked)
     }
 
-    func observeShoppingListChanges(_ onChange: @escaping (_ weekStart: String) -> Void) {
+    func observeShoppingListChanges(_ onChange: @escaping (_ event: BackendShoppingListChangedDTO) -> Void) {
         client.observeShoppingListChanges(onChange)
+    }
+
+    func observeRealtimeReconnect(_ onReconnect: @escaping () -> Void) {
+        client.observeRealtimeReconnect(onReconnect)
     }
 }
 
@@ -191,16 +205,30 @@ final class ShoppingListStore {
     private let repository: ShoppingListRepository
     private(set) var items: [ShoppingItem] = []
     private(set) var weekStart: String?
+    private var pendingReloadTask: Task<Void, Never>?
+    private var lastChangeVersionByWeek: [String: Int64] = [:]
     var isLoading: Bool = false
     var errorMessage: String?
 
     init(repository: ShoppingListRepository) {
         self.repository = repository
-        self.repository.observeShoppingListChanges { [weak self] changedWeekStart in
+        self.repository.observeShoppingListChanges { [weak self] event in
             guard let self else { return }
             Task { @MainActor in
-                guard let currentWeekStart = self.weekStart, currentWeekStart == changedWeekStart else { return }
-                await self.load(weekStart: currentWeekStart, force: true)
+                guard let currentWeekStart = self.weekStart, currentWeekStart == event.weekStart else { return }
+                if let changeVersion = event.changeVersion {
+                    let previous = self.lastChangeVersionByWeek[currentWeekStart] ?? 0
+                    guard changeVersion > previous else { return }
+                    self.lastChangeVersionByWeek[currentWeekStart] = changeVersion
+                }
+                self.scheduleReload(weekStart: currentWeekStart)
+            }
+        }
+        self.repository.observeRealtimeReconnect { [weak self] in
+            guard let self else { return }
+            Task { @MainActor in
+                guard let currentWeekStart = self.weekStart else { return }
+                self.scheduleReload(weekStart: currentWeekStart)
             }
         }
     }
@@ -217,6 +245,11 @@ final class ShoppingListStore {
         isLoading = false
     }
 
+    func refreshCurrentWeek() {
+        guard let weekStart else { return }
+        scheduleReload(weekStart: weekStart)
+    }
+
     func toggleChecked(_ item: ShoppingItem) async {
         guard let index = items.firstIndex(where: { $0.productKey == item.productKey }),
               let weekStart else { return }
@@ -230,6 +263,15 @@ final class ShoppingListStore {
         } catch {
             items[index].isChecked = previous
             errorMessage = error.localizedDescription
+        }
+    }
+
+    private func scheduleReload(weekStart: String) {
+        pendingReloadTask?.cancel()
+        pendingReloadTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 250_000_000)
+            guard let self else { return }
+            await self.load(weekStart: weekStart, force: true)
         }
     }
 }
