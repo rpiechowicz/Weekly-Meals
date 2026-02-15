@@ -201,7 +201,7 @@ class WeeklyMealStore {
             syncSavedPlanSelectionFlagsWithCalendar()
             errorMessage = nil
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = UserFacingErrorMapper.message(from: error)
         }
     }
 
@@ -228,7 +228,7 @@ class WeeklyMealStore {
             return true
         } catch {
             setRecipe(previous, for: date, slot: slot)
-            errorMessage = error.localizedDescription
+            errorMessage = UserFacingErrorMapper.message(from: error)
             return false
         }
     }
@@ -250,7 +250,7 @@ class WeeklyMealStore {
             return true
         } catch {
             setRecipe(previous, for: date, slot: slot)
-            errorMessage = error.localizedDescription
+            errorMessage = UserFacingErrorMapper.message(from: error)
             return false
         }
     }
@@ -269,7 +269,7 @@ class WeeklyMealStore {
             saveSavedPlan()
             errorMessage = nil
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = UserFacingErrorMapper.message(from: error)
         }
     }
 
@@ -343,7 +343,7 @@ class WeeklyMealStore {
             syncSavedPlanSelectionFlagsWithCalendar()
             errorMessage = nil
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = UserFacingErrorMapper.message(from: error)
         }
     }
 
@@ -367,7 +367,7 @@ class WeeklyMealStore {
             cleanupCalendarAndSync(with: mapped)
             errorMessage = nil
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = UserFacingErrorMapper.message(from: error)
         }
     }
 
@@ -1262,7 +1262,7 @@ final class RecipeCatalogStore {
             didLoad = true
             saveCache()
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = UserFacingErrorMapper.message(from: error)
         }
         isLoading = false
     }
@@ -1285,7 +1285,7 @@ final class RecipeCatalogStore {
             hasMore = items.count >= pageSize
             saveCache()
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = UserFacingErrorMapper.message(from: error)
         }
     }
 
@@ -1302,7 +1302,7 @@ final class RecipeCatalogStore {
             recipes[index] = detailed
             return detailed
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = UserFacingErrorMapper.message(from: error)
             return current
         }
     }
@@ -1318,7 +1318,7 @@ final class RecipeCatalogStore {
             saveCache()
         } catch {
             recipes[index].favourite = previous
-            errorMessage = error.localizedDescription
+            errorMessage = UserFacingErrorMapper.message(from: error)
         }
     }
 

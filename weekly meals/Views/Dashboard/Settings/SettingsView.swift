@@ -525,7 +525,7 @@ struct SettingsView: View {
             // Sheet/task lifecycle cancellation is expected; do not surface as UI error.
             return
         } catch {
-            sessionStore.authError = error.localizedDescription
+            sessionStore.authError = UserFacingErrorMapper.message(from: error)
             householdMembers = []
         }
     }
@@ -575,7 +575,7 @@ struct SettingsView: View {
         } catch is CancellationError {
             return
         } catch {
-            sessionStore.authError = error.localizedDescription
+            sessionStore.authError = UserFacingErrorMapper.message(from: error)
             invitationLink = nil
         }
     }

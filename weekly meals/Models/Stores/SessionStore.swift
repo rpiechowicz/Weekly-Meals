@@ -186,7 +186,7 @@ final class SessionStore {
             await registerPushDeviceIfPossible()
             isAuthenticated = true
         } catch {
-            authError = error.localizedDescription
+            authError = UserFacingErrorMapper.message(from: error)
             isAuthenticated = false
             clearRuntimeStores()
         }
@@ -338,7 +338,7 @@ final class SessionStore {
             await registerPushDeviceIfPossible()
             isAuthenticated = true
         } catch {
-            authError = error.localizedDescription
+            authError = UserFacingErrorMapper.message(from: error)
         }
     }
 
@@ -374,7 +374,7 @@ final class SessionStore {
             // Ignore task cancellation caused by view lifecycle updates.
             return
         } catch {
-            authError = error.localizedDescription
+            authError = UserFacingErrorMapper.message(from: error)
         }
     }
 
@@ -493,7 +493,7 @@ final class SessionStore {
         } catch is CancellationError {
             return
         } catch {
-            authError = error.localizedDescription
+            authError = UserFacingErrorMapper.message(from: error)
         }
     }
 
@@ -532,7 +532,7 @@ final class SessionStore {
             } catch is CancellationError {
                 return
             } catch {
-                authError = error.localizedDescription
+                authError = UserFacingErrorMapper.message(from: error)
             }
         }
     }

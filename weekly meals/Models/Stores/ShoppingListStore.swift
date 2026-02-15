@@ -240,7 +240,7 @@ final class ShoppingListStore {
             items = try await repository.fetchShoppingList(weekStart: weekStart)
             self.weekStart = weekStart
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = UserFacingErrorMapper.message(from: error)
         }
         isLoading = false
     }
@@ -262,7 +262,7 @@ final class ShoppingListStore {
             try await repository.setChecked(weekStart: weekStart, productKey: item.productKey, isChecked: next)
         } catch {
             items[index].isChecked = previous
-            errorMessage = error.localizedDescription
+            errorMessage = UserFacingErrorMapper.message(from: error)
         }
     }
 
