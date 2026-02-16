@@ -4,6 +4,7 @@ struct ProductsView: View {
     @Environment(\.shoppingListStore) private var shoppingListStore
     @Environment(\.datesViewModel) private var datesViewModel
     @Environment(\.colorScheme) private var colorScheme
+    @State private var isAddManualItemSheetPresented = false
 
     private var shoppingItems: [ShoppingItem] {
         shoppingListStore.items
@@ -73,8 +74,32 @@ struct ProductsView: View {
                 }
             }
             .navigationTitle("Produkty")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        isAddManualItemSheetPresented = true
+                    } label: {
+                        Image(systemName: "plus.circle.fill")
+                    }
+                    .accessibilityLabel("Dodaj produkt ręcznie")
+                }
+            }
             .task(id: datesViewModel.weekStartISO) {
                 await shoppingListStore.load(weekStart: datesViewModel.weekStartISO)
+            }
+            .sheet(isPresented: $isAddManualItemSheetPresented) {
+                AddManualShoppingItemSheet { name, amount, unit, department in
+                    let success = await shoppingListStore.addManualItem(
+                        name: name,
+                        amount: amount,
+                        unit: unit,
+                        department: department
+                    )
+                    if success {
+                        await shoppingListStore.load(weekStart: datesViewModel.weekStartISO, force: true)
+                    }
+                    return success
+                }
             }
         }
     }
