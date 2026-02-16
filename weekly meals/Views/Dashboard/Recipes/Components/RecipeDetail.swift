@@ -31,6 +31,32 @@ struct RecipeDetailView: View {
         case .hard: return .red
         }
     }
+
+    private func ingredientDisplayName(_ name: String) -> String {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let first = trimmed.first else { return trimmed }
+        return String(first).uppercased(with: Locale(identifier: "pl_PL")) + trimmed.dropFirst()
+    }
+
+    private func formatNutritionValue(_ value: Double, maximumFractionDigits: Int = 1) -> String {
+        let formatter = NumberFormatter()
+        formatter.locale = Locale(identifier: "pl_PL")
+        formatter.numberStyle = .decimal
+        formatter.minimumFractionDigits = 0
+        formatter.maximumFractionDigits = maximumFractionDigits
+        formatter.roundingMode = .halfUp
+        return formatter.string(from: NSNumber(value: value)) ?? "\(value)"
+    }
+
+    private func formatIngredientAmount(_ value: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.locale = Locale(identifier: "pl_PL")
+        formatter.numberStyle = .decimal
+        formatter.minimumFractionDigits = 0
+        formatter.maximumFractionDigits = 2
+        formatter.roundingMode = .halfUp
+        return formatter.string(from: NSNumber(value: value)) ?? "\(value)"
+    }
     
     var body: some View {
         ZStack(alignment: .topTrailing) {
@@ -107,12 +133,12 @@ struct RecipeDetailView: View {
                                 .font(.headline)
                             
                             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                                NutritionCard(title: "Kalorie", value: "\(Int(recipe.nutritionPerServing.kcal))", unit: "kcal", icon: "flame.fill", color: .orange)
-                                NutritionCard(title: "Białko", value: "\(Int(recipe.nutritionPerServing.protein))", unit: "g", icon: "bolt.fill", color: .blue)
-                                NutritionCard(title: "Węglowodany", value: "\(Int(recipe.nutritionPerServing.carbs))", unit: "g", icon: "leaf.fill", color: .green)
-                                NutritionCard(title: "Tłuszcze", value: "\(Int(recipe.nutritionPerServing.fat))", unit: "g", icon: "drop.fill", color: .purple)
-                                NutritionCard(title: "Błonnik", value: "\(Int(recipe.nutritionPerServing.fiber))", unit: "g", icon: "heart.fill", color: .pink)
-                                NutritionCard(title: "Sól", value: String(format: "%.1f", recipe.nutritionPerServing.salt), unit: "g", icon: "sparkles", color: .cyan)
+                                NutritionCard(title: "Kalorie", value: formatNutritionValue(recipe.nutritionPerServing.kcal, maximumFractionDigits: 0), unit: "kcal", icon: "flame.fill", color: .orange)
+                                NutritionCard(title: "Białko", value: formatNutritionValue(recipe.nutritionPerServing.protein), unit: "g", icon: "bolt.fill", color: .blue)
+                                NutritionCard(title: "Węglowodany", value: formatNutritionValue(recipe.nutritionPerServing.carbs), unit: "g", icon: "leaf.fill", color: .green)
+                                NutritionCard(title: "Tłuszcze", value: formatNutritionValue(recipe.nutritionPerServing.fat), unit: "g", icon: "drop.fill", color: .purple)
+                                NutritionCard(title: "Błonnik", value: formatNutritionValue(recipe.nutritionPerServing.fiber), unit: "g", icon: "heart.fill", color: .pink)
+                                NutritionCard(title: "Sól", value: formatNutritionValue(recipe.nutritionPerServing.salt), unit: "g", icon: "sparkles", color: .cyan)
                             }
                             .padding(1) // Spacer for border visibility
                         }
@@ -172,14 +198,14 @@ struct RecipeDetailView: View {
                                 ForEach(Array(recipe.ingredients.enumerated()), id: \.element.id) { index, ingredient in
                                     HStack(alignment: .center, spacing: 12) {
                                         // Ingredient name
-                                        Text(ingredient.name)
+                                        Text(ingredientDisplayName(ingredient.name))
                                             .font(.subheadline)
                                             .foregroundStyle(.primary)
                                         
                                         Spacer(minLength: 8)
                                         
                                         // Amount
-                                        Text("\(ingredient.amount.formatted()) \(ingredient.unit.rawValue)")
+                                        Text("\(formatIngredientAmount(ingredient.amount)) \(ingredient.unit.rawValue)")
                                             .font(.subheadline)
                                             .fontWeight(.medium)
                                             .foregroundStyle(.secondary)

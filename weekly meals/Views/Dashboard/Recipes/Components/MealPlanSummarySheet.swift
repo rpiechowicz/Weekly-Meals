@@ -7,12 +7,7 @@ struct MealPlanSummarySheet: View {
     @Environment(\.weeklyMealStore) private var mealStore
     @Environment(\.datesViewModel) private var datesViewModel
     @Environment(\.shoppingListStore) private var shoppingListStore
-    @State private var showProtectedRecipeAlert = false
-    @State private var protectedRecipeAlertMessage = ""
-
-    private var canSave: Bool {
-        mealPlan.totalCount > 0
-    }
+    private var canSave: Bool { true }
 
     private func usedCount(for recipe: Recipe, slot: MealSlot) -> Int {
         datesViewModel.dates.reduce(into: 0) { result, date in
@@ -54,12 +49,7 @@ struct MealPlanSummarySheet: View {
                                 .swipeActions(edge: .leading, allowsFullSwipe: true) {
                                     Button {
                                         withAnimation {
-                                            if mealPlan.recipeCount(recipe) > inUse {
-                                                mealPlan.decrementRecipe(recipe)
-                                            } else {
-                                                protectedRecipeAlertMessage = "Nie możesz odjąć tego przepisu, bo jest już przypisany w kalendarzu (\(inUse) raz(y)). Najpierw usuń go z dnia w Kalendarzu."
-                                                showProtectedRecipeAlert = true
-                                            }
+                                            mealPlan.decrementRecipe(recipe)
                                         }
                                     } label: {
                                         Label("Odejmij", systemImage: "minus")
@@ -94,11 +84,6 @@ struct MealPlanSummarySheet: View {
                     Button("Zapisz") { saveTapped() }
                         .disabled(!canSave)
                 }
-            }
-            .alert("Nie można odjąć przepisu", isPresented: $showProtectedRecipeAlert) {
-                Button("OK", role: .cancel) { }
-            } message: {
-                Text(protectedRecipeAlertMessage)
             }
         }
         .presentationDetents([.large])

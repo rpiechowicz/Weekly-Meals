@@ -960,6 +960,30 @@ private struct BackendFavoritesChangedDTO: Codable {
 }
 
 extension BackendRecipeDTO {
+    private static let apiBaseURL = URL(string: "http://localhost:3000")!
+
+    private func displayIngredientName(_ raw: String) -> String {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let first = trimmed.first else { return trimmed }
+        return String(first).uppercased(with: Locale(identifier: "pl_PL")) + trimmed.dropFirst()
+    }
+
+    private func resolvedImageURL() -> URL? {
+        guard let raw = imageUrl?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else {
+            return nil
+        }
+
+        if let absolute = URL(string: raw), absolute.scheme != nil {
+            return absolute
+        }
+
+        if raw.hasPrefix("/") {
+            return URL(string: raw, relativeTo: Self.apiBaseURL)?.absoluteURL
+        }
+
+        return URL(string: "/" + raw, relativeTo: Self.apiBaseURL)?.absoluteURL
+    }
+
     var appCategory: RecipesCategory? {
         switch mealType.uppercased() {
         case "BREAKFAST": .breakfast
@@ -988,7 +1012,7 @@ extension BackendRecipeDTO {
             guard let mappedUnit = unit else { return nil }
             return Ingredient(
                 id: UUID(uuidString: item.id) ?? UUID(),
-                name: item.name,
+                name: displayIngredientName(item.name),
                 amount: item.amount,
                 unit: mappedUnit
             )
@@ -1013,7 +1037,7 @@ extension BackendRecipeDTO {
             servings: servings,
             prepTimeMinutes: prepTimeMinutes,
             difficulty: appDifficulty,
-            imageURL: imageUrl.flatMap(URL.init(string:)),
+            imageURL: resolvedImageURL(),
             ingredients: mappedIngredients,
             preparationSteps: mappedPreparationSteps,
             nutrition: Nutrition(
@@ -1205,7 +1229,7 @@ final class RecipeCatalogStore {
     private var cacheURL: URL {
         FileManager.default
             .urls(for: .documentDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("recipes_catalog_cache.json")
+            .appendingPathComponent("recipes_catalog_cache_v2.json")
     }
 
     init(

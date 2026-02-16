@@ -134,6 +134,7 @@ struct ProductsView: View {
             ProgressView(value: progress)
                 .tint(boughtCount == shoppingItems.count ? .green : .blue)
                 .scaleEffect(y: 1.5)
+                .animation(.easeInOut(duration: 0.35), value: progress)
 
             if boughtCount == shoppingItems.count && !shoppingItems.isEmpty {
                 HStack(spacing: 6) {

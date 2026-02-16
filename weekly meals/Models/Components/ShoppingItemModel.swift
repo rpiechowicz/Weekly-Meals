@@ -9,9 +9,18 @@ struct ShoppingItem: Identifiable, Codable, Hashable {
     var department: String
     var isChecked: Bool
 
+    private static let amountFormatter: NumberFormatter = {
+        let formatter = NumberFormatter()
+        formatter.locale = Locale(identifier: "pl_PL")
+        formatter.numberStyle = .decimal
+        formatter.minimumFractionDigits = 0
+        formatter.maximumFractionDigits = 0
+        formatter.roundingMode = .halfUp
+        return formatter
+    }()
+
     var formattedAmount: String {
-        totalAmount.truncatingRemainder(dividingBy: 1) == 0
-            ? String(format: "%.0f", totalAmount)
-            : String(format: "%.1f", totalAmount)
+        ShoppingItem.amountFormatter.string(from: NSNumber(value: totalAmount))
+            ?? String(totalAmount)
     }
 }
