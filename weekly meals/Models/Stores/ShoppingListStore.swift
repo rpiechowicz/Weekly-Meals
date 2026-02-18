@@ -4,14 +4,6 @@ import Observation
 protocol ShoppingListRepository {
     func fetchShoppingList(weekStart: String) async throws -> [ShoppingItem]
     func setChecked(weekStart: String, productKey: String, isChecked: Bool) async throws
-    func upsertManualItem(
-        weekStart: String,
-        name: String,
-        amount: Double,
-        unit: String,
-        department: String?
-    ) async throws
-    func removeManualItem(weekStart: String, productKey: String) async throws
     func observeShoppingListChanges(_ onChange: @escaping (_ event: BackendShoppingListChangedDTO) -> Void)
     func observeRealtimeReconnect(_ onReconnect: @escaping () -> Void)
 }
@@ -19,14 +11,6 @@ protocol ShoppingListRepository {
 protocol ShoppingListTransportClient {
     func fetchShoppingList(weekStart: String) async throws -> [BackendShoppingItemDTO]
     func setChecked(weekStart: String, productKey: String, isChecked: Bool) async throws
-    func upsertManualItem(
-        weekStart: String,
-        name: String,
-        amount: Double,
-        unit: String,
-        department: String?
-    ) async throws
-    func removeManualItem(weekStart: String, productKey: String) async throws
     func observeShoppingListChanges(_ onChange: @escaping (_ event: BackendShoppingListChangedDTO) -> Void)
     func observeRealtimeReconnect(_ onReconnect: @escaping () -> Void)
 }
@@ -51,28 +35,34 @@ struct BackendShoppingItemCheckDTO: Codable {
     let isChecked: Bool
 }
 
-struct BackendManualShoppingItemDTO: Codable {
-    let id: String
-    let householdId: String
-    let createdById: String?
-    let weekStart: String
-    let productKey: String
-    let name: String
-    let amount: Double
-    let unit: String
-    let department: String
-}
-
-struct BackendManualShoppingItemDeleteDTO: Codable {
-    let deleted: Bool
-}
-
 struct BackendShoppingListChangedDTO: Codable {
     let householdId: String
     let weekStart: String
     let productKey: String?
     let isChecked: Bool?
     let changeVersion: Int64?
+}
+
+private struct HouseholdListPayload: Encodable {
+    let userId: String
+}
+
+private struct ShoppingListPayload: Encodable {
+    let userId: String
+    let householdId: String
+    let weekStart: String
+}
+
+private struct SetCheckedDataPayload: Encodable {
+    let productKey: String
+    let isChecked: Bool
+}
+
+private struct SetCheckedPayload: Encodable {
+    let userId: String
+    let householdId: String
+    let weekStart: String
+    let data: SetCheckedDataPayload
 }
 
 private extension BackendShoppingItemDTO {
@@ -94,6 +84,7 @@ final class WebSocketShoppingListTransportClient: ShoppingListTransportClient {
     private let householdId: String?
     private let preferredHouseholdName: String?
     private var resolvedHouseholdId: String?
+    private let stateLock = NSLock()
 
     init(
         socket: RecipeSocketClient,
@@ -107,18 +98,34 @@ final class WebSocketShoppingListTransportClient: ShoppingListTransportClient {
         self.preferredHouseholdName = preferredHouseholdName
     }
 
+    private func makePayload<T: Encodable>(_ value: T) throws -> [String: Any] {
+        let encoded = try JSONEncoder().encode(value)
+        let object = try JSONSerialization.jsonObject(with: encoded, options: [])
+        guard let dictionary = object as? [String: Any] else {
+            throw RecipeDataError.serverError(message: "Nie udało się zbudować payloadu JSON.")
+        }
+        return dictionary
+    }
+
     private func resolveHouseholdId() async throws -> String {
-        if let resolvedHouseholdId {
-            return resolvedHouseholdId
+        stateLock.lock()
+        let currentResolved = resolvedHouseholdId
+        stateLock.unlock()
+
+        if let currentResolved {
+            return currentResolved
         }
         if let householdId, !householdId.isEmpty {
+            stateLock.lock()
             resolvedHouseholdId = householdId
+            stateLock.unlock()
             return householdId
         }
 
+        let payload = try makePayload(HouseholdListPayload(userId: userId))
         let envelope: WsEnvelope<[BackendHouseholdDTO]> = try await socket.emitWithAck(
             event: "households:findAll",
-            payload: ["userId": userId],
+            payload: payload,
             as: WsEnvelope<[BackendHouseholdDTO]>.self
         )
 
@@ -128,26 +135,33 @@ final class WebSocketShoppingListTransportClient: ShoppingListTransportClient {
 
         if let preferredHouseholdName,
            let matched = households.first(where: { $0.name.lowercased() == preferredHouseholdName.lowercased() }) {
+            stateLock.lock()
             resolvedHouseholdId = matched.id
+            stateLock.unlock()
             return matched.id
         }
 
         guard let first = households.first else {
             throw RecipeDataError.serverError(message: "Brak gospodarstwa dla użytkownika.")
         }
+        stateLock.lock()
         resolvedHouseholdId = first.id
+        stateLock.unlock()
         return first.id
     }
 
     func fetchShoppingList(weekStart: String) async throws -> [BackendShoppingItemDTO] {
         let householdId = try await resolveHouseholdId()
+        let payload = try makePayload(
+            ShoppingListPayload(
+                userId: userId,
+                householdId: householdId,
+                weekStart: weekStart
+            )
+        )
         let envelope: WsEnvelope<[BackendShoppingItemDTO]> = try await socket.emitWithAck(
             event: "weeklyPlans:getShoppingList",
-            payload: [
-                "userId": userId,
-                "householdId": householdId,
-                "weekStart": weekStart
-            ],
+            payload: payload,
             as: WsEnvelope<[BackendShoppingItemDTO]>.self
         )
 
@@ -159,17 +173,20 @@ final class WebSocketShoppingListTransportClient: ShoppingListTransportClient {
 
     func setChecked(weekStart: String, productKey: String, isChecked: Bool) async throws {
         let householdId = try await resolveHouseholdId()
+        let payload = try makePayload(
+            SetCheckedPayload(
+                userId: userId,
+                householdId: householdId,
+                weekStart: weekStart,
+                data: SetCheckedDataPayload(
+                    productKey: productKey,
+                    isChecked: isChecked
+                )
+            )
+        )
         let envelope: WsEnvelope<BackendShoppingItemCheckDTO> = try await socket.emitWithAck(
             event: "weeklyPlans:setShoppingItemChecked",
-            payload: [
-                "userId": userId,
-                "householdId": householdId,
-                "weekStart": weekStart,
-                "data": [
-                    "productKey": productKey,
-                    "isChecked": isChecked
-                ]
-            ],
+            payload: payload,
             as: WsEnvelope<BackendShoppingItemCheckDTO>.self
         )
 
@@ -177,61 +194,6 @@ final class WebSocketShoppingListTransportClient: ShoppingListTransportClient {
             return
         }
         throw RecipeDataError.serverError(message: envelope.error ?? "Nieznany błąd weeklyPlans:setShoppingItemChecked.")
-    }
-
-    func upsertManualItem(
-        weekStart: String,
-        name: String,
-        amount: Double,
-        unit: String,
-        department: String?
-    ) async throws {
-        let householdId = try await resolveHouseholdId()
-        var data: [String: Any] = [
-            "name": name,
-            "amount": amount,
-            "unit": unit
-        ]
-        if let department, !department.isEmpty {
-            data["department"] = department
-        }
-
-        let envelope: WsEnvelope<BackendManualShoppingItemDTO> = try await socket.emitWithAck(
-            event: "weeklyPlans:upsertManualShoppingItem",
-            payload: [
-                "userId": userId,
-                "householdId": householdId,
-                "weekStart": weekStart,
-                "data": data
-            ],
-            as: WsEnvelope<BackendManualShoppingItemDTO>.self
-        )
-
-        if envelope.ok {
-            return
-        }
-        throw RecipeDataError.serverError(message: envelope.error ?? "Nieznany błąd weeklyPlans:upsertManualShoppingItem.")
-    }
-
-    func removeManualItem(weekStart: String, productKey: String) async throws {
-        let householdId = try await resolveHouseholdId()
-        let envelope: WsEnvelope<BackendManualShoppingItemDeleteDTO> = try await socket.emitWithAck(
-            event: "weeklyPlans:removeManualShoppingItem",
-            payload: [
-                "userId": userId,
-                "householdId": householdId,
-                "weekStart": weekStart,
-                "data": [
-                    "productKey": productKey
-                ]
-            ],
-            as: WsEnvelope<BackendManualShoppingItemDeleteDTO>.self
-        )
-
-        if envelope.ok {
-            return
-        }
-        throw RecipeDataError.serverError(message: envelope.error ?? "Nieznany błąd weeklyPlans:removeManualShoppingItem.")
     }
 
     func observeShoppingListChanges(_ onChange: @escaping (_ event: BackendShoppingListChangedDTO) -> Void) {
@@ -244,7 +206,10 @@ final class WebSocketShoppingListTransportClient: ShoppingListTransportClient {
                   let event = try? JSONDecoder().decode(BackendShoppingListChangedDTO.self, from: data)
             else { return }
 
-            let expectedHouseholdId = self.resolvedHouseholdId ?? self.householdId
+            self.stateLock.lock()
+            let cachedHouseholdId = self.resolvedHouseholdId
+            self.stateLock.unlock()
+            let expectedHouseholdId = cachedHouseholdId ?? self.householdId
             if let expectedHouseholdId, event.householdId != expectedHouseholdId {
                 return
             }
@@ -275,26 +240,6 @@ final class ApiShoppingListRepository: ShoppingListRepository {
 
     func setChecked(weekStart: String, productKey: String, isChecked: Bool) async throws {
         try await client.setChecked(weekStart: weekStart, productKey: productKey, isChecked: isChecked)
-    }
-
-    func upsertManualItem(
-        weekStart: String,
-        name: String,
-        amount: Double,
-        unit: String,
-        department: String?
-    ) async throws {
-        try await client.upsertManualItem(
-            weekStart: weekStart,
-            name: name,
-            amount: amount,
-            unit: unit,
-            department: department
-        )
-    }
-
-    func removeManualItem(weekStart: String, productKey: String) async throws {
-        try await client.removeManualItem(weekStart: weekStart, productKey: productKey)
     }
 
     func observeShoppingListChanges(_ onChange: @escaping (_ event: BackendShoppingListChangedDTO) -> Void) {
@@ -343,9 +288,9 @@ final class ShoppingListStore {
     func load(weekStart: String, force: Bool = false) async {
         isLoading = true
         errorMessage = nil
+        self.weekStart = weekStart
         do {
             items = try await repository.fetchShoppingList(weekStart: weekStart)
-            self.weekStart = weekStart
         } catch {
             errorMessage = UserFacingErrorMapper.message(from: error)
         }
@@ -370,47 +315,6 @@ final class ShoppingListStore {
         } catch {
             items[index].isChecked = previous
             errorMessage = UserFacingErrorMapper.message(from: error)
-        }
-    }
-
-    func addManualItem(
-        name: String,
-        amount: Double,
-        unit: String,
-        department: String?
-    ) async -> Bool {
-        guard let weekStart else {
-            errorMessage = "Brak wybranego tygodnia."
-            return false
-        }
-
-        do {
-            try await repository.upsertManualItem(
-                weekStart: weekStart,
-                name: name,
-                amount: amount,
-                unit: unit,
-                department: department
-            )
-            return true
-        } catch {
-            errorMessage = UserFacingErrorMapper.message(from: error)
-            return false
-        }
-    }
-
-    func removeManualItem(_ item: ShoppingItem) async -> Bool {
-        guard let weekStart else {
-            errorMessage = "Brak wybranego tygodnia."
-            return false
-        }
-
-        do {
-            try await repository.removeManualItem(weekStart: weekStart, productKey: item.productKey)
-            return true
-        } catch {
-            errorMessage = UserFacingErrorMapper.message(from: error)
-            return false
         }
     }
 

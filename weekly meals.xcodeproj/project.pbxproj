@@ -14,22 +14,9 @@
 		010DDB762F3235DD007CBEBF /* weekly meals.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "weekly meals.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
-/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		0108D34A2F3F6D9D00A2EB43 /* Exceptions for "weekly meals" folder in "weekly meals" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				"weekly-meals-Info.plist",
-			);
-			target = 010DDB752F3235DD007CBEBF /* weekly meals */;
-		};
-/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
-
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		010DDB782F3235DD007CBEBF /* weekly meals */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				0108D34A2F3F6D9D00A2EB43 /* Exceptions for "weekly meals" folder in "weekly meals" target */,
-			);
 			path = "weekly meals";
 			sourceTree = "<group>";
 		};

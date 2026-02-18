@@ -714,6 +714,7 @@ protocol RecipeSocketClient {
 final class SocketIORecipeSocketClient: RecipeSocketClient {
     private let manager: SocketManager
     private let socket: SocketIOClient
+    private let socketQueue = DispatchQueue(label: "weeklymeals.socket.io.serial")
     private let ackTimeoutSeconds: Double = 6
     private let maxAckAttempts: Int = 3
     private var connectionObservers: [UUID: (Bool) -> Void] = [:]
@@ -725,12 +726,15 @@ final class SocketIORecipeSocketClient: RecipeSocketClient {
             config: [
                 .log(false),
                 .compress,
-                .forceWebsockets(true)
+                .forceWebsockets(true),
+                .handleQueue(socketQueue)
             ]
         )
         self.socket = manager.defaultSocket
         registerConnectionLifecycleEvents()
-        self.socket.connect()
+        socketQueue.async { [weak self] in
+            self?.socket.connect()
+        }
     }
 
     private func registerConnectionLifecycleEvents() {
@@ -758,15 +762,28 @@ final class SocketIORecipeSocketClient: RecipeSocketClient {
         }
     }
 
-    private func ensureConnected() async throws {
-        if socket.status == .connected { return }
-
-        if socket.status != .connecting {
-            socket.connect()
+    private func socketStatus() -> SocketIOStatus {
+        socketQueue.sync {
+            socket.status
         }
+    }
+
+    private func connectIfNeeded() {
+        socketQueue.async { [weak self] in
+            guard let self else { return }
+            if self.socket.status != .connected && self.socket.status != .connecting {
+                self.socket.connect()
+            }
+        }
+    }
+
+    private func ensureConnected() async throws {
+        if socketStatus() == .connected { return }
+
+        connectIfNeeded()
 
         for _ in 0..<30 {
-            if socket.status == .connected { return }
+            if socketStatus() == .connected { return }
             try await Task.sleep(nanoseconds: 100_000_000)
         }
 
@@ -774,15 +791,61 @@ final class SocketIORecipeSocketClient: RecipeSocketClient {
     }
 
     private func requestAck(event: String, payload: [String: Any], timeout: Double) async throws -> [Any] {
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<[Any], Error>) in
-            socket.emitWithAck(event, payload).timingOut(after: timeout) { items in
-                if let first = items.first as? String, first == "NO ACK" {
-                    continuation.resume(throwing: RecipeDataError.serverError(message: "Brak ACK dla eventu \(event)."))
+        let safePayload = try makeSafePayload(payload, event: event)
+
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<[Any], Error>) in
+            let continuationLock = NSLock()
+            var didResume = false
+
+            func resumeOnce(_ result: Result<[Any], Error>) {
+                continuationLock.lock()
+                if didResume {
+                    continuationLock.unlock()
                     return
                 }
-                continuation.resume(returning: items)
+                didResume = true
+                continuationLock.unlock()
+
+                switch result {
+                case .success(let items):
+                    continuation.resume(returning: items)
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+
+            socketQueue.async { [weak self] in
+                guard let self else {
+                    resumeOnce(.failure(RecipeDataError.serverError(message: "Brak klienta WebSocket.")))
+                    return
+                }
+
+                self.socket.emitWithAck(event, safePayload).timingOut(after: timeout) { items in
+                    if let first = items.first as? String, first == "NO ACK" {
+                        resumeOnce(.failure(RecipeDataError.serverError(message: "Brak ACK dla eventu \(event).")))
+                        return
+                    }
+                    resumeOnce(.success(items))
+                }
             }
         }
+    }
+
+    private func makeSafePayload(_ payload: [String: Any], event: String) throws -> [String: Any] {
+        guard JSONSerialization.isValidJSONObject(payload) else {
+            throw RecipeDataError.serverError(
+                message: "Nieprawidłowy payload JSON dla eventu \(event)."
+            )
+        }
+
+        let data = try JSONSerialization.data(withJSONObject: payload, options: [])
+        let object = try JSONSerialization.jsonObject(with: data, options: [])
+        guard let dictionary = object as? [String: Any] else {
+            throw RecipeDataError.serverError(
+                message: "Nie udało się zbudować payloadu JSON dla eventu \(event)."
+            )
+        }
+        return dictionary
     }
 
     func emitWithAck<T: Decodable>(event: String, payload: [String: Any], as: T.Type) async throws -> T {
@@ -829,13 +892,18 @@ final class SocketIORecipeSocketClient: RecipeSocketClient {
     }
 
     func on(event: String, handler: @escaping ([Any]) -> Void) {
-        socket.on(event) { data, _ in
-            handler(data)
+        socketQueue.async { [weak self] in
+            guard let self else { return }
+            self.socket.on(event) { data, _ in
+                handler(data)
+            }
         }
     }
 
     func off(event: String) {
-        socket.off(event)
+        socketQueue.async { [weak self] in
+            self?.socket.off(event)
+        }
     }
 
     func observeConnection(_ handler: @escaping (Bool) -> Void) {

@@ -4,7 +4,6 @@ struct ProductsView: View {
     @Environment(\.shoppingListStore) private var shoppingListStore
     @Environment(\.datesViewModel) private var datesViewModel
     @Environment(\.colorScheme) private var colorScheme
-    @State private var isAddManualItemSheetPresented = false
 
     private var shoppingItems: [ShoppingItem] {
         shoppingListStore.items
@@ -74,32 +73,8 @@ struct ProductsView: View {
                 }
             }
             .navigationTitle("Produkty")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        isAddManualItemSheetPresented = true
-                    } label: {
-                        Image(systemName: "plus.circle.fill")
-                    }
-                    .accessibilityLabel("Dodaj produkt ręcznie")
-                }
-            }
             .task(id: datesViewModel.weekStartISO) {
                 await shoppingListStore.load(weekStart: datesViewModel.weekStartISO)
-            }
-            .sheet(isPresented: $isAddManualItemSheetPresented) {
-                AddManualShoppingItemSheet { name, amount, unit, department in
-                    let success = await shoppingListStore.addManualItem(
-                        name: name,
-                        amount: amount,
-                        unit: unit,
-                        department: department
-                    )
-                    if success {
-                        await shoppingListStore.load(weekStart: datesViewModel.weekStartISO, force: true)
-                    }
-                    return success
-                }
             }
         }
     }
@@ -116,7 +91,7 @@ struct ProductsView: View {
         ScrollView {
             VStack(spacing: 12) {
                 if let errorMessage = shoppingListStore.errorMessage, !errorMessage.isEmpty {
-                    Text(errorMessage)
+                    Text(verbatim: errorMessage)
                         .font(.caption)
                         .foregroundStyle(.red)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -196,7 +171,7 @@ struct ProductsView: View {
                 }
                 .frame(width: 28, height: 28)
 
-                Text(department)
+                Text(verbatim: department)
                     .font(.subheadline)
                     .fontWeight(.semibold)
                     .foregroundStyle(allBought ? .secondary : .primary)
@@ -256,7 +231,7 @@ struct ProductsView: View {
                     .foregroundStyle(bought ? .green : Color(.tertiaryLabel))
                     .contentTransition(.symbolEffect(.replace))
 
-                Text(item.name)
+                Text(verbatim: item.name)
                     .font(.subheadline)
                     .fontWeight(bought ? .regular : .medium)
                     .strikethrough(bought)
@@ -265,7 +240,7 @@ struct ProductsView: View {
 
                 Spacer(minLength: 4)
 
-                Text("\(item.formattedAmount) \(item.unit)")
+                Text(verbatim: "\(item.formattedAmount) \(item.unit)")
                     .font(.caption)
                     .fontWeight(.medium)
                     .foregroundStyle(bought ? Color.secondary : color)
