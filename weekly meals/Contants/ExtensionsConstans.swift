@@ -3,8 +3,8 @@ import SwiftUI
 extension View {
     func myBorderOverlay(
         cornerRadius: CGFloat = 14,
-        color: Color = Color(.separator),
-        lineWidth: CGFloat = 0.5
+        color: Color = Color.white.opacity(0.24),
+        lineWidth: CGFloat = 1
     ) -> some View {
         overlay(
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
@@ -12,10 +12,10 @@ extension View {
         )
     }
     
-    func myBackground() -> some View {
+    func myBackground(cornerRadius: CGFloat = 14) -> some View {
         background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color(.secondarySystemGroupedBackground))
+            .ultraThinMaterial,
+            in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         )
     }
 }

@@ -6,7 +6,6 @@ struct CalendarView: View {
 
     @State private var slotToPick: MealSlot? = nil
     @State private var detailRecipe: Recipe? = nil
-    @State private var showTipPopover: Bool = false
 
     // MARK: - Computed
 
@@ -19,6 +18,7 @@ struct CalendarView: View {
         return DayNutrition(
             kcal: recipes.reduce(0) { $0 + Int($1.nutritionPerServing.kcal) },
             protein: recipes.reduce(0) { $0 + Int($1.nutritionPerServing.protein) },
+            fat: recipes.reduce(0) { $0 + Int($1.nutritionPerServing.fat) },
             carbs: recipes.reduce(0) { $0 + Int($1.nutritionPerServing.carbs) }
         )
     }
@@ -55,21 +55,61 @@ struct CalendarView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
+            ZStack {
+                DashboardLiquidBackground()
+                    .ignoresSafeArea()
+
                 @Bindable var bindableDates = datesViewModel
-                DatesView(datesViewModal: bindableDates)
-
-                if let errorMessage = mealStore.errorMessage, !errorMessage.isEmpty {
-                    Text(errorMessage)
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                        .padding(.horizontal, 20)
+                List {
+                    DatesView(datesViewModal: bindableDates)
+                        .dashboardLiquidCard(cornerRadius: 22, strokeOpacity: 0.28)
+                        .padding(.horizontal, 14)
                         .padding(.top, 4)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets())
+                        .listRowBackground(Color.clear)
 
-                dayHeader
-                mealList
+                    if let errorMessage = mealStore.errorMessage, !errorMessage.isEmpty {
+                        Text(errorMessage)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                            .padding(.horizontal, 20)
+                            .padding(.top, 8)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .listRowSeparator(.hidden)
+                            .listRowInsets(EdgeInsets())
+                            .listRowBackground(Color.clear)
+                    }
+
+                    dayHeader
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets())
+                        .listRowBackground(Color.clear)
+
+                    ForEach(MealSlot.allCases) { slot in
+                        MealCardView(slot: slot, recipe: recipe(for: slot), isEditable: isDayEditable)
+                            .contentShape(Rectangle())
+                            .onTapGesture { handleTap(slot) }
+                            .swipeActions(edge: .leading) {
+                                if recipe(for: slot) != nil && isDayEditable {
+                                    Button("Edytuj") { slotToPick = slot }
+                                        .tint(slot.accentColor)
+                                }
+                            }
+                            .swipeActions(edge: .trailing) {
+                                if recipe(for: slot) != nil && isDayEditable {
+                                    Button("Usuń") { clearRecipe(for: slot) }
+                                        .tint(.red)
+                                }
+                            }
+                            .listRowSeparator(.hidden)
+                            .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                            .listRowBackground(Color.clear)
+                    }
+                }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .scrollBounceBehavior(.always)
             }
             .navigationTitle("Kalendarz")
             .task(id: datesViewModel.weekStartISO) {
@@ -107,6 +147,7 @@ struct CalendarView: View {
                         }
                     }
                 }
+                .dashboardLiquidSheet()
             }
             .sheet(item: $detailRecipe) { recipe in
                 NavigationStack {
@@ -114,7 +155,7 @@ struct CalendarView: View {
                         .navigationBarTitleDisplayMode(.inline)
                 }
                 .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
+                .dashboardLiquidSheet()
             }
         }
     }
@@ -122,132 +163,103 @@ struct CalendarView: View {
     // MARK: - Day Header
 
     private var dayHeader: some View {
-        HStack(alignment: .center) {
-            Text(datesViewModel.formattedDate(datesViewModel.selectedDate))
-                .font(.title2)
-                .fontWeight(.bold)
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(datesViewModel.formattedDate(datesViewModel.selectedDate))
+                        .font(.system(.title, design: .rounded))
+                        .fontWeight(.bold)
+                    Text("Bilans dnia")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
 
-            Spacer(minLength: 8)
+                Spacer(minLength: 8)
 
-            if !isDayEditable {
-                pastDayBadge
+                if !isDayEditable {
+                    pastDayBadge
+                }
             }
 
-            infoButton
+            nutritionPanel
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 20)
+        .padding(16)
+        .dashboardLiquidCard(cornerRadius: 24, strokeOpacity: 0.22)
+        .padding(.horizontal, 14)
+        .padding(.top, 8)
     }
 
     private var pastDayBadge: some View {
-        HStack(spacing: 4) {
-            Image(systemName: "lock.circle.fill")
-        }
-        .font(.title3)
-        .symbolRenderingMode(.hierarchical)
-        .foregroundStyle(.secondary)
-        .padding(4)
-        .background(.ultraThinMaterial, in: Circle())
-    }
-
-    private var infoButton: some View {
-        Button {
-            showTipPopover.toggle()
-        } label: {
-            Image(systemName: "info.circle.fill")
-                .font(.title3)
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(.secondary)
-                .padding(4)
-                .background(.ultraThinMaterial, in: Circle())
-        }
-        .buttonStyle(.plain)
-        .popover(isPresented: $showTipPopover, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
-            infoPopoverContent
-                .padding()
-                .padding(.vertical, 8)
-                .presentationCompactAdaptation(.none)
-        }
-    }
-
-    // MARK: - Info Popover
-
-    private var infoPopoverContent: some View {
-        InfoPopoverContent {
-            HStack(alignment: .firstTextBaseline) {
-                Text("Informacje")
-                    .font(.headline)
-                Spacer()
-            }
-
-            nutritionSummary
-
-            Divider()
-
-            InfoTipRow(icon: "hand.rays", text: "Stuknij kartę posiłku, aby zobaczyć szczegóły.")
-            InfoTipRow(icon: "hand.draw", text: "Przesuń w lewo/prawo aby edytować bądź usuwać dany posiłek.")
-        }
-    }
-
-    private var nutritionSummary: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Podsumowanie dnia")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-
-            VStack(spacing: 12) {
-                HStack {
-                    nutritionBadge(icon: "flame.fill", color: .orange, text: "\(dayNutrition.kcal) kcal")
-                    nutritionBadge(icon: "bolt.fill", color: .blue, text: "\(dayNutrition.protein) g białka")
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                nutritionBadge(icon: "leaf.fill", color: .green, text: "\(dayNutrition.carbs) g węglowodanów")
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-        }
-    }
-
-    private func nutritionBadge(icon: String, color: Color, text: String) -> some View {
         HStack(spacing: 6) {
-            Image(systemName: icon)
-                .foregroundStyle(color)
-            Text(text)
-                .monospacedDigit()
+            Image(systemName: "lock.fill")
+            Text("Archiwum")
         }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 12)
+        .font(.caption)
+        .fontWeight(.semibold)
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
         .background(.ultraThinMaterial, in: Capsule())
+        .overlay(
+            Capsule()
+                .stroke(Color.white.opacity(0.18), lineWidth: 1)
+        )
     }
 
-    // MARK: - Meal List
+    private var nutritionPanel: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) {
+                nutritionMetricChip(title: "Kalorie", value: "\(dayNutrition.kcal) kcal", icon: "flame.fill", tint: .orange)
+                nutritionMetricChip(title: "Białko", value: "\(dayNutrition.protein) g", icon: "bolt.fill", tint: .blue)
+                nutritionMetricChip(title: "Tłuszcz", value: "\(dayNutrition.fat) g", icon: "drop.fill", tint: .pink)
+                nutritionMetricChip(title: "Węgle", value: "\(dayNutrition.carbs) g", icon: "leaf.fill", tint: .green)
+            }
 
-    private var mealList: some View {
-        List {
-            ForEach(MealSlot.allCases) { slot in
-                MealCardView(slot: slot, recipe: recipe(for: slot), isEditable: isDayEditable)
-                    .contentShape(Rectangle())
-                    .onTapGesture { handleTap(slot) }
-                    .swipeActions(edge: .leading) {
-                        if recipe(for: slot) != nil && isDayEditable {
-                            Button("Edytuj") { slotToPick = slot }
-                                .tint(slot.accentColor)
-                        }
-                    }
-                    .swipeActions(edge: .trailing) {
-                        if recipe(for: slot) != nil && isDayEditable {
-                            Button("Usuń") { clearRecipe(for: slot) }
-                                .tint(.red)
-                        }
-                    }
-                    .listRowSeparator(.hidden)
-                    .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
-                    .listRowBackground(Color.clear)
+            VStack(spacing: 8) {
+                HStack(spacing: 8) {
+                    nutritionMetricChip(title: "Kalorie", value: "\(dayNutrition.kcal) kcal", icon: "flame.fill", tint: .orange)
+                    nutritionMetricChip(title: "Białko", value: "\(dayNutrition.protein) g", icon: "bolt.fill", tint: .blue)
+                }
+                HStack(spacing: 8) {
+                    nutritionMetricChip(title: "Tłuszcz", value: "\(dayNutrition.fat) g", icon: "drop.fill", tint: .pink)
+                    nutritionMetricChip(title: "Węgle", value: "\(dayNutrition.carbs) g", icon: "leaf.fill", tint: .green)
+                }
             }
         }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
-        .scrollDisabled(true)
+    }
+
+    private func nutritionMetricChip(title: String, value: String, icon: String, tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(tint)
+                Text(title)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            Text(value)
+                .font(.footnote)
+                .fontWeight(.semibold)
+                .foregroundStyle(.primary)
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(tint.opacity(0.1))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(tint.opacity(0.2), lineWidth: 1)
+        )
     }
 
     // MARK: - Actions
@@ -283,6 +295,7 @@ struct CalendarView: View {
 private struct DayNutrition {
     var kcal: Int = 0
     var protein: Int = 0
+    var fat: Int = 0
     var carbs: Int = 0
 }
 

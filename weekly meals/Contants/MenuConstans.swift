@@ -8,6 +8,11 @@ struct MenuConstans {
         static let name: String = "Przepisy"
         static let icon: String = "book.pages"
     }
+
+    struct Plan: MenuModel {
+        static let name: String = "Plan"
+        static let icon: String = "calendar.badge.clock"
+    }
     
     struct Products: MenuModel {
         static let name: String = "Produkty"

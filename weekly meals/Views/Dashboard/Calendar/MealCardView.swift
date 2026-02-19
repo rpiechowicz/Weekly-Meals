@@ -63,12 +63,12 @@ struct MealCardView: View {
             }
         }
         .frame(width: 56, height: 56)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     private var placeholderThumb: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(slot.accentColor.opacity(colorScheme == .dark ? 0.22 : 0.12))
             Image(systemName: "fork.knife.circle.fill")
                 .font(.title3)
@@ -76,40 +76,28 @@ struct MealCardView: View {
         }
     }
 
-    private func difficultyIcon(for diff: Difficulty) -> String {
-        switch diff {
-        case .easy: return "star"
-        case .medium: return "star.leadinghalf.filled"
-        case .hard: return "star.fill"
-        }
-    }
-
-    private func difficultyColor(for diff: Difficulty) -> Color {
-        switch diff {
-        case .easy: return .green
-        case .medium: return .orange
-        case .hard: return .red
-        }
-    }
-    
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Header
-            HStack(spacing: 12) {
+            HStack(spacing: 10) {
                 ZStack {
                     Circle()
-                        .fill(slot.accentColor.opacity(colorScheme == .dark ? 0.25 : 0.15))
+                        .fill(slot.accentColor.opacity(colorScheme == .dark ? 0.24 : 0.14))
                     Image(systemName: slot.icon)
-                        .font(.subheadline)
+                        .font(.subheadline.weight(.semibold))
                         .foregroundStyle(slot.accentColor)
                 }
-                .frame(width: 32, height: 32)
+                .frame(width: 36, height: 36)
 
-                Text(slot.title)
-                    .font(.headline)
-                    .foregroundStyle(isEmpty ? .secondary : .primary)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(slot.title)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                    Text(isEmpty ? "Brak przypisanego posiłku" : "Zaplanowany posiłek")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
 
-                Spacer(minLength: 0)
+                Spacer(minLength: 8)
 
                 Text(slot.time)
                     .font(.caption)
@@ -117,15 +105,11 @@ struct MealCardView: View {
                     .foregroundStyle(slot.accentColor)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
-                    .background(
-                        Capsule()
-                            .fill(slot.accentColor.opacity(colorScheme == .dark ? 0.22 : 0.12))
-                    )
+                    .background(slot.accentColor.opacity(colorScheme == .dark ? 0.22 : 0.12), in: Capsule())
             }
 
             if let recipe {
-                // Content with selected recipe
-                HStack(alignment: .center, spacing: 12) {
+                HStack(spacing: 12) {
                     thumbnail
 
                     VStack(alignment: .leading, spacing: 6) {
@@ -135,62 +119,70 @@ struct MealCardView: View {
                             .foregroundStyle(.primary)
                             .lineLimit(2)
 
-                        HStack(spacing: 10) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "clock")
-                                Text("\(recipe.prepTimeMinutes) min")
-                            }
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-
-                            HStack(spacing: 4) {
-                                Image(systemName: "flame.fill")
-                                Text("\(Int(recipe.nutritionPerServing.kcal)) kcal")
-                            }
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        HStack(spacing: 8) {
+                            recipeMetaPill(icon: "clock", text: "\(recipe.prepTimeMinutes) min")
+                            recipeMetaPill(icon: "flame.fill", text: "\(Int(recipe.nutritionPerServing.kcal)) kcal")
                         }
                     }
 
                     Spacer(minLength: 0)
                 }
-                .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
-                .padding(.top, 2)
+                .padding(10)
+                .background(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(Color.white.opacity(colorScheme == .dark ? 0.08 : 0.16))
+                )
             } else if isEditable {
-                // Empty state — editable day
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(style: StrokeStyle(lineWidth: 1, dash: [5]))
-                        .foregroundStyle(Color.gray.opacity(colorScheme == .dark ? 0.35 : 0.22))
-                    HStack(spacing: 10) {
-                        Image(systemName: "plus.circle.fill")
-                            .foregroundStyle(slot.accentColor)
-                        Text("Dodaj posiłek")
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .frame(height: 56)
-                .padding(.top, 2)
-            } else {
-                // Empty state — past day (non-editable)
-                HStack(spacing: 10) {
-                    Image(systemName: "minus.circle")
-                        .foregroundStyle(.tertiary)
-                    Text("Brak posiłku")
+                HStack(spacing: 8) {
+                    Image(systemName: "plus.circle.fill")
+                        .foregroundStyle(slot.accentColor)
+                    Text("Dodaj posiłek")
                         .font(.subheadline)
-                        .foregroundStyle(.tertiary)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.secondary)
                 }
-                .frame(height: 56)
-                .frame(maxWidth: .infinity)
-                .padding(.top, 2)
+                .frame(maxWidth: .infinity, minHeight: 52, alignment: .center)
+                .background(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(slot.accentColor.opacity(colorScheme == .dark ? 0.14 : 0.1))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(slot.accentColor.opacity(0.22), lineWidth: 1)
+                )
+            } else {
+                HStack(spacing: 8) {
+                    Image(systemName: "lock.fill")
+                        .foregroundStyle(.secondary)
+                    Text("Dzień nieedytowalny")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, minHeight: 52, alignment: .center)
+                .background(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(Color.white.opacity(colorScheme == .dark ? 0.07 : 0.12))
+                )
             }
         }
-        .padding(16)
+        .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .myBackground()
-        .myBorderOverlay()
+        .dashboardLiquidCard(cornerRadius: 24, strokeOpacity: 0.2)
+    }
+
+    private func recipeMetaPill(icon: String, text: String) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
+            Text(text)
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 4)
+        .background(
+            Capsule()
+                .fill(Color.white.opacity(colorScheme == .dark ? 0.1 : 0.2))
+        )
     }
 }
 

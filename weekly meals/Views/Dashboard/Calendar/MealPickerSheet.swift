@@ -13,6 +13,14 @@ struct MealPickerSheet: View {
     @State private var searchText: String = ""
 
     private var categories: [RecipesCategory] { RecipesCategory.allCases }
+    private var selectedFilterIcon: String {
+        selectedCategory == .all
+        ? "line.3.horizontal.decrease.circle"
+        : RecipesConstants.icon(for: selectedCategory)
+    }
+    private var selectedFilterTint: Color {
+        selectedCategory == .all ? .secondary : .blue
+    }
 
     init(
         slot: MealSlot,
@@ -64,32 +72,31 @@ struct MealPickerSheet: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                // Filters
-                RecipeFilters(
-                    categories: categories,
-                    selectedCategory: $selectedCategory,
-                    disabled: true
-                )
+            ZStack {
+                DashboardLiquidBackground()
+                    .ignoresSafeArea()
 
                 ScrollView {
                     if filteredRecipes.isEmpty {
-                        VStack(spacing: 16) {
+                        VStack(spacing: 12) {
                             Image(systemName: "fork.knife.circle")
-                                .font(.system(size: 64))
+                                .font(.system(size: 56))
                                 .foregroundStyle(.secondary)
 
                             Text("Brak przepisów")
-                                .font(.title3)
+                                .font(.headline)
                                 .fontWeight(.semibold)
 
-                            Text("Dopasuj filtry lub wyszukaj inaczej")
+                            Text("Dopasuj filtr lub wpisz inną frazę.")
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                         }
                         .frame(maxWidth: .infinity)
-                        .padding(.top, 80)
-                        .padding(.horizontal)
+                        .padding(.vertical, 44)
+                        .padding(.horizontal, 16)
+                        .dashboardLiquidCard(cornerRadius: 20, strokeOpacity: 0.18)
+                        .padding(.horizontal, 14)
+                        .padding(.top, 8)
                     } else {
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: 16)], spacing: 16) {
                             ForEach(filteredRecipes) { recipe in
@@ -131,11 +138,39 @@ struct MealPickerSheet: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        ForEach(categories, id: \.self) { category in
+                            Button {
+                                selectedCategory = category
+                            } label: {
+                                HStack(spacing: 8) {
+                                    Image(systemName: RecipesConstants.icon(for: category))
+                                    Text(RecipesConstants.displayName(for: category))
+                                    Spacer(minLength: 8)
+                                    if selectedCategory == category {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
+                    } label: {
+                        Image(systemName: selectedFilterIcon)
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(selectedFilterTint)
+                            .frame(width: 34, height: 34)
+                            .background(.ultraThinMaterial, in: Circle())
+                            .overlay(
+                                Circle()
+                                    .stroke(Color.white.opacity(0.22), lineWidth: 1)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
             }
         }
         .searchable(text: $searchText, prompt: "Szukaj przepisów")
-        .presentationDetents([.large, .large])
-        .presentationDragIndicator(.visible)
+        .presentationDetents([.large])
     }
 }
 

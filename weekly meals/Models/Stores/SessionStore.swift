@@ -113,7 +113,7 @@ final class SessionStore {
         static let pushDeviceToken = "notifications.pushDeviceToken"
     }
 
-    private let baseURL = URL(string: "http://localhost:3000")!
+    private let baseURL = AppEnvironment.apiBaseURL
 
     var isSigningIn = false
     var authError: String?

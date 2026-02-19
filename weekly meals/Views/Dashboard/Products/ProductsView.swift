@@ -4,9 +4,45 @@ struct ProductsView: View {
     @Environment(\.shoppingListStore) private var shoppingListStore
     @Environment(\.datesViewModel) private var datesViewModel
     @Environment(\.colorScheme) private var colorScheme
+    @State private var selectedFilter: ProductsFilter = .all
+
+    private enum ProductsFilter: CaseIterable, Identifiable {
+        case all
+        case missing
+        case bought
+
+        var id: Self { self }
+
+        var title: String {
+            switch self {
+            case .all: return "Wszystkie"
+            case .missing: return "Do kupienia"
+            case .bought: return "Kupione"
+            }
+        }
+
+        var icon: String {
+            switch self {
+            case .all: return "line.3.horizontal.decrease.circle"
+            case .missing: return "circle"
+            case .bought: return "checkmark.circle.fill"
+            }
+        }
+    }
 
     private var shoppingItems: [ShoppingItem] {
         shoppingListStore.items
+    }
+
+    private var visibleItems: [ShoppingItem] {
+        switch selectedFilter {
+        case .all:
+            return shoppingItems
+        case .missing:
+            return shoppingItems.filter { !$0.isChecked }
+        case .bought:
+            return shoppingItems.filter(\.isChecked)
+        }
     }
 
     private var groupedByDepartment: [(department: String, items: [ShoppingItem])] {
@@ -33,7 +69,7 @@ struct ProductsView: View {
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
 
-        return Dictionary(grouping: shoppingItems, by: \.department)
+        return Dictionary(grouping: visibleItems, by: \.department)
             .sorted {
                 let leftKey = $0.key.trimmingCharacters(in: .whitespacesAndNewlines)
                 let rightKey = $1.key.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -56,6 +92,10 @@ struct ProductsView: View {
         shoppingItems.filter(\.isChecked).count
     }
 
+    private var remainingCount: Int {
+        max(0, shoppingItems.count - boughtCount)
+    }
+
     private var progress: Double {
         guard !shoppingItems.isEmpty else { return 0 }
         return Double(boughtCount) / Double(shoppingItems.count)
@@ -63,13 +103,18 @@ struct ProductsView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if shoppingListStore.isLoading && shoppingItems.isEmpty {
-                    ProgressView("Ładowanie listy zakupów...")
-                } else if shoppingItems.isEmpty {
-                    emptyState
-                } else {
-                    shoppingList
+            ZStack {
+                DashboardLiquidBackground()
+                    .ignoresSafeArea()
+
+                Group {
+                    if shoppingListStore.isLoading && shoppingItems.isEmpty {
+                        ProgressView("Ładowanie listy zakupów...")
+                    } else if shoppingItems.isEmpty {
+                        emptyState
+                    } else {
+                        shoppingList
+                    }
                 }
             }
             .navigationTitle("Produkty")
@@ -85,6 +130,9 @@ struct ProductsView: View {
             systemImage: "basket",
             description: Text("Brak pozycji dla tygodnia \(datesViewModel.weekStartISO).")
         )
+        .padding()
+        .dashboardLiquidCard(cornerRadius: 24, strokeOpacity: 0.28)
+        .padding(.horizontal, 14)
     }
 
     private var shoppingList: some View {
@@ -99,9 +147,14 @@ struct ProductsView: View {
                 }
 
                 progressCard
+                filterBar
 
-                ForEach(groupedByDepartment, id: \.department) { department, items in
-                    departmentSection(department: department, items: items)
+                if groupedByDepartment.isEmpty {
+                    filteredEmptyState
+                } else {
+                    ForEach(groupedByDepartment, id: \.department) { department, items in
+                        departmentSection(department: department, items: items)
+                    }
                 }
             }
             .padding(.horizontal, 16)
@@ -109,7 +162,6 @@ struct ProductsView: View {
             .padding(.bottom, 16)
         }
         .scrollContentBackground(.hidden)
-        .background(Color(.systemGroupedBackground))
     }
 
     private var progressCard: some View {
@@ -123,17 +175,17 @@ struct ProductsView: View {
                     .font(.headline)
 
                 Spacer()
+            }
 
-                Text("\(boughtCount) z \(shoppingItems.count)")
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
+            HStack(spacing: 8) {
+                progressStatChip(title: "Pozostało", value: "\(remainingCount)")
+                progressStatChip(title: "Kupione", value: "\(boughtCount)")
+                progressStatChip(title: "Razem", value: "\(shoppingItems.count)")
             }
 
             ProgressView(value: progress)
                 .tint(boughtCount == shoppingItems.count ? .green : .blue)
-                .scaleEffect(y: 1.5)
+                .scaleEffect(y: 1.35)
                 .animation(.easeInOut(duration: 0.35), value: progress)
 
             if boughtCount == shoppingItems.count && !shoppingItems.isEmpty {
@@ -149,8 +201,88 @@ struct ProductsView: View {
             }
         }
         .padding(16)
-        .myBackground()
-        .myBorderOverlay()
+        .dashboardLiquidCard(cornerRadius: 22, strokeOpacity: 0.24)
+    }
+
+    private var filterBar: some View {
+        HStack(spacing: 8) {
+            ForEach(ProductsFilter.allCases) { filter in
+                let isSelected = selectedFilter == filter
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        selectedFilter = filter
+                    }
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: filter.icon)
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                        Text(filter.title)
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .lineLimit(1)
+                    }
+                    .foregroundStyle(isSelected ? .white : .secondary)
+                    .padding(.vertical, 7)
+                    .padding(.horizontal, 10)
+                    .frame(maxWidth: .infinity)
+                    .background(
+                        isSelected
+                        ? AnyShapeStyle(
+                            LinearGradient(
+                                colors: [.blue.opacity(0.96), .cyan.opacity(0.9)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        : AnyShapeStyle(Color.white.opacity(0.14)),
+                        in: Capsule()
+                    )
+                    .overlay(
+                        Capsule()
+                            .stroke(
+                                isSelected ? Color.white.opacity(0.24) : Color.white.opacity(0.18),
+                                lineWidth: 0.8
+                            )
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(4)
+        .dashboardLiquidCard(cornerRadius: 18, strokeOpacity: 0.18)
+    }
+
+    private var filteredEmptyState: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "line.3.horizontal.decrease.circle")
+                .font(.title3)
+                .foregroundStyle(.secondary)
+            Text("Brak pozycji dla filtra „\(selectedFilter.title)”")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 16)
+        .dashboardLiquidCard(cornerRadius: 16, strokeOpacity: 0.16)
+    }
+
+    private func progressStatChip(title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundStyle(.primary)
+                .monospacedDigit()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 6)
+        .padding(.horizontal, 8)
+        .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     private func departmentSection(department: String, items: [ShoppingItem]) -> some View {
@@ -211,8 +343,7 @@ struct ProductsView: View {
             }
             .padding(.bottom, 6)
         }
-        .myBackground()
-        .myBorderOverlay()
+        .dashboardLiquidCard(cornerRadius: 20, strokeOpacity: 0.22)
     }
 
     private func shoppingRow(_ item: ShoppingItem, color: Color) -> some View {
@@ -236,7 +367,8 @@ struct ProductsView: View {
                     .fontWeight(bought ? .regular : .medium)
                     .strikethrough(bought)
                     .foregroundStyle(bought ? .secondary : .primary)
-                    .lineLimit(1)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
 
                 Spacer(minLength: 4)
 

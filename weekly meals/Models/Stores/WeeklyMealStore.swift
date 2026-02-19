@@ -1028,7 +1028,7 @@ private struct BackendFavoritesChangedDTO: Codable {
 }
 
 extension BackendRecipeDTO {
-    private static let apiBaseURL = URL(string: "http://localhost:3000")!
+    private static let apiBaseURL = AppEnvironment.apiBaseURL
 
     private func displayIngredientName(_ raw: String) -> String {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)

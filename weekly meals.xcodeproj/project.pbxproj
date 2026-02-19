@@ -266,6 +266,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "weekly-meals-Info.plist";
+				INFOPLIST_KEY_API_BASE_URL = "https://weakly-meals-backend-production.up.railway.app";
 				INFOPLIST_KEY_CFBundleDisplayName = "Weekly Meals";
 				INFOPLIST_KEY_CFBundleURLTypes_0_CFBundleURLName = weeklymeals;
 				INFOPLIST_KEY_CFBundleURLTypes_0_CFBundleURLSchemes_0 = weeklymeals;
@@ -309,6 +310,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "weekly-meals-Info.plist";
+				INFOPLIST_KEY_API_BASE_URL = "https://weakly-meals-backend-production.up.railway.app";
 				INFOPLIST_KEY_CFBundleDisplayName = "Weekly Meals";
 				INFOPLIST_KEY_CFBundleURLTypes_0_CFBundleURLName = weeklymeals;
 				INFOPLIST_KEY_CFBundleURLTypes_0_CFBundleURLSchemes_0 = weeklymeals;

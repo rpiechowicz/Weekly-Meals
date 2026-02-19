@@ -24,7 +24,7 @@ struct AuthActionsView: View {
                     } else {
                         Image(systemName: "person.circle.fill")
                     }
-                    Text(isLoading ? "Logowanie..." : "Wejdź jako Rafał")
+                    Text(isLoading ? "Logowanie..." : "Wejdź jako user1")
                 }
                 .font(.headline)
                 .foregroundStyle(.white)
@@ -50,7 +50,7 @@ struct AuthActionsView: View {
                     } else {
                         Image(systemName: "person.circle.fill")
                     }
-                    Text(isLoading ? "Logowanie..." : "Wejdź jako Ania")
+                    Text(isLoading ? "Logowanie..." : "Wejdź jako user2")
                 }
                 .font(.headline)
                 .foregroundStyle(.white)
@@ -71,10 +71,10 @@ struct AuthActionsView: View {
                 Text("Konta testowe")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
-                Text("Rafał Dev • rafal.dev@example.com")
+                Text("user1 • user1@example.com")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                Text("Ania Dev • ania.dev@example.com")
+                Text("user2 • user2@example.com")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

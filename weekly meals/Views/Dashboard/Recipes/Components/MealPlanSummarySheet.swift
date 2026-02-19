@@ -19,60 +19,79 @@ struct MealPlanSummarySheet: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                ForEach(MealSlot.allCases) { slot in
-                    Section {
-                        let unique = mealPlan.uniqueRecipes(for: slot)
-                        if unique.isEmpty {
-                            emptyRow
-                        } else {
-                            ForEach(unique) { recipe in
-                                let inUse = usedCount(for: recipe, slot: slot)
-                                let recipeCount = mealPlan.recipeCount(recipe)
-                                MealPlanSummaryRow(
-                                    recipe: recipe,
-                                    slot: slot,
-                                    count: recipeCount,
-                                    minCount: inUse
-                                )
-                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                    Button {
-                                        withAnimation {
-                                            mealPlan.incrementRecipe(recipe)
+            ZStack {
+                DashboardLiquidBackground()
+                    .ignoresSafeArea()
+
+                List {
+                    ForEach(MealSlot.allCases) { slot in
+                        Section {
+                            let unique = mealPlan.uniqueRecipes(for: slot)
+                            if unique.isEmpty {
+                                emptyRow
+                                    .padding(12)
+                                    .dashboardLiquidCard(cornerRadius: 14, strokeOpacity: 0.16)
+                                    .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
+                                    .listRowSeparator(.hidden)
+                                    .listRowBackground(Color.clear)
+                            } else {
+                                ForEach(unique) { recipe in
+                                    let inUse = usedCount(for: recipe, slot: slot)
+                                    let recipeCount = mealPlan.recipeCount(recipe)
+                                    MealPlanSummaryRow(
+                                        recipe: recipe,
+                                        slot: slot,
+                                        count: recipeCount,
+                                        minCount: inUse
+                                    )
+                                    .padding(10)
+                                    .dashboardLiquidCard(cornerRadius: 16, strokeOpacity: 0.16)
+                                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                        Button {
+                                            withAnimation {
+                                                mealPlan.incrementRecipe(recipe)
+                                            }
+                                        } label: {
+                                            Label("Dodaj", systemImage: "plus")
                                         }
-                                    } label: {
-                                        Label("Dodaj", systemImage: "plus")
+                                        .tint(.green)
+                                        .disabled(!mealPlan.canAdd(to: slot))
                                     }
-                                    .tint(.green)
-                                    .disabled(!mealPlan.canAdd(to: slot))
-                                }
-                                .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                                    Button {
-                                        withAnimation {
-                                            mealPlan.decrementRecipe(recipe)
+                                    .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                                        Button {
+                                            withAnimation {
+                                                mealPlan.decrementRecipe(recipe)
+                                            }
+                                        } label: {
+                                            Label("Odejmij", systemImage: "minus")
                                         }
-                                    } label: {
-                                        Label("Odejmij", systemImage: "minus")
+                                        .tint(.orange)
                                     }
-                                    .tint(.orange)
+                                    .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
+                                    .listRowSeparator(.hidden)
+                                    .listRowBackground(Color.clear)
                                 }
                             }
+                        } header: {
+                            HStack(spacing: 8) {
+                                Image(systemName: slot.icon)
+                                    .foregroundStyle(slot.accentColor)
+                                    .frame(width: 24, height: 24)
+                                    .background(slot.accentColor.opacity(0.14), in: Circle())
+                                Text(slot.title)
+                                Spacer()
+                                Text("\(mealPlan.count(for: slot))/\(MealPlanViewModel.maxPerSlot)")
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
                         }
-                    } header: {
-                        HStack(spacing: 8) {
-                            Image(systemName: slot.icon)
-                                .foregroundStyle(slot.accentColor)
-                            Text(slot.title)
-                            Spacer()
-                            Text("\(mealPlan.count(for: slot))/\(MealPlanViewModel.maxPerSlot)")
-                                .font(.caption)
-                                .fontWeight(.medium)
-                                .foregroundStyle(.secondary)
-                        }
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
                     }
                 }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
             }
             .navigationTitle("Plan posiłków")
             .navigationBarTitleDisplayMode(.inline)
@@ -87,7 +106,6 @@ struct MealPlanSummarySheet: View {
             }
         }
         .presentationDetents([.large])
-        .presentationDragIndicator(.visible)
     }
 
     // MARK: - Empty Row

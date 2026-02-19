@@ -5,8 +5,44 @@
 //  Created by Rafi on 03/02/2026.
 //
 
+import Foundation
 import SwiftUI
 import UserNotifications
+
+enum AppEnvironment {
+    private static let apiBaseURLKey = "API_BASE_URL"
+    private static let defaultBaseURL = URL(string: "https://weakly-meals-backend-production.up.railway.app")!
+
+    static var apiBaseURL: URL {
+        if let environmentURL = resolvedURL(
+            from: ProcessInfo.processInfo.environment[apiBaseURLKey],
+            allowLocalhost: true
+        ) {
+            return environmentURL
+        }
+
+        if let plistValue = Bundle.main.object(forInfoDictionaryKey: apiBaseURLKey) as? String,
+           let plistURL = resolvedURL(from: plistValue, allowLocalhost: true) {
+            return plistURL
+        }
+
+        return defaultBaseURL
+    }
+
+    private static func resolvedURL(from rawValue: String?, allowLocalhost: Bool) -> URL? {
+        guard let rawValue else { return nil }
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        let normalized = trimmed.replacingOccurrences(of: "/+$", with: "", options: .regularExpression)
+        guard let url = URL(string: normalized) else { return nil }
+
+        if !allowLocalhost, let host = url.host?.lowercased(), host == "localhost" || host == "127.0.0.1" {
+            return nil
+        }
+
+        return url
+    }
+}
 
 final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
     weak var sessionStore: SessionStore?
