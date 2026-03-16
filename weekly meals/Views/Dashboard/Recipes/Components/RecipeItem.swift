@@ -7,10 +7,10 @@ struct RecipeItemView: View {
     var badgeCount: Int = 0
     var availabilityBadgeText: String? = nil
     var availabilityBadgeColor: Color = .green
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Image section
+        VStack(alignment: .leading, spacing: 10) {
             ZStack(alignment: .topLeading) {
                 if let imageURL = recipe.imageURL {
                     Color(.secondarySystemFill)
@@ -40,14 +40,15 @@ struct RecipeItemView: View {
                     recipePlaceholder
                 }
 
-                // Top-trailing badge
                 HStack {
                     Spacer()
                     if isSelected {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.title2)
+                        Label("Wybrane", systemImage: "checkmark.circle.fill")
+                            .font(.caption2.weight(.bold))
                             .foregroundStyle(.green)
-                            .background(Circle().fill(.ultraThickMaterial).padding(2))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(.ultraThinMaterial, in: Capsule())
                             .padding(8)
                     } else if recipe.favourite {
                         Image(systemName: "heart.fill")
@@ -56,15 +57,6 @@ struct RecipeItemView: View {
                     }
                 }
 
-                // Category badge
-                Text(recipe.category.rawValue)
-                    .font(.caption2)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(.thinMaterial, in: Capsule())
-                    .padding(8)
-
-                // Availability/count badge (bottom-right of image)
                 if let availabilityBadgeText {
                     VStack {
                         Spacer()
@@ -104,25 +96,42 @@ struct RecipeItemView: View {
             }
             .frame(height: 140)
 
-            Text(recipe.name)
-                .font(.headline)
-                .foregroundStyle(.primary)
-                .lineLimit(2)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .top, spacing: 8) {
+                    Text(recipe.name)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                        .lineLimit(2)
 
-            Text(recipe.description)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .lineLimit(2)
+                    Spacer(minLength: 0)
+
+                    categoryPill
+                }
+
+                Text(recipe.description)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+
+                HStack(spacing: 6) {
+                    infoPill(icon: "clock", text: "\(recipe.prepTimeMinutes) min")
+                    infoPill(icon: "flame.fill", text: "\(Int(recipe.nutritionPerServing.kcal)) kcal")
+                }
+            }
 
             Spacer(minLength: 0)
+
+            if isInPlanningMode {
+                planningFooter
+            }
         }
         .padding(12)
-        .myBackground()
-        .myBorderOverlay(
-            color: isSelected ? .green : Color(.separator),
-            lineWidth: isSelected ? 2.5 : 0.5
+        .background(cardFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(isSelected ? Color.green.opacity(0.8) : Color.white.opacity(0.12), lineWidth: isSelected ? 2 : 1)
         )
-        .frame(height: 260)
+        .frame(height: 286)
     }
 
     private var recipePlaceholder: some View {
@@ -134,6 +143,55 @@ struct RecipeItemView: View {
                     .font(.system(size: 40))
                     .foregroundStyle(.secondary)
             )
+    }
+
+    private var categoryPill: some View {
+        Text(recipe.category.rawValue)
+            .font(.caption2)
+            .fontWeight(.semibold)
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(Color.white.opacity(colorScheme == .dark ? 0.08 : 0.16), in: Capsule())
+    }
+
+    private func infoPill(icon: String, text: String) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
+            Text(text)
+        }
+        .font(.caption2)
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 4)
+        .background(Color.white.opacity(colorScheme == .dark ? 0.08 : 0.16), in: Capsule())
+    }
+
+    private var planningFooter: some View {
+        HStack(spacing: 8) {
+            Image(systemName: isSelected ? "checkmark.circle.fill" : "plus.circle")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(isSelected ? .green : .secondary)
+
+            Text(isSelected ? "Kliknij, aby usunąć z planu" : "Kliknij, aby dodać do planu")
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+
+            Spacer(minLength: 0)
+        }
+        .padding(.top, 2)
+    }
+
+    private var cardFill: Color {
+        if isSelected {
+            return Color.green.opacity(colorScheme == .dark ? 0.12 : 0.08)
+        }
+
+        return colorScheme == .dark
+            ? Color.white.opacity(0.08)
+            : Color.white.opacity(0.18)
     }
 }
 

@@ -8,20 +8,40 @@ struct MealPlanFloatingBar: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 12) {
-                Image(systemName: "list.clipboard")
-                Text("Wybrano: \(totalCount)/\(maxCount)")
-                    .fontWeight(.semibold)
+                Image(systemName: "square.stack.3d.up.fill")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.green)
+                    .frame(width: 30, height: 30)
+                    .background(Color.white.opacity(0.14), in: Circle())
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Wybrane przepisy")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.75))
+
+                    Text("\(totalCount)/\(maxCount)")
+                        .font(.subheadline)
+                        .fontWeight(.bold)
+                        .monospacedDigit()
+                        .foregroundStyle(.white)
+                }
+
                 Spacer()
+                Text("Podsumuj")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.white.opacity(0.9))
+
                 Image(systemName: "chevron.up")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.white.opacity(0.9))
             }
-            .font(.subheadline)
-            .foregroundStyle(.white)
-            .padding(.horizontal, 20)
-            .padding(.vertical, 14)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
             .background(
-                Capsule()
-                    .fill(Color.green)
-                    .shadow(color: .green.opacity(0.3), radius: 10, y: 5)
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(Color.green.opacity(0.9))
+                    .shadow(color: .green.opacity(0.24), radius: 12, y: 6)
             )
         }
         .buttonStyle(.plain)

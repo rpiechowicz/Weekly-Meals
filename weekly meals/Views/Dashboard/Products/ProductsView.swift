@@ -4,45 +4,9 @@ struct ProductsView: View {
     @Environment(\.shoppingListStore) private var shoppingListStore
     @Environment(\.datesViewModel) private var datesViewModel
     @Environment(\.colorScheme) private var colorScheme
-    @State private var selectedFilter: ProductsFilter = .all
-
-    private enum ProductsFilter: CaseIterable, Identifiable {
-        case all
-        case missing
-        case bought
-
-        var id: Self { self }
-
-        var title: String {
-            switch self {
-            case .all: return "Wszystkie"
-            case .missing: return "Do kupienia"
-            case .bought: return "Kupione"
-            }
-        }
-
-        var icon: String {
-            switch self {
-            case .all: return "line.3.horizontal.decrease.circle"
-            case .missing: return "circle"
-            case .bought: return "checkmark.circle.fill"
-            }
-        }
-    }
 
     private var shoppingItems: [ShoppingItem] {
         shoppingListStore.items
-    }
-
-    private var visibleItems: [ShoppingItem] {
-        switch selectedFilter {
-        case .all:
-            return shoppingItems
-        case .missing:
-            return shoppingItems.filter { !$0.isChecked }
-        case .bought:
-            return shoppingItems.filter(\.isChecked)
-        }
     }
 
     private var groupedByDepartment: [(department: String, items: [ShoppingItem])] {
@@ -69,7 +33,7 @@ struct ProductsView: View {
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
 
-        return Dictionary(grouping: visibleItems, by: \.department)
+        return Dictionary(grouping: shoppingItems, by: \.department)
             .sorted {
                 let leftKey = $0.key.trimmingCharacters(in: .whitespacesAndNewlines)
                 let rightKey = $1.key.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -132,7 +96,7 @@ struct ProductsView: View {
 
     private var shoppingList: some View {
         ScrollView {
-            VStack(spacing: 9) {
+            VStack(spacing: 12) {
                 if let errorMessage = shoppingListStore.errorMessage, !errorMessage.isEmpty {
                     Text(verbatim: errorMessage)
                         .font(.caption)
@@ -142,10 +106,9 @@ struct ProductsView: View {
                 }
 
                 progressCard
-                filterBar
 
                 if groupedByDepartment.isEmpty {
-                    filteredEmptyState
+                    emptyState
                 } else {
                     ForEach(groupedByDepartment, id: \.department) { department, items in
                         departmentSection(department: department, items: items)
@@ -160,85 +123,45 @@ struct ProductsView: View {
     }
 
     private var progressCard: some View {
-        HStack(spacing: 8) {
-            progressStatChip(icon: "clock.fill", title: "Do kupienia", value: "\(remainingCount)", tint: .orange)
-            progressStatChip(icon: "checkmark.circle.fill", title: "Kupione", value: "\(boughtCount)", tint: .green)
-            progressStatChip(icon: "square.grid.2x2.fill", title: "Razem", value: "\(shoppingItems.count)", tint: .blue)
-        }
-        .padding(10)
-        .dashboardLiquidCard(cornerRadius: 16, strokeOpacity: 0.17)
-    }
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Lista zakupów")
+                        .font(.headline)
+                        .fontWeight(.semibold)
 
-    private var filterBar: some View {
-        HStack(spacing: 6) {
-            ForEach(ProductsFilter.allCases) { filter in
-                let isSelected = selectedFilter == filter
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        selectedFilter = filter
-                    }
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: filter.icon)
-                            .font(.caption2)
-                            .fontWeight(.semibold)
-                        Text(filter.title)
-                            .font(.caption2)
-                            .fontWeight(.semibold)
-                            .lineLimit(1)
-                    }
-                    .foregroundStyle(isSelected ? .primary : .secondary)
-                    .padding(.vertical, 5)
-                    .padding(.horizontal, 8)
-                    .frame(maxWidth: .infinity)
-                    .background(
-                        isSelected
-                        ? AnyShapeStyle(
-                            LinearGradient(
-                                colors: [.blue.opacity(0.3), .cyan.opacity(0.2)],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        : AnyShapeStyle(Color.white.opacity(0.1)),
-                        in: Capsule()
-                    )
-                    .overlay(
-                        Capsule()
-                            .stroke(
-                                isSelected ? Color.blue.opacity(0.36) : Color.white.opacity(0.16),
-                                lineWidth: 0.8
-                            )
-                    )
+                    Text(progressSubtitle)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 }
-                .buttonStyle(.plain)
+
+                Spacer(minLength: 12)
+            }
+
+            progressBar
+
+            HStack(spacing: 8) {
+                statPill(value: "\(remainingCount)", title: "Do kupienia", tint: .orange)
+                statPill(value: "\(boughtCount)", title: "Kupione", tint: .green)
+                statPill(value: "\(shoppingItems.count)", title: "Razem", tint: .blue)
             }
         }
-        .padding(2)
-        .dashboardLiquidCard(cornerRadius: 14, strokeOpacity: 0.14)
+        .padding(16)
+        .dashboardLiquidCard(cornerRadius: 18, strokeOpacity: 0.17)
     }
 
-    private var filteredEmptyState: some View {
-        VStack(spacing: 10) {
-            Image(systemName: "line.3.horizontal.decrease.circle")
-                .font(.title3)
-                .foregroundStyle(.secondary)
-            Text("Brak pozycji dla filtra „\(selectedFilter.title)”")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 14)
-        .dashboardLiquidCard(cornerRadius: 14, strokeOpacity: 0.14)
-    }
+    private func statPill(value: String, title: String, tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(value)
+                .font(.headline)
+                .fontWeight(.semibold)
+                .foregroundStyle(.primary)
+                .monospacedDigit()
 
-    private func progressStatChip(icon: String, title: String, value: String, tint: Color) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            HStack(spacing: 4) {
-                Image(systemName: icon)
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(tint)
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(tint.opacity(0.95))
+                    .frame(width: 7, height: 7)
 
                 Text(title)
                     .font(.caption2)
@@ -246,20 +169,14 @@ struct ProductsView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
-
-            Text(value)
-                .font(.subheadline)
-                .fontWeight(.semibold)
-                .foregroundStyle(.primary)
-                .monospacedDigit()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, 6)
-        .padding(.horizontal, 8)
-        .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(tint.opacity(0.22), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
         )
     }
 
@@ -272,7 +189,7 @@ struct ProductsView: View {
         return VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 8) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
                         .fill(color.opacity(colorScheme == .dark ? 0.24 : 0.14))
                     Image(systemName: icon)
                         .font(.caption2)
@@ -288,13 +205,12 @@ struct ProductsView: View {
 
                 Spacer()
 
-                Text("\(boughtInSection)/\(items.count)")
-                    .font(.caption2)
+                Text(allBought ? "Gotowe" : "\(items.count) pozycji")
+                    .font(.caption2.weight(.semibold))
                     .fontWeight(.medium)
                     .foregroundStyle(allBought ? .green : .secondary)
-                    .monospacedDigit()
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 3)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
                     .background(
                         Capsule()
                             .fill(
@@ -304,9 +220,9 @@ struct ProductsView: View {
                             )
                     )
             }
-            .padding(.horizontal, 10)
-            .padding(.top, 10)
-            .padding(.bottom, 5)
+            .padding(.horizontal, 12)
+            .padding(.top, 12)
+            .padding(.bottom, 6)
 
             VStack(spacing: 0) {
                 ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
@@ -314,14 +230,14 @@ struct ProductsView: View {
 
                     if index < items.count - 1 {
                         Divider()
-                            .padding(.leading, 38)
-                            .padding(.trailing, 10)
+                            .padding(.leading, 46)
+                            .padding(.trailing, 12)
                     }
                 }
             }
-            .padding(.bottom, 2)
+            .padding(.bottom, 4)
         }
-        .dashboardLiquidCard(cornerRadius: 16, strokeOpacity: 0.16)
+        .dashboardLiquidCard(cornerRadius: 18, strokeOpacity: 0.16)
     }
 
     private func shoppingRow(_ item: ShoppingItem, color: Color) -> some View {
@@ -334,28 +250,40 @@ struct ProductsView: View {
                 }
             }
         } label: {
-            HStack(spacing: 10) {
-                Image(systemName: bought ? "checkmark.circle.fill" : "circle")
-                    .font(.body.weight(.medium))
-                    .foregroundStyle(bought ? .green : Color(.tertiaryLabel))
-                    .contentTransition(.symbolEffect(.replace))
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(
+                            bought
+                            ? Color.green.opacity(colorScheme == .dark ? 0.2 : 0.12)
+                            : Color.white.opacity(0.08)
+                        )
 
-                Text(verbatim: item.name)
-                    .font(.footnote)
-                    .fontWeight(bought ? .regular : .medium)
-                    .strikethrough(bought)
-                    .foregroundStyle(bought ? .secondary : .primary)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
+                    Image(systemName: bought ? "checkmark" : "circle")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(bought ? .green : Color(.tertiaryLabel))
+                        .contentTransition(.symbolEffect(.replace))
+                }
+                .frame(width: 28, height: 28)
 
-                Spacer(minLength: 4)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(verbatim: item.name)
+                        .font(.footnote)
+                        .fontWeight(bought ? .regular : .medium)
+                        .strikethrough(bought)
+                        .foregroundStyle(bought ? .secondary : .primary)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                }
+
+                Spacer(minLength: 8)
 
                 Text(verbatim: "\(item.formattedAmount) \(item.unit)")
-                    .font(.caption2)
-                    .fontWeight(.medium)
+                    .font(.caption)
+                    .fontWeight(.semibold)
                     .foregroundStyle(bought ? Color.secondary : color)
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 3)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 5)
                     .background(
                         Capsule()
                             .fill(
@@ -365,11 +293,55 @@ struct ProductsView: View {
                             )
                     )
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 9)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+
+    private var progressSubtitle: String {
+        if shoppingItems.isEmpty {
+            return "Lista jest jeszcze pusta"
+        }
+        if remainingCount == 0 {
+            return "Wszystko kupione na ten tydzień"
+        }
+        if boughtCount == 0 {
+            return "Masz \(remainingCount) pozycji do kupienia"
+        }
+        return "Zostało \(remainingCount) z \(shoppingItems.count) pozycji"
+    }
+
+    private var completionRatio: Double {
+        guard !shoppingItems.isEmpty else { return 0 }
+        return Double(boughtCount) / Double(shoppingItems.count)
+    }
+
+    private var progressBar: some View {
+        GeometryReader { geometry in
+            let width = geometry.size.width * completionRatio
+
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(Color.white.opacity(0.08))
+
+                Capsule()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(red: 0.35, green: 0.64, blue: 1.0).opacity(0.95),
+                                Color(red: 0.23, green: 0.83, blue: 0.76).opacity(0.82)
+                            ],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .frame(width: shoppingItems.isEmpty ? 0 : width)
+                    .animation(.easeInOut(duration: 0.28), value: completionRatio)
+            }
+        }
+        .frame(height: 8)
     }
 
 }

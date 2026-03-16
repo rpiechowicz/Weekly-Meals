@@ -85,7 +85,7 @@ struct SettingsView: View {
                     .ignoresSafeArea()
 
                 ScrollView {
-                    VStack(spacing: 10) {
+                    VStack(spacing: 12) {
                         accountSection
                         householdEntryCard
                         preferencesEntryCard
@@ -123,21 +123,27 @@ struct SettingsView: View {
     }
 
     private var accountSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 10) {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 12) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
                         .fill(Color.blue.opacity(colorScheme == .dark ? 0.22 : 0.14))
                     Image(systemName: "person.fill")
-                        .font(.system(size: 18, weight: .semibold))
+                        .font(.system(size: 20, weight: .semibold))
                         .foregroundStyle(.blue)
                 }
-                .frame(width: 42, height: 42)
+                .frame(width: 50, height: 50)
 
-                VStack(alignment: .leading, spacing: 1) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Konto")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.secondary)
+
                     Text(userDisplayName)
                         .font(.headline)
                         .fontWeight(.semibold)
+
                     Text(userEmail)
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -149,34 +155,38 @@ struct SettingsView: View {
                 Button(role: .destructive) {
                     showLogoutAlert = true
                 } label: {
-                    Image(systemName: "rectangle.portrait.and.arrow.right")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.red)
-                        .frame(width: 30, height: 30)
-                        .background(
-                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .fill(Color.red.opacity(0.14))
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .stroke(Color.red.opacity(0.24), lineWidth: 1)
-                        )
+                    HStack(spacing: 6) {
+                        Image(systemName: "rectangle.portrait.and.arrow.right")
+                        Text("Wyloguj")
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.red)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(Color.red.opacity(0.14))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .stroke(Color.red.opacity(0.24), lineWidth: 1)
+                    )
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Wyloguj")
             }
 
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 accountInfoPill(icon: "house.fill", title: householdSummary, tint: hasHousehold ? .green : .secondary)
                 accountInfoPill(icon: "circle.lefthalf.filled", title: (AppTheme(rawValue: themeRawValue) ?? .system).title, tint: .blue)
             }
         }
-        .padding(14)
+        .padding(16)
         .dashboardLiquidCard(cornerRadius: 20, strokeOpacity: 0.2)
     }
 
     private var householdEntryCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 Image(systemName: "house.fill")
                     .font(.caption.weight(.semibold))
@@ -192,18 +202,10 @@ struct SettingsView: View {
                     .fontWeight(.semibold)
 
                 Spacer(minLength: 0)
-
-                Text(hasHousehold ? "Aktywne" : "Brak")
-                    .font(.caption2)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(hasHousehold ? .green : .secondary)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background((hasHousehold ? Color.green : Color.white).opacity(hasHousehold ? 0.15 : 0.12), in: Capsule())
             }
 
-            Text(hasHousehold ? "Zapraszaj domowników i zarządzaj rolami." : "Utwórz wspólne gospodarstwo do planowania i zakupów.")
-                .font(.caption)
+            Text(hasHousehold ? "Zarządzaj domownikami i zaproszeniami w jednym miejscu." : "Utwórz wspólne gospodarstwo do planowania i zakupów.")
+                .font(.footnote)
                 .foregroundStyle(.secondary)
 
             if hasHousehold {
@@ -228,12 +230,12 @@ struct SettingsView: View {
                 }
             }
         }
-        .padding(14)
+        .padding(16)
         .dashboardLiquidCard(cornerRadius: 18, strokeOpacity: 0.18)
     }
 
     private var preferencesEntryCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 Image(systemName: "slider.horizontal.3")
                     .font(.caption.weight(.semibold))
@@ -249,13 +251,11 @@ struct SettingsView: View {
                     .fontWeight(.semibold)
 
                 Spacer(minLength: 0)
-                Text((AppTheme(rawValue: themeRawValue) ?? .system).title)
-                    .font(.caption2)
-                    .fontWeight(.semibold)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color.white.opacity(0.12), in: Capsule())
             }
+
+            Text("Powiadomienia i wygląd aplikacji.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
 
             settingsRowButton(
                 title: "Ustawienia aplikacji",
@@ -266,7 +266,7 @@ struct SettingsView: View {
                 showPreferencesSheet = true
             }
         }
-        .padding(14)
+        .padding(16)
         .dashboardLiquidCard(cornerRadius: 18, strokeOpacity: 0.18)
     }
 
@@ -278,13 +278,13 @@ struct SettingsView: View {
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            HStack(spacing: 9) {
+            HStack(spacing: 10) {
                 Image(systemName: icon)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(accent)
-                    .frame(width: 24, height: 24)
-                    .background(accent.opacity(0.16), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                VStack(alignment: .leading, spacing: 2) {
+                    .frame(width: 28, height: 28)
+                    .background(accent.opacity(0.16), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                VStack(alignment: .leading, spacing: 3) {
                     Text(title)
                         .font(.footnote)
                         .fontWeight(.semibold)
@@ -299,17 +299,17 @@ struct SettingsView: View {
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(.secondary)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 10)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 12)
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color.white.opacity(colorScheme == .dark ? 0.08 : 0.12))
+                    .fill(Color.white.opacity(colorScheme == .dark ? 0.07 : 0.11))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(Color.white.opacity(0.14), lineWidth: 1)
+                    .stroke(Color.white.opacity(0.12), lineWidth: 1)
             )
         }
         .buttonStyle(.plain)
