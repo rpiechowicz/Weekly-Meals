@@ -37,80 +37,122 @@ struct RecipesView: View {
         recipeCatalogStore.isLoading && recipeCatalogStore.recipes.isEmpty
     }
 
-    private var selectedFilterIcon: String {
-        selectedCategory == .all
-        ? "line.3.horizontal.decrease.circle"
-        : "line.3.horizontal.decrease.circle.fill"
-    }
-
-    private var selectedFilterTint: Color {
-        selectedCategory == .all ? .secondary : .blue
-    }
-
     private var selectedCategoryTitle: String {
         selectedCategory == .all
         ? "Wszystkie przepisy"
         : RecipesConstants.displayName(for: selectedCategory)
     }
 
-    private var recipesSummaryCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 12) {
-                Text(searchText.isEmpty ? selectedCategoryTitle : "Wyniki wyszukiwania")
-                    .font(.title3)
-                    .fontWeight(.bold)
-                    .fontDesign(.rounded)
-
-                Spacer(minLength: 0)
-                recipesFilterActions
-            }
-        }
-        .padding(16)
-        .dashboardLiquidCard(cornerRadius: 24, strokeOpacity: 0.28)
+    private var hasActiveFilters: Bool {
+        selectedCategory != .all || !searchText.isEmpty
     }
 
-    private var recipesFilterActions: some View {
-        Menu {
-            ForEach(categories, id: \.self) { category in
-                Button {
-                    withAnimation(.easeInOut(duration: 0.15)) {
-                        selectedCategory = category
-                    }
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: RecipesConstants.icon(for: category))
-                        Text(RecipesConstants.displayName(for: category))
-                        Spacer(minLength: 8)
-                        if selectedCategory == category {
-                            Image(systemName: "checkmark")
+    private var recipesSummaryCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(searchText.isEmpty ? selectedCategoryTitle : "Wyniki wyszukiwania")
+                        .font(.title3)
+                        .fontWeight(.bold)
+                        .fontDesign(.rounded)
+
+                    Text("\(filteredRecipes.count) \(resultsLabel(for: filteredRecipes.count))")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+
+                Spacer(minLength: 8)
+
+                if hasActiveFilters {
+                    Button("Wyczyść") {
+                        withAnimation(.easeInOut(duration: 0.18)) {
+                            selectedCategory = .all
+                            searchText = ""
+                            debouncedSearchText = ""
                         }
                     }
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.blue)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Color.blue.opacity(0.13), in: Capsule())
+                    .buttonStyle(.plain)
                 }
             }
-        } label: {
-            Image(systemName: selectedFilterIcon)
-                .symbolRenderingMode(.monochrome)
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(selectedFilterTint)
-                .frame(width: 36, height: 36)
-                .background(.ultraThinMaterial, in: Circle())
-                .overlay(
-                    Circle()
-                        .stroke(Color.white.opacity(0.24), lineWidth: 1)
-                )
+
+            categoryChips
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Filtr kategorii: \(selectedCategoryTitle)")
+        .padding(16)
+        .dashboardLiquidCard(cornerRadius: 22, strokeOpacity: 0.22)
+    }
+
+    private var categoryChips: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(categories, id: \.self) { category in
+                    let isSelected = selectedCategory == category
+                    let tint = categoryColor(for: category)
+
+                    Button {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.84)) {
+                            selectedCategory = category
+                        }
+                    } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: RecipesConstants.icon(for: category))
+                                .font(.caption.weight(.semibold))
+
+                            Text(RecipesConstants.displayName(for: category))
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                        }
+                        .foregroundStyle(isSelected ? tint : Color.primary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                        .background(
+                            Capsule()
+                                .fill(isSelected ? tint.opacity(0.18) : Color.white.opacity(0.14))
+                        )
+                        .overlay(
+                            Capsule()
+                                .stroke(
+                                    isSelected ? tint.opacity(0.36) : Color.white.opacity(0.2),
+                                    lineWidth: 1
+                                )
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 1)
+        }
+    }
+
+    private func resultsLabel(for count: Int) -> String {
+        count == 1 ? "przepis" : "przepisy"
+    }
+
+    private func categoryColor(for category: RecipesCategory) -> Color {
+        switch category {
+        case .all: return .blue
+        case .favourite: return .pink
+        case .breakfast: return .orange
+        case .lunch: return .blue
+        case .dinner: return .purple
+        @unknown default: return .teal
+        }
     }
 
     var body: some View {
         NavigationStack {
             ZStack {
-                DashboardLiquidBackground()
+                RecipesLiquidBackground()
                     .ignoresSafeArea()
 
                 ScrollView {
-                    VStack(spacing: 14) {
+                    VStack(spacing: 12) {
                         recipesSummaryCard
 
                         if let errorMessage = recipeCatalogStore.errorMessage {
@@ -124,24 +166,24 @@ struct RecipesView: View {
                         }
 
                         if shouldShowSkeleton {
-                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: 16)], spacing: 16) {
+                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 165), spacing: 12)], spacing: 12) {
                                 ForEach(0..<6, id: \.self) { _ in
                                     RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                        .fill(Color.white.opacity(0.06))
-                                        .frame(height: 250)
+                                        .fill(Color.white.opacity(0.08))
+                                        .frame(height: 232)
                                         .redacted(reason: .placeholder)
                                 }
                             }
-                            .padding(.horizontal, 4)
+                            .padding(.horizontal, 2)
                             .padding(.bottom, 12)
                         } else if filteredRecipes.isEmpty {
-                            VStack(spacing: 16) {
+                            VStack(spacing: 12) {
                                 Image(systemName: "fork.knife.circle")
-                                    .font(.system(size: 64))
+                                    .font(.system(size: 56))
                                     .foregroundStyle(.secondary)
 
                                 Text("Brak przepisów")
-                                    .font(.title2)
+                                    .font(.headline)
                                     .fontWeight(.semibold)
 
                                 Text("Spróbuj wybrać inną kategorię")
@@ -149,17 +191,18 @@ struct RecipesView: View {
                                     .foregroundStyle(.secondary)
                             }
                             .frame(maxWidth: .infinity)
-                            .padding(.top, 80)
-                            .padding(.horizontal)
+                            .padding(.vertical, 44)
+                            .padding(.horizontal, 16)
+                            .dashboardLiquidCard(cornerRadius: 20, strokeOpacity: 0.2)
                         } else {
-                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: 16)], spacing: 16) {
+                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 165), spacing: 12)], spacing: 12) {
                                 ForEach(filteredRecipes) { recipe in
                                     Button {
                                         Task { @MainActor in
                                             selectedRecipe = await recipeCatalogStore.loadRecipeDetail(recipeId: recipe.id) ?? recipe
                                         }
                                     } label: {
-                                        RecipeItemView(recipe: recipe)
+                                        RecipeGridCard(recipe: recipe)
                                     }
                                     .buttonStyle(.plain)
                                     .task {
@@ -167,7 +210,7 @@ struct RecipesView: View {
                                     }
                                 }
                             }
-                            .padding(.horizontal, 4)
+                            .padding(.horizontal, 2)
                             .padding(.bottom, 18)
 
                             if recipeCatalogStore.isLoadingMore {
@@ -178,7 +221,7 @@ struct RecipesView: View {
                         }
                     }
                     .padding(.horizontal, 14)
-                    .padding(.top, 8)
+                    .padding(.top, 10)
                     .padding(.bottom, 14)
                 }
             }
@@ -215,6 +258,183 @@ struct RecipesView: View {
                 .presentationDetents([.large])
                 .dashboardLiquidSheet()
             }
+        }
+    }
+}
+
+private struct RecipesLiquidBackground: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: [
+                    colorScheme == .dark
+                        ? Color(red: 0.08, green: 0.09, blue: 0.11)
+                        : Color(red: 0.95, green: 0.96, blue: 0.98),
+                    colorScheme == .dark
+                        ? Color(red: 0.05, green: 0.06, blue: 0.07)
+                        : Color(red: 0.92, green: 0.94, blue: 0.97)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            Circle()
+                .fill(Color.blue.opacity(colorScheme == .dark ? 0.22 : 0.11))
+                .frame(width: 260, height: 260)
+                .blur(radius: 90)
+                .offset(x: -130, y: -210)
+
+            Circle()
+                .fill(Color.cyan.opacity(colorScheme == .dark ? 0.14 : 0.09))
+                .frame(width: 210, height: 210)
+                .blur(radius: 80)
+                .offset(x: 120, y: -260)
+
+            Circle()
+                .fill(Color.purple.opacity(colorScheme == .dark ? 0.16 : 0.08))
+                .frame(width: 280, height: 280)
+                .blur(radius: 100)
+                .offset(x: 140, y: 260)
+        }
+    }
+}
+
+private struct RecipeGridCard: View {
+    let recipe: Recipe
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            thumbnail
+                .frame(height: 126)
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .overlay(alignment: .topLeading) {
+                    categoryBadge
+                        .padding(.leading, 12)
+                        .padding(.top, 12)
+                }
+                .overlay(alignment: .topTrailing) {
+                    if recipe.favourite {
+                        Image(systemName: "heart.fill")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.pink)
+                            .frame(width: 26, height: 26)
+                            .background(Color.white.opacity(colorScheme == .dark ? 0.16 : 0.26), in: Circle())
+                            .overlay(
+                                Circle()
+                                    .stroke(Color.white.opacity(0.25), lineWidth: 1)
+                            )
+                            .padding(.trailing, 10)
+                            .padding(.top, 10)
+                    }
+                }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(recipe.name)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+
+                Text(recipe.description)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+
+            HStack(spacing: 6) {
+                metaPill(icon: "clock", text: "\(recipe.prepTimeMinutes) min")
+                metaPill(icon: "flame.fill", text: "\(Int(recipe.nutritionPerServing.kcal)) kcal")
+            }
+        }
+        .padding(11)
+        .frame(height: 232)
+        .dashboardLiquidCard(cornerRadius: 20, strokeOpacity: 0.18)
+    }
+
+    private var thumbnail: some View {
+        Group {
+            if let imageURL = recipe.imageURL {
+                AsyncImage(url: imageURL) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    case .failure:
+                        placeholderThumb
+                    case .empty:
+                        ZStack {
+                            placeholderThumb
+                            ProgressView()
+                        }
+                    @unknown default:
+                        placeholderThumb
+                    }
+                }
+            } else {
+                placeholderThumb
+            }
+        }
+    }
+
+    private var placeholderThumb: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(categoryTint.opacity(colorScheme == .dark ? 0.22 : 0.14))
+
+            Image(systemName: "fork.knife")
+                .font(.title3)
+                .foregroundStyle(categoryTint)
+        }
+    }
+
+    private var categoryBadge: some View {
+        HStack(spacing: 5) {
+            Circle()
+                .fill(categoryTint)
+                .frame(width: 6, height: 6)
+
+            Text(RecipesConstants.displayName(for: recipe.category))
+                .lineLimit(1)
+        }
+        .font(.system(size: 10, weight: .semibold))
+        .foregroundStyle(Color.white.opacity(0.96))
+        .padding(.horizontal, 9)
+        .padding(.vertical, 5)
+        .background(
+            Capsule()
+                .fill(Color.black.opacity(colorScheme == .dark ? 0.44 : 0.28))
+        )
+        .overlay(
+            Capsule()
+                .stroke(Color.white.opacity(0.22), lineWidth: 0.8)
+        )
+        .shadow(color: .black.opacity(0.22), radius: 6, x: 0, y: 2)
+    }
+
+    private func metaPill(icon: String, text: String) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
+            Text(text)
+                .lineLimit(1)
+        }
+        .font(.caption2)
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 4)
+        .background(Color.white.opacity(colorScheme == .dark ? 0.09 : 0.2), in: Capsule())
+    }
+
+    private var categoryTint: Color {
+        switch recipe.category {
+        case .breakfast: return .orange
+        case .lunch: return .blue
+        case .dinner: return .purple
+        case .favourite: return .pink
+        case .all: return .teal
         }
     }
 }

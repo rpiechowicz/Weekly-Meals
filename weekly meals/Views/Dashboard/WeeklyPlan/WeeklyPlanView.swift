@@ -4,6 +4,7 @@ struct WeeklyPlanView: View {
     @Environment(\.weeklyMealStore) private var mealStore
     @Environment(\.datesViewModel) private var datesViewModel
     @Environment(\.shoppingListStore) private var shoppingListStore
+    @Environment(\.colorScheme) private var colorScheme
 
     @State private var showEditor = false
     @State private var showDeletePlanAlert = false
@@ -27,13 +28,16 @@ struct WeeklyPlanView: View {
         mealStore.savedPlan.breakfastEntries.count + mealStore.savedPlan.lunchEntries.count + mealStore.savedPlan.dinnerEntries.count
     }
 
-    private var progressValue: Double {
-        guard MealPlanViewModel.maxTotal > 0 else { return 0 }
-        return min(1, Double(totalPlannedCount) / Double(MealPlanViewModel.maxTotal))
+    private var breakfastCount: Int {
+        mealStore.savedPlan.breakfastEntries.count
     }
 
-    private var heroStatusText: String {
-        mealStore.hasSavedPlan ? "Gotowe do przypisywania w Kalendarzu." : "Dodaj plan na ten tydzień."
+    private var lunchCount: Int {
+        mealStore.savedPlan.lunchEntries.count
+    }
+
+    private var dinnerCount: Int {
+        mealStore.savedPlan.dinnerEntries.count
     }
 
     var body: some View {
@@ -86,9 +90,9 @@ struct WeeklyPlanView: View {
     }
 
     private var heroCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .top, spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 3) {
                     Text("Tydzień")
                         .font(.caption)
                         .fontWeight(.semibold)
@@ -98,56 +102,43 @@ struct WeeklyPlanView: View {
                         .font(.title3)
                         .fontWeight(.bold)
                         .fontDesign(.rounded)
+
+                    Text(mealStore.hasSavedPlan ? "Plan aktywny" : "Brak planu")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
                 }
 
-                Spacer()
+                Spacer(minLength: 8)
 
                 heroActions
             }
 
-            GeometryReader { proxy in
-                let width = proxy.size.width
-                let clamped = min(max(progressValue, 0), 1)
-                ZStack(alignment: .leading) {
-                    Capsule()
-                        .fill(Color.white.opacity(0.22))
-                    Capsule()
-                        .fill(
-                            LinearGradient(
-                                colors: [.cyan.opacity(0.85), .blue.opacity(0.85)],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .frame(width: width * clamped)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) {
+                    planStatChip(title: "Śniad.", value: "\(breakfastCount)/\(MealPlanViewModel.maxPerSlot)", tint: .orange)
+                    planStatChip(title: "Obiad", value: "\(lunchCount)/\(MealPlanViewModel.maxPerSlot)", tint: .blue)
+                    planStatChip(title: "Kolacja", value: "\(dinnerCount)/\(MealPlanViewModel.maxPerSlot)", tint: .purple)
+                }
+
+                VStack(spacing: 8) {
+                    HStack(spacing: 8) {
+                        planStatChip(title: "Śniad.", value: "\(breakfastCount)/\(MealPlanViewModel.maxPerSlot)", tint: .orange)
+                        planStatChip(title: "Obiad", value: "\(lunchCount)/\(MealPlanViewModel.maxPerSlot)", tint: .blue)
+                    }
+                    HStack(spacing: 8) {
+                        planStatChip(title: "Kolacja", value: "\(dinnerCount)/\(MealPlanViewModel.maxPerSlot)", tint: .purple)
+                    }
                 }
             }
-            .frame(height: 10)
 
-            HStack(alignment: .center, spacing: 10) {
-                Text(heroStatusText)
-                    .lineLimit(1)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                Text("\(totalPlannedCount)/\(MealPlanViewModel.maxTotal)")
-                    .font(.footnote)
-                    .fontWeight(.semibold)
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(.thickMaterial, in: Capsule())
-            }
+            Text("Łącznie \(totalPlannedCount)/\(MealPlanViewModel.maxTotal) pozycji")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 26, style: .continuous)
-                .stroke(Color.white.opacity(0.3), lineWidth: 1)
-        )
+        .dashboardLiquidCard(cornerRadius: 24, strokeOpacity: 0.2)
     }
 
     private var heroActions: some View {
@@ -159,33 +150,32 @@ struct WeeklyPlanView: View {
                     .font(.subheadline)
                     .fontWeight(.semibold)
                     .foregroundStyle(.primary)
-                    .frame(width: 36, height: 36)
+                    .frame(width: 34, height: 34)
             }
             .accessibilityLabel(mealStore.hasSavedPlan ? "Edytuj plan" : "Utwórz plan")
             .buttonStyle(.plain)
 
             if mealStore.hasSavedPlan {
                 Divider()
-                    .frame(height: 20)
+                    .frame(height: 18)
                     .padding(.horizontal, 2)
 
                 Button(role: .destructive) {
                     showDeletePlanAlert = true
                 } label: {
                     Image(systemName: "trash")
-                        .font(.subheadline)
-                        .fontWeight(.bold)
+                        .font(.subheadline.weight(.bold))
                         .foregroundStyle(.red)
-                        .frame(width: 36, height: 36)
+                        .frame(width: 34, height: 34)
                 }
                 .buttonStyle(.plain)
             }
         }
-        .padding(3)
-        .background(.thinMaterial, in: Capsule())
+        .padding(3.5)
+        .background(Color.white.opacity(0.15), in: Capsule())
         .overlay(
             Capsule()
-                .stroke(Color.white.opacity(0.24), lineWidth: 1)
+                .stroke(Color.white.opacity(0.22), lineWidth: 1)
         )
         .fixedSize(horizontal: true, vertical: false)
     }
@@ -196,16 +186,17 @@ struct WeeklyPlanView: View {
         let slotCount = entries.count
         let recipes = uniqueRecipes(for: slot)
 
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
                 Image(systemName: slot.icon)
                     .font(.subheadline)
                     .foregroundStyle(slot.accentColor)
                     .frame(width: 30, height: 30)
-                    .background(slot.accentColor.opacity(0.16), in: Circle())
+                    .background(slot.accentColor.opacity(0.14), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
 
                 Text(slot.title)
-                    .font(.headline)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
                     .fontDesign(.rounded)
 
                 Spacer()
@@ -220,8 +211,23 @@ struct WeeklyPlanView: View {
                     .background(slot.accentColor.opacity(slotCount > 0 ? 0.16 : 0.08), in: Capsule())
             }
 
-            if !recipes.isEmpty {
-                VStack(spacing: 10) {
+            if recipes.isEmpty {
+                Text("Brak przepisów w tym slocie")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(Color.white.opacity(0.08))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .stroke(Color.white.opacity(0.14), lineWidth: 1)
+                    )
+            } else {
+                VStack(spacing: 8) {
                     ForEach(recipes) { recipe in
                         PlanRecipeRow(
                             recipe: recipe,
@@ -232,12 +238,33 @@ struct WeeklyPlanView: View {
                 }
             }
         }
-        .padding(16)
+        .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .dashboardLiquidCard(cornerRadius: 20, strokeOpacity: 0.18)
+    }
+
+    private func planStatChip(title: String, value: String, tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+
+            Text(value)
+                .font(.caption)
+                .fontWeight(.semibold)
+                .monospacedDigit()
+                .foregroundStyle(.primary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(tint.opacity(0.12))
+        )
         .overlay(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .stroke(Color.white.opacity(0.24), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(tint.opacity(0.24), lineWidth: 1)
         )
     }
 
@@ -251,25 +278,34 @@ struct WeeklyPlanView: View {
         ZStack {
             LinearGradient(
                 colors: [
-                    Color.blue.opacity(0.22),
-                    Color.cyan.opacity(0.16),
-                    Color.indigo.opacity(0.18)
+                    colorScheme == .dark
+                        ? Color(red: 0.08, green: 0.09, blue: 0.11)
+                        : Color(red: 0.95, green: 0.96, blue: 0.98),
+                    colorScheme == .dark
+                        ? Color(red: 0.05, green: 0.06, blue: 0.07)
+                        : Color(red: 0.92, green: 0.94, blue: 0.97)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
 
             Circle()
-                .fill(Color.cyan.opacity(0.35))
+                .fill(Color.blue.opacity(colorScheme == .dark ? 0.22 : 0.12))
                 .frame(width: 260, height: 260)
-                .blur(radius: 80)
-                .offset(x: -120, y: -200)
+                .blur(radius: 90)
+                .offset(x: -120, y: -190)
 
             Circle()
-                .fill(Color.blue.opacity(0.3))
+                .fill(Color.purple.opacity(colorScheme == .dark ? 0.16 : 0.1))
                 .frame(width: 280, height: 280)
-                .blur(radius: 90)
+                .blur(radius: 100)
                 .offset(x: 140, y: 220)
+
+            Circle()
+                .fill(Color.cyan.opacity(colorScheme == .dark ? 0.12 : 0.08))
+                .frame(width: 210, height: 210)
+                .blur(radius: 85)
+                .offset(x: 120, y: -240)
         }
     }
 
@@ -285,6 +321,7 @@ private struct PlanRecipeRow: View {
     let recipe: Recipe
     let slot: MealSlot
     let count: Int
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         HStack(spacing: 10) {
@@ -308,29 +345,25 @@ private struct PlanRecipeRow: View {
                     fallbackIcon
                 }
             }
-            .frame(width: 52, height: 52)
+            .frame(width: 48, height: 48)
             .background(Color(.secondarySystemFill))
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 11, style: .continuous)
+                    .stroke(slot.accentColor.opacity(0.25), lineWidth: 1)
+            )
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(recipe.name)
-                    .font(.subheadline)
+                    .font(.callout)
                     .fontWeight(.semibold)
                     .lineLimit(2)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                HStack(spacing: 10) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "clock")
-                        Text("\(recipe.prepTimeMinutes) min")
-                    }
-                    HStack(spacing: 4) {
-                        Image(systemName: "flame.fill")
-                        Text("\(Int(recipe.nutritionPerServing.kcal)) kcal")
-                    }
+                HStack(spacing: 6) {
+                    metaPill(icon: "clock", text: "\(recipe.prepTimeMinutes) min")
+                    metaPill(icon: "flame.fill", text: "\(Int(recipe.nutritionPerServing.kcal)) kcal")
                 }
-                .font(.caption2)
-                .foregroundStyle(.secondary)
             }
 
             Text("\(count)x")
@@ -346,17 +379,36 @@ private struct PlanRecipeRow: View {
                         .stroke(Color.white.opacity(0.28), lineWidth: 1)
                 )
         }
-        .padding(10)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .padding(.horizontal, 10)
+        .padding(.vertical, 9)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.white.opacity(colorScheme == .dark ? 0.1 : 0.16))
+        )
         .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(Color.white.opacity(0.18), lineWidth: 1)
+        )
+    }
+
+    private func metaPill(icon: String, text: String) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
+            Text(text)
+        }
+        .font(.caption2)
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 3.5)
+        .background(
+            Capsule()
+                .fill(Color.white.opacity(colorScheme == .dark ? 0.09 : 0.2))
         )
     }
 
     private var fallbackIcon: some View {
         Image(systemName: "fork.knife.circle.fill")
-            .font(.title3)
+            .font(.subheadline)
             .foregroundStyle(slot.accentColor)
     }
 }

@@ -7,6 +7,13 @@ struct CalendarView: View {
     @State private var slotToPick: MealSlot? = nil
     @State private var detailRecipe: Recipe? = nil
 
+    private static let weekRangeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "pl_PL")
+        formatter.dateFormat = "d MMM"
+        return formatter
+    }()
+
     // MARK: - Computed
 
     private var isDayEditable: Bool {
@@ -21,6 +28,14 @@ struct CalendarView: View {
             fat: recipes.reduce(0) { $0 + Int($1.nutritionPerServing.fat) },
             carbs: recipes.reduce(0) { $0 + Int($1.nutritionPerServing.carbs) }
         )
+    }
+
+    private var weekRangeText: String {
+        guard let first = datesViewModel.dates.first,
+              let last = datesViewModel.dates.last else {
+            return "Bieżący tydzień"
+        }
+        return "\(Self.weekRangeFormatter.string(from: first)) - \(Self.weekRangeFormatter.string(from: last))"
     }
 
     private func recipe(for slot: MealSlot) -> Recipe? {
@@ -56,17 +71,16 @@ struct CalendarView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                DashboardLiquidBackground()
+                CalendarLiquidBackground()
                     .ignoresSafeArea()
 
                 @Bindable var bindableDates = datesViewModel
                 List {
                     DatesView(datesViewModal: bindableDates)
-                        .dashboardLiquidCard(cornerRadius: 22, strokeOpacity: 0.28)
-                        .padding(.horizontal, 14)
-                        .padding(.top, 4)
+                        .dashboardLiquidCard(cornerRadius: 24, strokeOpacity: 0.22)
+                        .padding(.horizontal, 16)
                         .listRowSeparator(.hidden)
-                        .listRowInsets(EdgeInsets())
+                        .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
                         .listRowBackground(Color.clear)
 
                     if let errorMessage = mealStore.errorMessage, !errorMessage.isEmpty {
@@ -83,7 +97,7 @@ struct CalendarView: View {
 
                     dayHeader
                         .listRowSeparator(.hidden)
-                        .listRowInsets(EdgeInsets())
+                        .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
                         .listRowBackground(Color.clear)
 
                     ForEach(MealSlot.allCases) { slot in
@@ -103,7 +117,7 @@ struct CalendarView: View {
                                 }
                             }
                             .listRowSeparator(.hidden)
-                            .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                             .listRowBackground(Color.clear)
                     }
                 }
@@ -163,15 +177,12 @@ struct CalendarView: View {
     // MARK: - Day Header
 
     private var dayHeader: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top, spacing: 12) {
-                VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 10) {
+                VStack(alignment: .leading, spacing: 0) {
                     Text(datesViewModel.formattedDate(datesViewModel.selectedDate))
-                        .font(.system(.title, design: .rounded))
-                        .fontWeight(.bold)
-                    Text("Bilans dnia")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 18, weight: .semibold, design: .rounded))
+                        .fontWeight(.semibold)
                 }
 
                 Spacer(minLength: 8)
@@ -184,10 +195,9 @@ struct CalendarView: View {
             nutritionPanel
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .dashboardLiquidCard(cornerRadius: 24, strokeOpacity: 0.22)
-        .padding(.horizontal, 14)
-        .padding(.top, 8)
+        .padding(12)
+        .dashboardLiquidCard(cornerRadius: 20, strokeOpacity: 0.18)
+        .padding(.horizontal, 16)
     }
 
     private var pastDayBadge: some View {
@@ -200,65 +210,62 @@ struct CalendarView: View {
         .foregroundStyle(.secondary)
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(.ultraThinMaterial, in: Capsule())
+        .background(Color.white.opacity(0.16), in: Capsule())
         .overlay(
             Capsule()
-                .stroke(Color.white.opacity(0.18), lineWidth: 1)
+                .stroke(Color.white.opacity(0.24), lineWidth: 1)
         )
     }
 
     private var nutritionPanel: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 8) {
-                nutritionMetricChip(title: "Kalorie", value: "\(dayNutrition.kcal) kcal", icon: "flame.fill", tint: .orange)
-                nutritionMetricChip(title: "Białko", value: "\(dayNutrition.protein) g", icon: "bolt.fill", tint: .blue)
-                nutritionMetricChip(title: "Tłuszcz", value: "\(dayNutrition.fat) g", icon: "drop.fill", tint: .pink)
-                nutritionMetricChip(title: "Węgle", value: "\(dayNutrition.carbs) g", icon: "leaf.fill", tint: .green)
-            }
-
-            VStack(spacing: 8) {
-                HStack(spacing: 8) {
-                    nutritionMetricChip(title: "Kalorie", value: "\(dayNutrition.kcal) kcal", icon: "flame.fill", tint: .orange)
-                    nutritionMetricChip(title: "Białko", value: "\(dayNutrition.protein) g", icon: "bolt.fill", tint: .blue)
-                }
-                HStack(spacing: 8) {
-                    nutritionMetricChip(title: "Tłuszcz", value: "\(dayNutrition.fat) g", icon: "drop.fill", tint: .pink)
-                    nutritionMetricChip(title: "Węgle", value: "\(dayNutrition.carbs) g", icon: "leaf.fill", tint: .green)
-                }
-            }
+        HStack(spacing: 8) {
+            nutritionStatPill(title: "Kalorie", value: "\(dayNutrition.kcal)", unit: "kcal", icon: "flame.fill", tint: .orange)
+            nutritionStatPill(title: "Białko", value: "\(dayNutrition.protein)", unit: "g", icon: "bolt.fill", tint: .blue)
+            nutritionStatPill(title: "Tłuszcz", value: "\(dayNutrition.fat)", unit: "g", icon: "drop.fill", tint: .pink)
+            nutritionStatPill(title: "Węgle", value: "\(dayNutrition.carbs)", unit: "g", icon: "leaf.fill", tint: .green)
         }
     }
 
-    private func nutritionMetricChip(title: String, value: String, icon: String, tint: Color) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            HStack(spacing: 4) {
+    private func nutritionStatPill(
+        title: String,
+        value: String,
+        unit: String,
+        icon: String,
+        tint: Color
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 5) {
                 Image(systemName: icon)
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(tint)
                 Text(title)
                     .font(.caption2)
+                    .fontWeight(.semibold)
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
             }
 
-            Text(value)
-                .font(.footnote)
-                .fontWeight(.semibold)
-                .foregroundStyle(.primary)
-                .monospacedDigit()
-                .lineLimit(1)
-                .minimumScaleFactor(0.85)
+            HStack(alignment: .firstTextBaseline, spacing: 2) {
+                Text(value)
+                    .font(.system(size: 18, weight: .bold, design: .rounded))
+                    .foregroundStyle(.primary)
+                    .monospacedDigit()
+
+                Text(unit)
+                    .font(.caption2)
+                    .fontWeight(.medium)
+                    .foregroundStyle(.secondary)
+            }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 10)
-        .padding(.vertical, 8)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(tint.opacity(0.1))
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.white.opacity(0.07))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(tint.opacity(0.2), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(tint.opacity(0.16), lineWidth: 1)
         )
     }
 
@@ -286,6 +293,45 @@ struct CalendarView: View {
             if !success, let previous {
                 mealStore.markAsSelected(previous, slot: slot)
             }
+        }
+    }
+}
+
+private struct CalendarLiquidBackground: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: [
+                    colorScheme == .dark
+                        ? Color(red: 0.08, green: 0.09, blue: 0.11)
+                        : Color(red: 0.95, green: 0.96, blue: 0.98),
+                    colorScheme == .dark
+                        ? Color(red: 0.05, green: 0.06, blue: 0.07)
+                        : Color(red: 0.92, green: 0.94, blue: 0.97)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            Circle()
+                .fill(Color.blue.opacity(colorScheme == .dark ? 0.22 : 0.12))
+                .frame(width: 260, height: 260)
+                .blur(radius: 95)
+                .offset(x: -120, y: -190)
+
+            Circle()
+                .fill(Color.purple.opacity(colorScheme == .dark ? 0.18 : 0.1))
+                .frame(width: 280, height: 280)
+                .blur(radius: 100)
+                .offset(x: 150, y: 240)
+
+            Circle()
+                .fill(Color.cyan.opacity(colorScheme == .dark ? 0.12 : 0.09))
+                .frame(width: 210, height: 210)
+                .blur(radius: 85)
+                .offset(x: 120, y: -240)
         }
     }
 }

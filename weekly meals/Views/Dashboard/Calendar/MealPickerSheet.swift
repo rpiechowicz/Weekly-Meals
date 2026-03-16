@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MealPickerSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
 
     let slot: MealSlot
     let recipes: [Recipe]
@@ -9,17 +10,34 @@ struct MealPickerSheet: View {
     let totalRecipeCounts: [UUID: Int]
     var onSelect: (Recipe) -> Void
 
-    @State private var selectedCategory: RecipesCategory
     @State private var searchText: String = ""
 
-    private var categories: [RecipesCategory] { RecipesCategory.allCases }
-    private var selectedFilterIcon: String {
-        selectedCategory == .all
-        ? "line.3.horizontal.decrease.circle"
-        : RecipesConstants.icon(for: selectedCategory)
+    private var slotSubtitle: String {
+        switch slot {
+        case .breakfast: return "Lekki start dnia"
+        case .lunch: return "Główny posiłek"
+        case .dinner: return "Spokojny finał dnia"
+        }
     }
-    private var selectedFilterTint: Color {
-        selectedCategory == .all ? .secondary : .blue
+
+    private var availableFilteredCount: Int {
+        filteredRecipes.filter { (recipeCounts[$0.id] ?? 0) > 0 }.count
+    }
+
+    private var visibleAvailableRecipes: [Recipe] {
+        filteredRecipes.filter { (recipeCounts[$0.id] ?? 0) > 0 }
+    }
+
+    private var visibleUnavailableRecipes: [Recipe] {
+        filteredRecipes.filter { (recipeCounts[$0.id] ?? 0) == 0 }
+    }
+
+    private var activeFilterSummary: String {
+        if !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return "Wyniki wyszukiwania"
+        }
+
+        return "Wszystkie przepisy"
     }
 
     init(
@@ -34,13 +52,6 @@ struct MealPickerSheet: View {
         self.recipeCounts = recipeCounts
         self.totalRecipeCounts = totalRecipeCounts
         self.onSelect = onSelect
-        self._selectedCategory = State(initialValue: {
-            switch slot {
-            case .breakfast: return .breakfast
-            case .lunch:     return .lunch
-            case .dinner:    return .dinner
-            }
-        }())
     }
 
     private var uniqueRecipes: [Recipe] {
@@ -50,15 +61,6 @@ struct MealPickerSheet: View {
 
     private var filteredRecipes: [Recipe] {
         var filtered = uniqueRecipes
-
-        switch selectedCategory {
-        case .all:
-            break
-        case .favourite:
-            filtered = filtered.filter { $0.favourite }
-        default:
-            filtered = filtered.filter { $0.category == selectedCategory }
-        }
 
         if !searchText.isEmpty {
             filtered = filtered.filter { recipe in
@@ -73,54 +75,72 @@ struct MealPickerSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                DashboardLiquidBackground()
+                MealPickerLiquidBackground(slot: slot)
                     .ignoresSafeArea()
 
                 ScrollView {
-                    if filteredRecipes.isEmpty {
-                        VStack(spacing: 12) {
-                            Image(systemName: "fork.knife.circle")
-                                .font(.system(size: 56))
-                                .foregroundStyle(.secondary)
+                    VStack(spacing: 20) {
+                        pickerHeader
+                        filterStatusBar
 
-                            Text("Brak przepisów")
-                                .font(.headline)
-                                .fontWeight(.semibold)
+                        if filteredRecipes.isEmpty {
+                            VStack(spacing: 12) {
+                                Image(systemName: "fork.knife.circle")
+                                    .font(.system(size: 56))
+                                    .foregroundStyle(.secondary)
 
-                            Text("Dopasuj filtr lub wpisz inną frazę.")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 44)
-                        .padding(.horizontal, 16)
-                        .dashboardLiquidCard(cornerRadius: 20, strokeOpacity: 0.18)
-                        .padding(.horizontal, 14)
-                        .padding(.top, 8)
-                    } else {
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: 16)], spacing: 16) {
-                            ForEach(filteredRecipes) { recipe in
-                                let count = recipeCounts[recipe.id] ?? 0
-                                let total = totalRecipeCounts[recipe.id] ?? 1
-                                Button {
-                                    onSelect(recipe)
-                                    dismiss()
-                                } label: {
-                                    RecipeItemView(
-                                        recipe: recipe,
-                                        badgeCount: 0,
-                                        availabilityBadgeText: "\(count)/\(total)",
-                                        availabilityBadgeColor: count > 0 ? .green : .orange
-                                    )
-                                    .opacity(count > 0 ? 1 : 0.55)
+                                Text("Brak pasujących przepisów")
+                                    .font(.headline)
+                                    .fontWeight(.semibold)
+
+                                Text("Wpisz inną frazę wyszukiwania.")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+
+                                if !searchText.isEmpty {
+                                    Button("Wyczyść wyszukiwanie") {
+                                        searchText = ""
+                                    }
+                                    .buttonStyle(.plain)
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                                    .foregroundStyle(slot.accentColor)
                                 }
-                                .buttonStyle(.plain)
-                                .disabled(count <= 0)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 44)
+                            .padding(.horizontal, 16)
+                            .dashboardLiquidCard(cornerRadius: 22, strokeOpacity: 0.2)
+                        } else {
+                            LazyVStack(spacing: 14) {
+                                if !visibleAvailableRecipes.isEmpty {
+                                    recipeSectionHeader(
+                                        title: "Dostępne teraz",
+                                        subtitle: "Możesz przypisać je od razu"
+                                    )
+
+                                    ForEach(visibleAvailableRecipes) { recipe in
+                                        recipeRow(recipe)
+                                    }
+                                }
+
+                                if !visibleUnavailableRecipes.isEmpty {
+                                    recipeSectionHeader(
+                                        title: visibleAvailableRecipes.isEmpty ? "Brak wolnych pozycji" : "Niedostępne",
+                                        subtitle: visibleAvailableRecipes.isEmpty
+                                            ? "Ten slot jest już w pełni wykorzystany"
+                                            : "Są już wykorzystane w planie"
+                                    )
+
+                                    ForEach(visibleUnavailableRecipes) { recipe in
+                                        recipeRow(recipe)
+                                    }
+                                }
                             }
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 14)
                 }
             }
             .navigationTitle("Wybierz posiłek")
@@ -129,48 +149,274 @@ struct MealPickerSheet: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Anuluj") { dismiss() }
                 }
-                ToolbarItem(placement: .principal) {
-                    HStack(spacing: 6) {
-                        Image(systemName: slot.icon)
-                            .foregroundStyle(slot.accentColor)
-                        Text(slot.title)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        ForEach(categories, id: \.self) { category in
-                            Button {
-                                selectedCategory = category
-                            } label: {
-                                HStack(spacing: 8) {
-                                    Image(systemName: RecipesConstants.icon(for: category))
-                                    Text(RecipesConstants.displayName(for: category))
-                                    Spacer(minLength: 8)
-                                    if selectedCategory == category {
-                                        Image(systemName: "checkmark")
-                                    }
-                                }
-                            }
-                        }
-                    } label: {
-                        Image(systemName: selectedFilterIcon)
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(selectedFilterTint)
-                            .frame(width: 34, height: 34)
-                            .background(.ultraThinMaterial, in: Circle())
-                            .overlay(
-                                Circle()
-                                    .stroke(Color.white.opacity(0.22), lineWidth: 1)
-                            )
-                    }
-                    .buttonStyle(.plain)
-                }
             }
         }
         .searchable(text: $searchText, prompt: "Szukaj przepisów")
         .presentationDetents([.large])
+    }
+
+    private var pickerHeader: some View {
+        HStack(alignment: .center, spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                slot.accentColor.opacity(0.38),
+                                slot.secondaryAccentColor.opacity(0.3)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                Image(systemName: slot.icon)
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(slot.accentColor)
+            }
+            .frame(width: 44, height: 44)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(slot.title)
+                    .font(.headline)
+                    .fontWeight(.bold)
+                Text("\(slot.time) • \(slotSubtitle)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 10)
+
+            VStack(alignment: .trailing, spacing: 1) {
+                Text("\(availableFilteredCount)/\(filteredRecipes.count)")
+                    .font(.subheadline)
+                    .fontWeight(.bold)
+                    .monospacedDigit()
+                Text("dostępne")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(18)
+        .dashboardLiquidCard(cornerRadius: 24, strokeOpacity: 0.22)
+    }
+
+    private var filterStatusBar: some View {
+        HStack(spacing: 10) {
+            HStack(spacing: 6) {
+                Image(systemName: "line.3.horizontal.decrease.circle")
+                Text(activeFilterSummary)
+                    .lineLimit(1)
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(Color.white.opacity(0.16), in: Capsule())
+
+            Spacer(minLength: 0)
+
+            Text("\(visibleAvailableRecipes.count) z \(filteredRecipes.count) dostępne")
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundStyle(slot.accentColor)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .background(slot.accentColor.opacity(0.14), in: Capsule())
+
+            if !searchText.isEmpty {
+                Button {
+                    searchText = ""
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 30, height: 30)
+                        .background(Color.white.opacity(0.14), in: Circle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func recipeSectionHeader(title: String, subtitle: String) -> some View {
+        HStack(alignment: .lastTextBaseline, spacing: 8) {
+            Text(title)
+                .font(.subheadline)
+                .fontWeight(.semibold)
+
+            Text(subtitle)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 2)
+        .padding(.top, 2)
+    }
+
+    private func recipeRow(_ recipe: Recipe) -> some View {
+        let count = recipeCounts[recipe.id] ?? 0
+        let total = max(totalRecipeCounts[recipe.id] ?? 1, 1)
+        let isAvailable = count > 0
+
+        return Button {
+            onSelect(recipe)
+            dismiss()
+        } label: {
+            HStack(spacing: 14) {
+                recipeThumbnail(recipe, isAvailable: isAvailable)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 6) {
+                        Text(recipe.name)
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.primary)
+                            .lineLimit(2)
+
+                        if recipe.favourite {
+                            Image(systemName: "heart.fill")
+                                .font(.caption)
+                                .foregroundStyle(.pink)
+                        }
+                    }
+
+                    Text(recipe.description)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+
+                    HStack(spacing: 6) {
+                        rowMetaPill(icon: "clock", text: "\(recipe.prepTimeMinutes) min")
+                        rowMetaPill(icon: "flame.fill", text: "\(Int(recipe.nutritionPerServing.kcal)) kcal")
+                    }
+                }
+
+                Spacer(minLength: 8)
+
+                VStack(alignment: .trailing, spacing: 8) {
+                    Text("\(count)/\(total)")
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .monospacedDigit()
+                        .foregroundStyle(isAvailable ? Color.white : Color.secondary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(
+                            isAvailable ? slot.accentColor : Color.white.opacity(0.18),
+                            in: Capsule()
+                        )
+
+                    Image(systemName: isAvailable ? "chevron.right.circle.fill" : "xmark.circle")
+                        .font(.subheadline)
+                        .foregroundStyle(isAvailable ? slot.accentColor : Color.secondary)
+                }
+            }
+            .padding(14)
+            .background(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(Color.white.opacity(colorScheme == .dark ? 0.1 : 0.22))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(
+                        isAvailable ? slot.accentColor.opacity(0.36) : Color.white.opacity(0.2),
+                        lineWidth: 1
+                    )
+            )
+            .opacity(isAvailable ? 1 : 0.58)
+        }
+        .buttonStyle(.plain)
+        .disabled(!isAvailable)
+    }
+
+    private func recipeThumbnail(_ recipe: Recipe, isAvailable: Bool) -> some View {
+        Group {
+            if let url = recipe.imageURL {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    case .failure:
+                        thumbnailPlaceholder
+                    case .empty:
+                        ZStack {
+                            thumbnailPlaceholder
+                            ProgressView()
+                        }
+                    @unknown default:
+                        thumbnailPlaceholder
+                    }
+                }
+            } else {
+                thumbnailPlaceholder
+            }
+        }
+        .frame(width: 76, height: 76)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(slot.accentColor.opacity(isAvailable ? 0.4 : 0.2), lineWidth: 1)
+        )
+    }
+
+    private var thumbnailPlaceholder: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(slot.accentColor.opacity(0.16))
+            Image(systemName: "fork.knife")
+                .font(.title3)
+                .foregroundStyle(slot.accentColor)
+        }
+    }
+
+    private func rowMetaPill(icon: String, text: String) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
+            Text(text)
+        }
+        .font(.caption2)
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 4)
+        .background(Color.white.opacity(0.16), in: Capsule())
+    }
+}
+
+private struct MealPickerLiquidBackground: View {
+    @Environment(\.colorScheme) private var colorScheme
+    let slot: MealSlot
+
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: [
+                    colorScheme == .dark
+                        ? Color(red: 0.07, green: 0.08, blue: 0.1)
+                        : Color(red: 0.94, green: 0.96, blue: 0.98),
+                    colorScheme == .dark
+                        ? Color(red: 0.05, green: 0.06, blue: 0.08)
+                        : Color(red: 0.91, green: 0.94, blue: 0.97)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            Circle()
+                .fill(slot.accentColor.opacity(colorScheme == .dark ? 0.26 : 0.14))
+                .frame(width: 260, height: 260)
+                .blur(radius: 95)
+                .offset(x: -130, y: -220)
+
+            Circle()
+                .fill(slot.secondaryAccentColor.opacity(colorScheme == .dark ? 0.2 : 0.12))
+                .frame(width: 280, height: 280)
+                .blur(radius: 100)
+                .offset(x: 150, y: 250)
+        }
     }
 }
 

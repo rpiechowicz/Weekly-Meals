@@ -96,15 +96,10 @@ struct ProductsView: View {
         max(0, shoppingItems.count - boughtCount)
     }
 
-    private var progress: Double {
-        guard !shoppingItems.isEmpty else { return 0 }
-        return Double(boughtCount) / Double(shoppingItems.count)
-    }
-
     var body: some View {
         NavigationStack {
             ZStack {
-                DashboardLiquidBackground()
+                ProductsLiquidBackground()
                     .ignoresSafeArea()
 
                 Group {
@@ -130,14 +125,14 @@ struct ProductsView: View {
             systemImage: "basket",
             description: Text("Brak pozycji dla tygodnia \(datesViewModel.weekStartISO).")
         )
-        .padding()
-        .dashboardLiquidCard(cornerRadius: 24, strokeOpacity: 0.28)
-        .padding(.horizontal, 14)
+        .padding(18)
+        .dashboardLiquidCard(cornerRadius: 22, strokeOpacity: 0.22)
+        .padding(.horizontal, 16)
     }
 
     private var shoppingList: some View {
         ScrollView {
-            VStack(spacing: 12) {
+            VStack(spacing: 9) {
                 if let errorMessage = shoppingListStore.errorMessage, !errorMessage.isEmpty {
                     Text(verbatim: errorMessage)
                         .font(.caption)
@@ -158,54 +153,24 @@ struct ProductsView: View {
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .padding(.bottom, 16)
+            .padding(.vertical, 9)
+            .padding(.bottom, 14)
         }
         .scrollContentBackground(.hidden)
     }
 
     private var progressCard: some View {
-        VStack(spacing: 12) {
-            HStack {
-                Image(systemName: "cart.fill")
-                    .font(.title3)
-                    .foregroundStyle(.green)
-
-                Text("Lista zakupów")
-                    .font(.headline)
-
-                Spacer()
-            }
-
-            HStack(spacing: 8) {
-                progressStatChip(title: "Pozostało", value: "\(remainingCount)")
-                progressStatChip(title: "Kupione", value: "\(boughtCount)")
-                progressStatChip(title: "Razem", value: "\(shoppingItems.count)")
-            }
-
-            ProgressView(value: progress)
-                .tint(boughtCount == shoppingItems.count ? .green : .blue)
-                .scaleEffect(y: 1.35)
-                .animation(.easeInOut(duration: 0.35), value: progress)
-
-            if boughtCount == shoppingItems.count && !shoppingItems.isEmpty {
-                HStack(spacing: 6) {
-                    Image(systemName: "checkmark.seal.fill")
-                    Text("Wszystko kupione!")
-                }
-                .font(.subheadline)
-                .fontWeight(.semibold)
-                .foregroundStyle(.green)
-                .frame(maxWidth: .infinity)
-                .padding(.top, 4)
-            }
+        HStack(spacing: 8) {
+            progressStatChip(icon: "clock.fill", title: "Do kupienia", value: "\(remainingCount)", tint: .orange)
+            progressStatChip(icon: "checkmark.circle.fill", title: "Kupione", value: "\(boughtCount)", tint: .green)
+            progressStatChip(icon: "square.grid.2x2.fill", title: "Razem", value: "\(shoppingItems.count)", tint: .blue)
         }
-        .padding(16)
-        .dashboardLiquidCard(cornerRadius: 22, strokeOpacity: 0.24)
+        .padding(10)
+        .dashboardLiquidCard(cornerRadius: 16, strokeOpacity: 0.17)
     }
 
     private var filterBar: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             ForEach(ProductsFilter.allCases) { filter in
                 let isSelected = selectedFilter == filter
                 Button {
@@ -213,35 +178,35 @@ struct ProductsView: View {
                         selectedFilter = filter
                     }
                 } label: {
-                    HStack(spacing: 5) {
+                    HStack(spacing: 4) {
                         Image(systemName: filter.icon)
-                            .font(.caption)
+                            .font(.caption2)
                             .fontWeight(.semibold)
                         Text(filter.title)
-                            .font(.caption)
+                            .font(.caption2)
                             .fontWeight(.semibold)
                             .lineLimit(1)
                     }
-                    .foregroundStyle(isSelected ? .white : .secondary)
-                    .padding(.vertical, 7)
-                    .padding(.horizontal, 10)
+                    .foregroundStyle(isSelected ? .primary : .secondary)
+                    .padding(.vertical, 5)
+                    .padding(.horizontal, 8)
                     .frame(maxWidth: .infinity)
                     .background(
                         isSelected
                         ? AnyShapeStyle(
                             LinearGradient(
-                                colors: [.blue.opacity(0.96), .cyan.opacity(0.9)],
+                                colors: [.blue.opacity(0.3), .cyan.opacity(0.2)],
                                 startPoint: .leading,
                                 endPoint: .trailing
                             )
                         )
-                        : AnyShapeStyle(Color.white.opacity(0.14)),
+                        : AnyShapeStyle(Color.white.opacity(0.1)),
                         in: Capsule()
                     )
                     .overlay(
                         Capsule()
                             .stroke(
-                                isSelected ? Color.white.opacity(0.24) : Color.white.opacity(0.18),
+                                isSelected ? Color.blue.opacity(0.36) : Color.white.opacity(0.16),
                                 lineWidth: 0.8
                             )
                     )
@@ -249,8 +214,8 @@ struct ProductsView: View {
                 .buttonStyle(.plain)
             }
         }
-        .padding(4)
-        .dashboardLiquidCard(cornerRadius: 18, strokeOpacity: 0.18)
+        .padding(2)
+        .dashboardLiquidCard(cornerRadius: 14, strokeOpacity: 0.14)
     }
 
     private var filteredEmptyState: some View {
@@ -264,17 +229,26 @@ struct ProductsView: View {
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 16)
-        .dashboardLiquidCard(cornerRadius: 16, strokeOpacity: 0.16)
+        .padding(.vertical, 14)
+        .dashboardLiquidCard(cornerRadius: 14, strokeOpacity: 0.14)
     }
 
-    private func progressStatChip(title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+    private func progressStatChip(icon: String, title: String, value: String, tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(tint)
+
+                Text(title)
+                    .font(.caption2)
+                    .fontWeight(.medium)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
             Text(value)
-                .font(.caption)
+                .font(.subheadline)
                 .fontWeight(.semibold)
                 .foregroundStyle(.primary)
                 .monospacedDigit()
@@ -282,7 +256,11 @@ struct ProductsView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, 6)
         .padding(.horizontal, 8)
-        .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(tint.opacity(0.22), lineWidth: 1)
+        )
     }
 
     private func departmentSection(department: String, items: [ShoppingItem]) -> some View {
@@ -292,43 +270,43 @@ struct ProductsView: View {
         let allBought = boughtInSection == items.count
 
         return VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 10) {
+            HStack(spacing: 8) {
                 ZStack {
-                    Circle()
-                        .fill(color.opacity(colorScheme == .dark ? 0.25 : 0.15))
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .fill(color.opacity(colorScheme == .dark ? 0.24 : 0.14))
                     Image(systemName: icon)
-                        .font(.caption)
+                        .font(.caption2)
                         .fontWeight(.semibold)
                         .foregroundStyle(color)
                 }
-                .frame(width: 28, height: 28)
+                .frame(width: 26, height: 26)
 
                 Text(verbatim: department)
-                    .font(.subheadline)
+                    .font(.footnote)
                     .fontWeight(.semibold)
                     .foregroundStyle(allBought ? .secondary : .primary)
 
                 Spacer()
 
                 Text("\(boughtInSection)/\(items.count)")
-                    .font(.caption)
+                    .font(.caption2)
                     .fontWeight(.medium)
                     .foregroundStyle(allBought ? .green : .secondary)
                     .monospacedDigit()
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
                     .background(
                         Capsule()
                             .fill(
                                 allBought
-                                ? Color.green.opacity(colorScheme == .dark ? 0.2 : 0.1)
-                                : Color(.tertiarySystemFill)
+                                ? Color.green.opacity(colorScheme == .dark ? 0.2 : 0.12)
+                                : Color.white.opacity(0.12)
                             )
                     )
             }
-            .padding(.horizontal, 14)
-            .padding(.top, 14)
-            .padding(.bottom, 8)
+            .padding(.horizontal, 10)
+            .padding(.top, 10)
+            .padding(.bottom, 5)
 
             VStack(spacing: 0) {
                 ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
@@ -336,14 +314,14 @@ struct ProductsView: View {
 
                     if index < items.count - 1 {
                         Divider()
-                            .padding(.leading, 44)
-                            .padding(.trailing, 14)
+                            .padding(.leading, 38)
+                            .padding(.trailing, 10)
                     }
                 }
             }
-            .padding(.bottom, 6)
+            .padding(.bottom, 2)
         }
-        .dashboardLiquidCard(cornerRadius: 20, strokeOpacity: 0.22)
+        .dashboardLiquidCard(cornerRadius: 16, strokeOpacity: 0.16)
     }
 
     private func shoppingRow(_ item: ShoppingItem, color: Color) -> some View {
@@ -356,14 +334,14 @@ struct ProductsView: View {
                 }
             }
         } label: {
-            HStack(spacing: 12) {
+            HStack(spacing: 10) {
                 Image(systemName: bought ? "checkmark.circle.fill" : "circle")
-                    .font(.title3)
+                    .font(.body.weight(.medium))
                     .foregroundStyle(bought ? .green : Color(.tertiaryLabel))
                     .contentTransition(.symbolEffect(.replace))
 
                 Text(verbatim: item.name)
-                    .font(.subheadline)
+                    .font(.footnote)
                     .fontWeight(bought ? .regular : .medium)
                     .strikethrough(bought)
                     .foregroundStyle(bought ? .secondary : .primary)
@@ -373,27 +351,66 @@ struct ProductsView: View {
                 Spacer(minLength: 4)
 
                 Text(verbatim: "\(item.formattedAmount) \(item.unit)")
-                    .font(.caption)
+                    .font(.caption2)
                     .fontWeight(.medium)
                     .foregroundStyle(bought ? Color.secondary : color)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
                     .background(
                         Capsule()
                             .fill(
                                 bought
-                                ? Color(.tertiarySystemFill).opacity(0.5)
+                                ? Color.white.opacity(0.08)
                                 : color.opacity(colorScheme == .dark ? 0.18 : 0.1)
                             )
                     )
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
 
+}
+
+private struct ProductsLiquidBackground: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: [
+                    colorScheme == .dark
+                        ? Color(red: 0.08, green: 0.09, blue: 0.11)
+                        : Color(red: 0.95, green: 0.96, blue: 0.98),
+                    colorScheme == .dark
+                        ? Color(red: 0.05, green: 0.06, blue: 0.07)
+                        : Color(red: 0.92, green: 0.94, blue: 0.97)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            Circle()
+                .fill(Color.blue.opacity(colorScheme == .dark ? 0.22 : 0.11))
+                .frame(width: 260, height: 260)
+                .blur(radius: 90)
+                .offset(x: -130, y: -210)
+
+            Circle()
+                .fill(Color.green.opacity(colorScheme == .dark ? 0.14 : 0.09))
+                .frame(width: 210, height: 210)
+                .blur(radius: 80)
+                .offset(x: 120, y: -250)
+
+            Circle()
+                .fill(Color.cyan.opacity(colorScheme == .dark ? 0.16 : 0.08))
+                .frame(width: 280, height: 280)
+                .blur(radius: 100)
+                .offset(x: 140, y: 250)
+        }
+    }
 }
 
 #Preview {

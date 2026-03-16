@@ -38,15 +38,44 @@ enum MealSlot: String, CaseIterable, Identifiable, Codable {
         case .dinner: return .purple
         }
     }
+
+    var secondaryAccentColor: Color {
+        switch self {
+        case .breakfast: return .yellow
+        case .lunch: return .cyan
+        case .dinner: return .indigo
+        }
+    }
 }
 
 struct MealCardView: View {
     let slot: MealSlot
     let recipe: Recipe? // nil => brak wybranego posiłku
     var isEditable: Bool = true
-    @Environment(\.colorScheme) var colorScheme
+    @Environment(\.colorScheme) private var colorScheme
 
     private var isEmpty: Bool { recipe == nil }
+    private var hasRecipe: Bool { recipe != nil }
+
+    private var statusTitle: String {
+        if hasRecipe {
+            return "Zaplanowany"
+        }
+        if isEditable {
+            return "Do uzupełnienia"
+        }
+        return "Zamknięty"
+    }
+
+    private var statusSubtitle: String {
+        if hasRecipe {
+            return "Tapnij, aby zobaczyć szczegóły"
+        }
+        if isEditable {
+            return "Tapnij, aby dodać posiłek"
+        }
+        return "Ten dzień jest tylko do podglądu"
+    }
 
     private var thumbnail: some View {
         Group {
@@ -69,8 +98,8 @@ struct MealCardView: View {
     private var placeholderThumb: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(slot.accentColor.opacity(colorScheme == .dark ? 0.22 : 0.12))
-            Image(systemName: "fork.knife.circle.fill")
+                .fill(slot.accentColor.opacity(colorScheme == .dark ? 0.22 : 0.15))
+            Image(systemName: "fork.knife")
                 .font(.title3)
                 .foregroundStyle(slot.accentColor)
         }
@@ -78,34 +107,33 @@ struct MealCardView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 10) {
-                ZStack {
-                    Circle()
-                        .fill(slot.accentColor.opacity(colorScheme == .dark ? 0.24 : 0.14))
-                    Image(systemName: slot.icon)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(slot.accentColor)
-                }
-                .frame(width: 36, height: 36)
+            HStack(spacing: 12) {
+                Image(systemName: slot.icon)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(slot.accentColor)
+                    .frame(width: 36, height: 36)
+                    .background(slot.accentColor.opacity(colorScheme == .dark ? 0.22 : 0.14), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 1) {
                     Text(slot.title)
                         .font(.headline)
                         .foregroundStyle(.primary)
-                    Text(isEmpty ? "Brak przypisanego posiłku" : "Zaplanowany posiłek")
-                        .font(.caption)
+                    Text(statusSubtitle)
+                        .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
 
                 Spacer(minLength: 8)
 
-                Text(slot.time)
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(slot.accentColor)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(slot.accentColor.opacity(colorScheme == .dark ? 0.22 : 0.12), in: Capsule())
+                VStack(alignment: .trailing, spacing: 6) {
+                    Text(slot.time)
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(slot.accentColor)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(slot.accentColor.opacity(colorScheme == .dark ? 0.2 : 0.12), in: Capsule())
+                }
             }
 
             if let recipe {
@@ -130,26 +158,14 @@ struct MealCardView: View {
                 .padding(10)
                 .background(
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(Color.white.opacity(colorScheme == .dark ? 0.08 : 0.16))
-                )
-            } else if isEditable {
-                HStack(spacing: 8) {
-                    Image(systemName: "plus.circle.fill")
-                        .foregroundStyle(slot.accentColor)
-                    Text("Dodaj posiłek")
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, minHeight: 52, alignment: .center)
-                .background(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(slot.accentColor.opacity(colorScheme == .dark ? 0.14 : 0.1))
+                        .fill(surfaceFill)
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .stroke(slot.accentColor.opacity(0.22), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(slot.accentColor.opacity(0.24), lineWidth: 1)
                 )
+            } else if isEditable {
+                emptyCallToAction
             } else {
                 HStack(spacing: 8) {
                     Image(systemName: "lock.fill")
@@ -160,14 +176,61 @@ struct MealCardView: View {
                 }
                 .frame(maxWidth: .infinity, minHeight: 52, alignment: .center)
                 .background(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(Color.white.opacity(colorScheme == .dark ? 0.07 : 0.12))
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(surfaceFill)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(borderStroke, lineWidth: 1)
                 )
             }
+
         }
-        .padding(14)
+        .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .dashboardLiquidCard(cornerRadius: 24, strokeOpacity: 0.2)
+    }
+
+    private var emptyCallToAction: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "plus")
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(slot.accentColor)
+                .frame(width: 30, height: 30)
+                .background(slot.accentColor.opacity(colorScheme == .dark ? 0.2 : 0.12), in: Circle())
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Dodaj posiłek")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.primary)
+
+                Text("Wybierz przepis z planu tygodniowego")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 0)
+
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(slot.accentColor)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(slot.accentColor.opacity(colorScheme == .dark ? 0.14 : 0.09))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(
+                    slot.accentColor.opacity(0.24),
+                    lineWidth: 1
+                )
+        )
+        .frame(maxWidth: .infinity, minHeight: 68, alignment: .leading)
     }
 
     private func recipeMetaPill(icon: String, text: String) -> some View {
@@ -181,9 +244,22 @@ struct MealCardView: View {
         .padding(.vertical, 4)
         .background(
             Capsule()
-                .fill(Color.white.opacity(colorScheme == .dark ? 0.1 : 0.2))
+                .fill(surfaceFill)
         )
     }
+
+    private var surfaceFill: Color {
+        colorScheme == .dark
+            ? Color.white.opacity(0.08)
+            : Color.white.opacity(0.22)
+    }
+
+    private var borderStroke: Color {
+        colorScheme == .dark
+            ? Color.white.opacity(0.16)
+            : Color.white.opacity(0.28)
+    }
+
 }
 
 #Preview("Meal Cards") {

@@ -5,6 +5,10 @@ import Observation
 class DatesViewModel {
     var selectedDate: Date = Date()
     var currentWeekOffset: Int = 0 // 0 = bieżący tydzień, -1 = poprzedni, +1 = następny
+
+    var isCurrentWeek: Bool {
+        currentWeekOffset == 0
+    }
     
     /// Generuje tablicę dat dla wybranego tygodnia (Poniedziałek - Niedziela)
     var dates: [Date] {
@@ -83,11 +87,13 @@ class DatesViewModel {
     /// Przechodzi do poprzedniego tygodnia
     func goToPreviousWeek() {
         currentWeekOffset -= 1
+        shiftSelectedDate(byWeeks: -1)
     }
     
     /// Przechodzi do następnego tygodnia
     func goToNextWeek() {
         currentWeekOffset += 1
+        shiftSelectedDate(byWeeks: 1)
     }
     
     /// Sprawdza czy data jest dzisiaj lub w przyszłości (można edytować)
@@ -100,5 +106,11 @@ class DatesViewModel {
     func goToCurrentWeek() {
         currentWeekOffset = 0
         selectedDate = Date()
+    }
+
+    private func shiftSelectedDate(byWeeks weeks: Int) {
+        if let shifted = Calendar.current.date(byAdding: .weekOfYear, value: weeks, to: selectedDate) {
+            selectedDate = shifted
+        }
     }
 }

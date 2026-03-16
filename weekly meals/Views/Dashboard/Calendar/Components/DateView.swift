@@ -1,39 +1,75 @@
 import SwiftUI
 
 struct DateView: View {
-    let date: Date
     let isSelected: Bool
     let isToday: Bool
+    let isEditable: Bool
     let dayName: String
     let dayNumber: String
-    
+
+    @Environment(\.colorScheme) private var colorScheme
+
     var body: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 8) {
             Text(dayName)
-                .font(.caption)
-                .fontWeight(.medium)
-                .foregroundStyle(isSelected ? .white : .secondary)
-            
+                .font(.caption2)
+                .fontWeight(.semibold)
+                .foregroundStyle(isSelected ? Color.blue : Color.secondary)
+
             Text(dayNumber)
-                .font(.system(size: 24, weight: .bold))
-                .foregroundStyle(isSelected ? .white : .primary)
-            
-            if isToday {
-                Circle()
-                    .fill(isSelected ? .white : .blue)
-                    .frame(width: 5, height: 5)
+                .font(.system(size: 24, weight: .bold, design: .rounded))
+                .foregroundStyle(isSelected ? Color.blue : Color.primary)
+                .monospacedDigit()
+
+            HStack(spacing: 5) {
+                if isToday {
+                    Circle()
+                        .fill(.blue)
+                        .frame(width: 5, height: 5)
+                }
+
+                if !isEditable {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundStyle(.secondary)
+                }
             }
+            .frame(height: 8)
         }
-        .frame(width: 60, height: 80)
+        .padding(.vertical, 12)
+        .frame(width: 66, height: 94)
         .background {
-            RoundedRectangle(cornerRadius: 16)
-                .fill(isSelected ? Color.blue : Color.gray.opacity(0.1))
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(cardFill)
         }
         .overlay {
-            if !isSelected {
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(Color.gray.opacity(0.2), lineWidth: 1)
-            }
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(cardStroke, lineWidth: 1)
         }
+        .opacity(isEditable ? 1 : 0.62)
+    }
+
+    private var cardFill: Color {
+        if isSelected {
+            return colorScheme == .dark
+                ? Color.blue.opacity(0.26)
+                : Color.blue.opacity(0.18)
+        }
+
+        return colorScheme == .dark
+            ? Color.white.opacity(0.07)
+            : Color.white.opacity(0.24)
+    }
+
+    private var cardStroke: Color {
+        if isSelected {
+            return colorScheme == .dark
+                ? Color.cyan.opacity(0.5)
+                : Color.blue.opacity(0.42)
+        }
+
+        return colorScheme == .dark
+            ? Color.white.opacity(0.16)
+            : Color.white.opacity(0.3)
     }
 }
