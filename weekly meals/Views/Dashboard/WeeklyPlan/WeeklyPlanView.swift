@@ -24,22 +24,6 @@ struct WeeklyPlanView: View {
         return "\(Self.weekRangeFormatter.string(from: first)) - \(Self.weekRangeFormatter.string(from: last))"
     }
 
-    private var totalPlannedCount: Int {
-        mealStore.savedPlan.breakfastEntries.count + mealStore.savedPlan.lunchEntries.count + mealStore.savedPlan.dinnerEntries.count
-    }
-
-    private var breakfastCount: Int {
-        mealStore.savedPlan.breakfastEntries.count
-    }
-
-    private var lunchCount: Int {
-        mealStore.savedPlan.lunchEntries.count
-    }
-
-    private var dinnerCount: Int {
-        mealStore.savedPlan.dinnerEntries.count
-    }
-
     var body: some View {
         NavigationStack {
             ZStack {
@@ -90,8 +74,8 @@ struct WeeklyPlanView: View {
     }
 
     private var heroCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .center, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(weekRangeText)
                         .font(.title3)
@@ -108,27 +92,6 @@ struct WeeklyPlanView: View {
 
                 heroActions
             }
-
-            HStack(spacing: 8) {
-                planStatChip(title: "Śniad.", value: "\(breakfastCount)", subtitle: "/\(MealPlanViewModel.maxPerSlot)", tint: .orange)
-                planStatChip(title: "Obiad", value: "\(lunchCount)", subtitle: "/\(MealPlanViewModel.maxPerSlot)", tint: .blue)
-                planStatChip(title: "Kolacja", value: "\(dinnerCount)", subtitle: "/\(MealPlanViewModel.maxPerSlot)", tint: .purple)
-            }
-
-            HStack(spacing: 8) {
-                Image(systemName: mealStore.hasSavedPlan ? "checkmark.circle.fill" : "tray")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(mealStore.hasSavedPlan ? .green : .secondary)
-
-                Text("Łącznie \(totalPlannedCount)/\(MealPlanViewModel.maxTotal) pozycji")
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
-                    .lineLimit(1)
-
-                Spacer(minLength: 0)
-            }
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -136,45 +99,27 @@ struct WeeklyPlanView: View {
     }
 
     private var heroActions: some View {
-        HStack(spacing: 0) {
-            Button {
+        HStack(spacing: 8) {
+            DashboardActionButton(
+                title: mealStore.hasSavedPlan ? "Edytuj" : "Utwórz",
+                systemImage: mealStore.hasSavedPlan ? "square.and.pencil" : "plus"
+            ) {
                 showEditor = true
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: mealStore.hasSavedPlan ? "square.and.pencil" : "plus")
-                    Text(mealStore.hasSavedPlan ? "Edytuj" : "Utwórz")
-                }
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.primary)
-                .padding(.horizontal, 12)
-                .frame(height: 34)
             }
             .accessibilityLabel(mealStore.hasSavedPlan ? "Edytuj plan" : "Utwórz plan")
-            .buttonStyle(.plain)
 
             if mealStore.hasSavedPlan {
-                Divider()
-                    .frame(height: 18)
-                    .padding(.horizontal, 2)
-
-                Button(role: .destructive) {
+                DashboardActionButton(
+                    title: nil,
+                    systemImage: "trash",
+                    tone: .destructive
+                ) {
                     showDeletePlanAlert = true
-                } label: {
-                    Image(systemName: "trash")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(.red)
-                        .frame(width: 34, height: 34)
                 }
-                .buttonStyle(.plain)
             }
         }
-        .padding(3.5)
-        .background(Color.white.opacity(0.15), in: Capsule())
-        .overlay(
-            Capsule()
-                .stroke(Color.white.opacity(0.22), lineWidth: 1)
-        )
         .fixedSize(horizontal: true, vertical: false)
+        .padding(.top, 2)
     }
 
     @ViewBuilder
@@ -198,16 +143,9 @@ struct WeeklyPlanView: View {
 
                 Spacer()
 
-                HStack(spacing: 6) {
-                    Text(slotCount == 0 ? "Pusto" : "\(slotCount) pozycji")
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(slotCount > 0 ? slot.accentColor : .secondary)
-
-                    Text("/ \(MealPlanViewModel.maxPerSlot)")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
+                Text("\(slotCount)/\(MealPlanViewModel.maxPerSlot)")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(slotCount > 0 ? slot.accentColor : .secondary)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 5)
                 .background(slot.accentColor.opacity(slotCount > 0 ? 0.16 : 0.08), in: Capsule())
@@ -215,13 +153,15 @@ struct WeeklyPlanView: View {
 
             if recipes.isEmpty {
                 HStack(spacing: 10) {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.subheadline)
+                    Image(systemName: "info.circle")
+                        .font(.caption.weight(.semibold))
                         .foregroundStyle(slot.accentColor)
+                        .frame(width: 24, height: 24)
+                        .background(slot.accentColor.opacity(0.12), in: Circle())
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Brak przepisów")
-                            .font(.caption)
+                            .font(.caption.weight(.semibold))
                             .fontWeight(.semibold)
                             .foregroundStyle(.primary)
                         Text("Dodaj pozycje w edytorze planu")
@@ -232,14 +172,14 @@ struct WeeklyPlanView: View {
                     Spacer(minLength: 0)
                 }
                 .padding(.horizontal, 12)
-                .padding(.vertical, 10)
+                .padding(.vertical, 8)
                 .background(
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(Color.white.opacity(0.08))
+                        .fill(Color.white.opacity(0.05))
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(Color.white.opacity(0.14), lineWidth: 1)
+                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
                 )
             } else {
                 VStack(spacing: 8) {
@@ -256,37 +196,6 @@ struct WeeklyPlanView: View {
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .dashboardLiquidCard(cornerRadius: 20, strokeOpacity: 0.18)
-    }
-
-    private func planStatChip(title: String, value: String, subtitle: String, tint: Color) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(title)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-
-            HStack(alignment: .firstTextBaseline, spacing: 2) {
-                Text(value)
-                    .font(.callout)
-                    .fontWeight(.bold)
-                    .monospacedDigit()
-                    .foregroundStyle(.primary)
-
-                Text(subtitle)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(tint.opacity(0.12))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(tint.opacity(0.24), lineWidth: 1)
-        )
     }
 
     private func recipeCount(for recipe: Recipe, in slot: MealSlot) -> Int {
@@ -448,12 +357,9 @@ private struct WeeklyPlanEditorView: View {
     @State private var mealPlan = MealPlanViewModel()
     @State private var showPastDayProtectionAlert = false
     @State private var pastDayProtectionMessage = ""
+    @State private var didSavePlan = false
 
     private var categories: [RecipesCategory] = RecipesCategory.allCases
-
-    private var selectedCategoryLabel: String {
-        RecipesConstants.displayName(for: selectedCategory)
-    }
 
     private var filteredRecipes: [Recipe] {
         var filtered = recipeCatalogStore.recipes
@@ -481,6 +387,13 @@ private struct WeeklyPlanEditorView: View {
         recipeCatalogStore.isLoading && recipeCatalogStore.recipes.isEmpty
     }
 
+    private func discardChangesAndDismiss() {
+        mealPlan.loadFromSaved(mealStore.savedPlan)
+        mealPlan.showSummarySheet = false
+        didSavePlan = false
+        dismiss()
+    }
+
     private func pastDayAssignmentsCount(for recipe: Recipe) -> Int {
         let pastDates = datesViewModel.dates.filter { !datesViewModel.isEditable($0) }
         guard !pastDates.isEmpty else { return 0 }
@@ -497,7 +410,7 @@ private struct WeeklyPlanEditorView: View {
     var body: some View {
         NavigationStack {
             ZStack(alignment: .bottom) {
-                DashboardLiquidBackground()
+                WeeklyPlanEditorBackground()
                     .ignoresSafeArea()
 
                 ScrollView {
@@ -600,6 +513,7 @@ private struct WeeklyPlanEditorView: View {
             .navigationTitle("Edytuj plan")
             .navigationBarTitleDisplayMode(.inline)
             .onAppear {
+                didSavePlan = false
                 mealPlan.loadFromSaved(mealStore.savedPlan)
             }
             .task {
@@ -624,12 +538,16 @@ private struct WeeklyPlanEditorView: View {
             }
             .onDisappear {
                 searchDebounceTask?.cancel()
+                if !didSavePlan && !mealPlan.showSummarySheet {
+                    mealPlan.loadFromSaved(mealStore.savedPlan)
+                }
+                didSavePlan = false
             }
             .searchable(text: $searchText, prompt: "Szukaj przepisów")
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Zamknij") {
-                        dismiss()
+                        discardChangesAndDismiss()
                     }
                 }
 
@@ -645,6 +563,7 @@ private struct WeeklyPlanEditorView: View {
             }
             .sheet(isPresented: $mealPlan.showSummarySheet) {
                 MealPlanSummarySheet(mealPlan: mealPlan) {
+                    didSavePlan = true
                     dismiss()
                 }
                 .dashboardLiquidSheet()
@@ -671,54 +590,53 @@ private struct WeeklyPlanEditorView: View {
     }
 
     private var editorStatusCard: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text("Wybrane \(mealPlan.totalCount)/\(MealPlanViewModel.maxTotal)")
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                    .monospacedDigit()
-
-                Text("Filtr: \(selectedCategoryLabel)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-
-            Spacer(minLength: 0)
-
-            HStack(spacing: 8) {
-                miniCountPill(title: "Śniad.", count: mealPlan.count(for: .breakfast), tint: .orange)
-                miniCountPill(title: "Obiad", count: mealPlan.count(for: .lunch), tint: .blue)
-                miniCountPill(title: "Kolacja", count: mealPlan.count(for: .dinner), tint: .purple)
-            }
+        HStack(spacing: 10) {
+            editorSlotSummaryTile(slot: .breakfast, count: mealPlan.count(for: .breakfast), tint: .orange)
+            editorSlotSummaryTile(slot: .lunch, count: mealPlan.count(for: .lunch), tint: .blue)
+            editorSlotSummaryTile(slot: .dinner, count: mealPlan.count(for: .dinner), tint: .purple)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .padding(10)
         .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color.white.opacity(0.08))
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color.white.opacity(0.07))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color.white.opacity(0.14), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color.white.opacity(0.12), lineWidth: 1)
         )
     }
 
-    private func miniCountPill(title: String, count: Int, tint: Color) -> some View {
-        VStack(alignment: .leading, spacing: 1) {
-            Text(title)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+    private func editorSlotSummaryTile(slot: MealSlot, count: Int, tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: slot.icon)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(tint)
+                    .frame(width: 24, height: 24)
+                    .background(tint.opacity(0.12), in: Circle())
 
-            Text("\(count)")
-                .font(.caption)
+                Text(slot.title)
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+            }
+
+            Text("\(count)/\(MealPlanViewModel.maxPerSlot)")
+                .font(.headline)
                 .fontWeight(.bold)
                 .monospacedDigit()
-                .foregroundStyle(tint)
+                .foregroundStyle(.primary)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 11)
+        .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(tint.opacity(0.18), lineWidth: 1)
+        )
     }
 
     private var emptyStateMessage: String {
@@ -736,4 +654,31 @@ private struct WeeklyPlanEditorView: View {
 
 #Preview {
     WeeklyPlanView()
+}
+
+private struct WeeklyPlanEditorBackground: View {
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: [
+                    Color(red: 0.12, green: 0.15, blue: 0.18),
+                    Color(red: 0.09, green: 0.11, blue: 0.14)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            Circle()
+                .fill(Color.blue.opacity(0.14))
+                .frame(width: 260, height: 260)
+                .blur(radius: 90)
+                .offset(x: -140, y: -220)
+
+            Circle()
+                .fill(Color.cyan.opacity(0.08))
+                .frame(width: 280, height: 280)
+                .blur(radius: 100)
+                .offset(x: 160, y: 260)
+        }
+    }
 }

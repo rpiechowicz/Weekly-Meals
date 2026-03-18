@@ -32,14 +32,6 @@ struct MealPickerSheet: View {
         filteredRecipes.filter { (recipeCounts[$0.id] ?? 0) == 0 }
     }
 
-    private var activeFilterSummary: String {
-        if !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return "Wyniki wyszukiwania"
-        }
-
-        return "Wszystkie przepisy"
-    }
-
     init(
         slot: MealSlot,
         recipes: [Recipe],
@@ -81,7 +73,6 @@ struct MealPickerSheet: View {
                 ScrollView {
                     VStack(spacing: 20) {
                         pickerHeader
-                        filterStatusBar
 
                         if filteredRecipes.isEmpty {
                             VStack(spacing: 12) {
@@ -115,8 +106,8 @@ struct MealPickerSheet: View {
                             LazyVStack(spacing: 14) {
                                 if !visibleAvailableRecipes.isEmpty {
                                     recipeSectionHeader(
-                                        title: "Dostępne teraz",
-                                        subtitle: "Możesz przypisać je od razu"
+                                        title: "Do wyboru",
+                                        badgeText: "\(visibleAvailableRecipes.count) z \(filteredRecipes.count) dostępne"
                                     )
 
                                     ForEach(visibleAvailableRecipes) { recipe in
@@ -127,9 +118,9 @@ struct MealPickerSheet: View {
                                 if !visibleUnavailableRecipes.isEmpty {
                                     recipeSectionHeader(
                                         title: visibleAvailableRecipes.isEmpty ? "Brak wolnych pozycji" : "Niedostępne",
-                                        subtitle: visibleAvailableRecipes.isEmpty
-                                            ? "Ten slot jest już w pełni wykorzystany"
-                                            : "Są już wykorzystane w planie"
+                                        badgeText: visibleAvailableRecipes.isEmpty
+                                            ? "\(visibleAvailableRecipes.count) z \(filteredRecipes.count) dostępne"
+                                            : nil
                                     )
 
                                     ForEach(visibleUnavailableRecipes) { recipe in
@@ -185,71 +176,28 @@ struct MealPickerSheet: View {
             }
 
             Spacer(minLength: 10)
-
-            VStack(alignment: .trailing, spacing: 1) {
-                Text("\(availableFilteredCount)/\(filteredRecipes.count)")
-                    .font(.subheadline)
-                    .fontWeight(.bold)
-                    .monospacedDigit()
-                Text("dostępne")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
         }
         .padding(18)
         .dashboardLiquidCard(cornerRadius: 24, strokeOpacity: 0.22)
     }
 
-    private var filterStatusBar: some View {
-        HStack(spacing: 10) {
-            HStack(spacing: 6) {
-                Image(systemName: "line.3.horizontal.decrease.circle")
-                Text(activeFilterSummary)
-                    .lineLimit(1)
-            }
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-            .background(Color.white.opacity(0.16), in: Capsule())
-
-            Spacer(minLength: 0)
-
-            Text("\(visibleAvailableRecipes.count) z \(filteredRecipes.count) dostępne")
-                .font(.caption)
-                .fontWeight(.semibold)
-                .foregroundStyle(slot.accentColor)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
-                .background(slot.accentColor.opacity(0.14), in: Capsule())
-
-            if !searchText.isEmpty {
-                Button {
-                    searchText = ""
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 30, height: 30)
-                        .background(Color.white.opacity(0.14), in: Circle())
-                }
-                .buttonStyle(.plain)
-            }
-        }
-    }
-
-    private func recipeSectionHeader(title: String, subtitle: String) -> some View {
-        HStack(alignment: .lastTextBaseline, spacing: 8) {
+    private func recipeSectionHeader(title: String, badgeText: String? = nil) -> some View {
+        HStack(alignment: .center, spacing: 8) {
             Text(title)
-                .font(.subheadline)
+                .font(.title3)
                 .fontWeight(.semibold)
 
-            Text(subtitle)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-
             Spacer(minLength: 0)
+
+            if let badgeText {
+                Text(badgeText)
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(slot.accentColor)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                    .background(slot.accentColor.opacity(0.14), in: Capsule())
+            }
         }
         .padding(.horizontal, 2)
         .padding(.top, 2)

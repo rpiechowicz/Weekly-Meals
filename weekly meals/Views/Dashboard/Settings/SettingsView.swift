@@ -34,16 +34,17 @@ struct SettingsView: View {
     @AppStorage("settings.user.email") private var userEmail: String = "user1@example.com"
     @AppStorage("settings.household.name") private var persistedHouseholdName: String = ""
 
-    @State private var householdId: String = UUID().uuidString
     @State private var showCreateHouseholdSheet = false
     @State private var showHouseholdSheet = false
     @State private var showPreferencesSheet = false
     @State private var createHouseholdName = ""
     @State private var showLogoutAlert = false
+    @State private var showLeaveHouseholdAlert = false
     @State private var householdMembers: [HouseholdMember] = []
     @State private var isLoadingMembers = false
     @State private var invitationLink: URL?
     @State private var isCreatingInvitation = false
+
     private let apiBaseURL = AppEnvironment.apiBaseURL
 
     private var hasHousehold: Bool {
@@ -64,20 +65,6 @@ struct SettingsView: View {
         return me.role.uppercased() == "OWNER"
     }
 
-    private var householdSummary: String {
-        if hasHousehold { return persistedHouseholdName }
-        return "Brak gospodarstwa"
-    }
-
-    private var householdEntrySubtitle: String {
-        if isLoadingMembers { return "Ładowanie domowników..." }
-        let count = householdMembers.count
-        if count > 0 {
-            return "\(count) \(membersLabel(for: count)) i zaproszenia"
-        }
-        return "Domownicy i zaproszenia"
-    }
-
     var body: some View {
         NavigationStack {
             ZStack {
@@ -85,17 +72,18 @@ struct SettingsView: View {
                     .ignoresSafeArea()
 
                 ScrollView {
-                    VStack(spacing: 12) {
-                        accountSection
-                        householdEntryCard
-                        preferencesEntryCard
+                    VStack(spacing: 14) {
+                        profileCard
+                        menuCard
                     }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
                     .padding(.bottom, 14)
+                    .padding(.bottom, 20)
                 }
             }
             .navigationTitle("Ustawienia")
+            .navigationBarTitleDisplayMode(.large)
             .sheet(isPresented: $showCreateHouseholdSheet) {
                 createHouseholdSheet
                     .dashboardLiquidSheet()
@@ -108,7 +96,7 @@ struct SettingsView: View {
                 preferencesSheet
                     .dashboardLiquidSheet()
             }
-            .alert("Wylogować się?", isPresented: $showLogoutAlert) {
+            .alert("Czy na pewno chcesz się wylogować?", isPresented: $showLogoutAlert) {
                 Button("Anuluj", role: .cancel) {}
                 Button("Wyloguj", role: .destructive) {
                     sessionStore.logout()
@@ -122,152 +110,75 @@ struct SettingsView: View {
         }
     }
 
-    private var accountSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(Color.blue.opacity(colorScheme == .dark ? 0.22 : 0.14))
+    private var profileCard: some View {
+        HStack(spacing: 12) {
+            Circle()
+                .fill(Color.blue.opacity(colorScheme == .dark ? 0.18 : 0.12))
+                .frame(width: 42, height: 42)
+                .overlay(
                     Image(systemName: "person.fill")
-                        .font(.system(size: 20, weight: .semibold))
+                        .font(.footnote.weight(.semibold))
                         .foregroundStyle(.blue)
-                }
-                .frame(width: 50, height: 50)
+                )
 
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Konto")
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(userDisplayName)
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.primary)
 
-                    Text(userDisplayName)
-                        .font(.headline)
-                        .fontWeight(.semibold)
-
-                    Text(userEmail)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-
-                Spacer(minLength: 8)
-
-                Button(role: .destructive) {
-                    showLogoutAlert = true
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "rectangle.portrait.and.arrow.right")
-                        Text("Wyloguj")
-                    }
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.red)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 8)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(Color.red.opacity(0.14))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .stroke(Color.red.opacity(0.24), lineWidth: 1)
-                    )
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Wyloguj")
+                Text(userEmail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
 
-            HStack(spacing: 8) {
-                accountInfoPill(icon: "house.fill", title: householdSummary, tint: hasHousehold ? .green : .secondary)
-                accountInfoPill(icon: "circle.lefthalf.filled", title: (AppTheme(rawValue: themeRawValue) ?? .system).title, tint: .blue)
+            Spacer(minLength: 0)
+
+            DashboardActionButton(
+                title: nil,
+                systemImage: "rectangle.portrait.and.arrow.right",
+                tone: .destructive,
+                controlSize: 30
+            ) {
+                showLogoutAlert = true
             }
+            .accessibilityLabel("Wyloguj")
         }
-        .padding(16)
-        .dashboardLiquidCard(cornerRadius: 20, strokeOpacity: 0.2)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .dashboardLiquidCard(cornerRadius: 18, strokeOpacity: 0.14)
     }
 
-    private var householdEntryCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                Image(systemName: "house.fill")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.green)
-                    .frame(width: 26, height: 26)
-                    .background(
-                        RoundedRectangle(cornerRadius: 9, style: .continuous)
-                            .fill(Color.green.opacity(colorScheme == .dark ? 0.22 : 0.14))
-                    )
-
-                Text("Gospodarstwo")
-                    .font(.headline)
-                    .fontWeight(.semibold)
-
-                Spacer(minLength: 0)
-            }
-
-            Text(hasHousehold ? "Zarządzaj domownikami i zaproszeniami w jednym miejscu." : "Utwórz wspólne gospodarstwo do planowania i zakupów.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-
-            if hasHousehold {
-                settingsRowButton(
-                    title: householdSummary,
-                    subtitle: householdEntrySubtitle,
-                    icon: "house.and.flag.fill",
-                    accent: .teal
-                ) {
+    private var menuCard: some View {
+        VStack(spacing: 0) {
+            settingsRowButton(
+                title: "Gospodarstwo",
+                subtitle: hasHousehold ? "Domownicy i zaproszenia" : "Utwórz wspólne gospodarstwo",
+                icon: hasHousehold ? "house.fill" : "house.badge.plus",
+                accent: hasHousehold ? .teal : .blue
+            ) {
+                if hasHousehold {
                     Task { await preloadHouseholdContextIfNeeded() }
                     showHouseholdSheet = true
-                }
-            } else {
-                settingsRowButton(
-                    title: "Utwórz gospodarstwo",
-                    subtitle: "Brak aktywnego gospodarstwa",
-                    icon: "house.badge.plus",
-                    accent: .blue
-                ) {
+                } else {
                     createHouseholdName = ""
                     showCreateHouseholdSheet = true
                 }
             }
-        }
-        .padding(16)
-        .dashboardLiquidCard(cornerRadius: 18, strokeOpacity: 0.18)
-    }
 
-    private var preferencesEntryCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                Image(systemName: "slider.horizontal.3")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.indigo)
-                    .frame(width: 26, height: 26)
-                    .background(
-                        RoundedRectangle(cornerRadius: 9, style: .continuous)
-                            .fill(Color.indigo.opacity(colorScheme == .dark ? 0.22 : 0.14))
-                    )
-
-                Text("Preferencje")
-                    .font(.headline)
-                    .fontWeight(.semibold)
-
-                Spacer(minLength: 0)
-            }
-
-            Text("Powiadomienia i wygląd aplikacji.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+            Divider()
+                .padding(.leading, 58)
 
             settingsRowButton(
-                title: "Ustawienia aplikacji",
-                subtitle: "Powiadomienia i wygląd",
-                icon: "paintbrush.fill",
+                title: "Preferencje",
+                subtitle: "Powiadomienia i wygląd aplikacji",
+                icon: "slider.horizontal.3",
                 accent: .indigo
             ) {
                 showPreferencesSheet = true
             }
         }
-        .padding(16)
-        .dashboardLiquidCard(cornerRadius: 18, strokeOpacity: 0.18)
+        .dashboardLiquidCard(cornerRadius: 22, strokeOpacity: 0.16)
     }
 
     private func settingsRowButton(
@@ -278,55 +189,33 @@ struct SettingsView: View {
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            HStack(spacing: 10) {
+            HStack(spacing: 12) {
                 Image(systemName: icon)
-                    .font(.caption.weight(.semibold))
+                    .font(.footnote.weight(.semibold))
                     .foregroundStyle(accent)
-                    .frame(width: 28, height: 28)
-                    .background(accent.opacity(0.16), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .frame(width: 30, height: 30)
+                    .background(accent.opacity(0.14), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
-                        .font(.footnote)
-                        .fontWeight(.semibold)
+                        .font(.footnote.weight(.semibold))
                         .foregroundStyle(.primary)
                     Text(subtitle)
-                        .font(.caption2)
+                        .font(.caption)
                         .foregroundStyle(.secondary)
-                        .lineLimit(2)
                 }
-                Spacer()
+
+                Spacer(minLength: 0)
+
                 Image(systemName: "chevron.right")
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(.secondary)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 12)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 15)
             .contentShape(Rectangle())
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color.white.opacity(colorScheme == .dark ? 0.07 : 0.11))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(Color.white.opacity(0.12), lineWidth: 1)
-            )
         }
         .buttonStyle(.plain)
-    }
-
-    private func accountInfoPill(icon: String, title: String, tint: Color) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: icon)
-            Text(title)
-                .lineLimit(1)
-        }
-        .font(.caption2)
-        .fontWeight(.semibold)
-        .foregroundStyle(tint)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 5)
-        .background(tint.opacity(0.14), in: Capsule())
     }
 
     private var createHouseholdSheet: some View {
@@ -336,72 +225,56 @@ struct SettingsView: View {
                     .ignoresSafeArea()
 
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 10) {
-                        sheetIntroCard(
-                            icon: "house.badge.plus.fill",
-                            title: "Nowe gospodarstwo",
-                            subtitle: "Utwórz wspólną przestrzeń do planowania posiłków i zakupów.",
-                            accent: .blue
-                        )
-
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Nazwa gospodarstwa")
+                    VStack(alignment: .leading, spacing: 14) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Nowe gospodarstwo")
+                                .font(.title2.weight(.semibold))
+                            Text("Nadaj nazwę wspólnej przestrzeni do planowania i zakupów.")
                                 .font(.footnote)
-                                .fontWeight(.semibold)
-
-                            HStack(spacing: 8) {
-                                Image(systemName: "house")
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(.blue)
-                                    .frame(width: 24, height: 24)
-                                    .background(Color.blue.opacity(0.14), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-
-                                TextField("Np. Dom", text: $createHouseholdName)
-                                    .textInputAutocapitalization(.words)
-                            }
-                            .padding(.vertical, 9)
-                            .padding(.horizontal, 10)
-                            .background(Color.white.opacity(0.1), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                    .stroke(Color.white.opacity(0.18), lineWidth: 1)
-                            )
-
-                            Text("Nazwa będzie widoczna dla wszystkich członków.")
-                                .font(.caption2)
                                 .foregroundStyle(.secondary)
                         }
-                        .padding(14)
-                        .dashboardLiquidCard(cornerRadius: 16, strokeOpacity: 0.18)
+
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Nazwa")
+                                .font(.footnote.weight(.semibold))
+
+                            TextField("Np. Dom", text: $createHouseholdName)
+                                .textInputAutocapitalization(.words)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 14)
+                                .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                        .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                                )
+                        }
+                        .padding(18)
+                        .dashboardLiquidCard(cornerRadius: 22, strokeOpacity: 0.16)
 
                         Button {
                             submitCreateHousehold()
                         } label: {
-                            HStack(spacing: 7) {
-                                Image(systemName: "checkmark.circle.fill")
-                                Text("Utwórz gospodarstwo")
-                                    .fontWeight(.semibold)
-                            }
-                            .font(.footnote)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 10)
-                            .foregroundStyle(canSubmitCreateHousehold ? .white : .secondary)
-                            .background(
-                                canSubmitCreateHousehold
-                                ? AnyShapeStyle(
-                                    LinearGradient(
-                                        colors: [.blue.opacity(0.92), .cyan.opacity(0.84)],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
+                            Text("Utwórz gospodarstwo")
+                                .font(.footnote.weight(.semibold))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
+                                .foregroundStyle(canSubmitCreateHousehold ? .white : .secondary)
+                                .background(
+                                    canSubmitCreateHousehold
+                                    ? AnyShapeStyle(
+                                        LinearGradient(
+                                            colors: [.blue.opacity(0.92), .cyan.opacity(0.84)],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
                                     )
+                                    : AnyShapeStyle(Color.white.opacity(0.08)),
+                                    in: RoundedRectangle(cornerRadius: 16, style: .continuous)
                                 )
-                                : AnyShapeStyle(Color.white.opacity(0.1)),
-                                in: RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .stroke(Color.white.opacity(canSubmitCreateHousehold ? 0.2 : 0.12), lineWidth: 1)
-                            )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                        .stroke(Color.white.opacity(canSubmitCreateHousehold ? 0.2 : 0.12), lineWidth: 1)
+                                )
                         }
                         .buttonStyle(.plain)
                         .disabled(!canSubmitCreateHousehold)
@@ -410,14 +283,13 @@ struct SettingsView: View {
                             Text(error)
                                 .font(.caption)
                                 .foregroundStyle(.red)
-                                .padding(.horizontal, 4)
                         }
                     }
                     .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
+                    .padding(.vertical, 14)
                 }
             }
-            .navigationTitle("Nowe gospodarstwo")
+            .navigationTitle("Gospodarstwo")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -434,303 +306,16 @@ struct SettingsView: View {
                     .ignoresSafeArea()
 
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 14) {
                         if hasHousehold {
-                            VStack(alignment: .leading, spacing: 12) {
-                                HStack(alignment: .top, spacing: 9) {
-                                    ZStack {
-                                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                            .fill(Color.teal.opacity(colorScheme == .dark ? 0.22 : 0.14))
-                                        Image(systemName: "house.fill")
-                                            .font(.caption.weight(.semibold))
-                                            .foregroundStyle(.teal)
-                                    }
-                                    .frame(width: 28, height: 28)
-
-                                    VStack(alignment: .leading, spacing: 3) {
-                                        Text(persistedHouseholdName)
-                                            .font(.subheadline)
-                                            .fontWeight(.semibold)
-                                        Text(canCreateInvitations ? "Zarządzaj zaproszeniem i członkami." : "Tryb podglądu dla członka gospodarstwa.")
-                                            .font(.caption2)
-                                            .foregroundStyle(.secondary)
-                                    }
-
-                                    Spacer(minLength: 8)
-
-                                    householdRoleBadge(
-                                        title: canCreateInvitations ? "Właściciel" : "Członek",
-                                        tint: canCreateInvitations ? .green : .blue
-                                    )
-                                }
-
-                                HStack(spacing: 8) {
-                                    householdMetaChip(
-                                        icon: "person.2.fill",
-                                        text: "\(householdMembers.count) \(membersLabel(for: householdMembers.count))",
-                                        tint: .blue
-                                    )
-                                    householdMetaChip(
-                                        icon: canCreateInvitations ? "key.fill" : "person.fill",
-                                        text: canCreateInvitations ? "Pełny dostęp" : "Dostęp podstawowy",
-                                        tint: canCreateInvitations ? .green : .secondary
-                                    )
-                                }
-
-                                if canCreateInvitations {
-                                    HStack(spacing: 8) {
-                                        if let invitationLink {
-                                            ShareLink(item: invitationLink) {
-                                                householdActionLabel(
-                                                    title: "Udostępnij",
-                                                    icon: "square.and.arrow.up",
-                                                    tint: .blue
-                                                )
-                                            }
-                                            .buttonStyle(.plain)
-
-                                            Button {
-                                                Task { await createInvitationLink() }
-                                            } label: {
-                                                householdActionLabel(
-                                                    title: "Odśwież link",
-                                                    icon: "arrow.clockwise",
-                                                    tint: .teal
-                                                )
-                                            }
-                                            .buttonStyle(.plain)
-                                        } else if isCreatingInvitation {
-                                            HStack(spacing: 7) {
-                                                ProgressView()
-                                                    .controlSize(.small)
-                                                Text("Tworzenie linku...")
-                                                    .font(.caption2)
-                                                    .fontWeight(.semibold)
-                                                    .foregroundStyle(.secondary)
-                                            }
-                                            .frame(maxWidth: .infinity)
-                                            .padding(.vertical, 9)
-                                            .background(Color.white.opacity(0.1), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                                    .stroke(Color.white.opacity(0.14), lineWidth: 1)
-                                            )
-                                        } else {
-                                            Button {
-                                                Task { await createInvitationLink() }
-                                            } label: {
-                                                householdActionLabel(
-                                                    title: "Utwórz link zaproszenia",
-                                                    icon: "link.badge.plus",
-                                                    tint: .blue
-                                                )
-                                            }
-                                            .buttonStyle(.plain)
-                                        }
-                                    }
-                                } else {
-                                    HStack(spacing: 6) {
-                                        Image(systemName: "info.circle.fill")
-                                            .foregroundStyle(.secondary)
-                                        Text("Tylko właściciel może tworzyć zaproszenia.")
-                                            .font(.caption2)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 8)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .background(Color.white.opacity(0.1), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                            .stroke(Color.white.opacity(0.14), lineWidth: 1)
-                                    )
-                                }
-
-                                if let invitationLink {
-                                    HStack(spacing: 7) {
-                                        Image(systemName: "link.circle.fill")
-                                            .foregroundStyle(.blue)
-                                        Text(invitationLink.absoluteString)
-                                            .font(.caption2)
-                                            .foregroundStyle(.secondary)
-                                            .lineLimit(1)
-                                            .truncationMode(.middle)
-
-                                        Spacer(minLength: 8)
-
-                                        ShareLink(item: invitationLink) {
-                                            Image(systemName: "square.and.arrow.up")
-                                                .font(.caption.weight(.semibold))
-                                                .foregroundStyle(.blue)
-                                        }
-                                        .buttonStyle(.plain)
-                                    }
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 8)
-                                    .background(Color.white.opacity(0.1), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                            .stroke(Color.white.opacity(0.14), lineWidth: 1)
-                                    )
-                                }
-
-                                Button(role: .destructive) {
-                                    Task {
-                                        await sessionStore.leaveCurrentHousehold()
-                                        if sessionStore.currentHouseholdId == nil {
-                                            persistedHouseholdName = ""
-                                            householdId = UUID().uuidString
-                                            showHouseholdSheet = false
-                                        }
-                                    }
-                                } label: {
-                                    HStack(spacing: 7) {
-                                        if sessionStore.isSigningIn {
-                                            ProgressView()
-                                                .controlSize(.small)
-                                        } else {
-                                            Image(systemName: "rectangle.portrait.and.arrow.right")
-                                        }
-                                        Text(sessionStore.isSigningIn ? "Opuszczanie..." : "Opuść gospodarstwo")
-                                            .fontWeight(.semibold)
-                                    }
-                                    .font(.caption)
-                                    .foregroundStyle(.red)
-                                    .padding(.horizontal, 11)
-                                    .padding(.vertical, 8)
-                                    .background(Color.red.opacity(0.12), in: Capsule())
-                                    .overlay(
-                                        Capsule()
-                                            .stroke(Color.red.opacity(0.22), lineWidth: 1)
-                                    )
-                                }
-                                .buttonStyle(.plain)
-                                .disabled(sessionStore.isSigningIn)
-
-                                if let error = sessionStore.authError, !error.isEmpty {
-                                    HStack(spacing: 6) {
-                                        Image(systemName: "exclamationmark.triangle.fill")
-                                            .foregroundStyle(.red)
-                                        Text(error)
-                                            .font(.caption2)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                }
-                            }
-                            .padding(14)
-                            .dashboardLiquidCard(cornerRadius: 18, strokeOpacity: 0.18)
-
-                            VStack(alignment: .leading, spacing: 10) {
-                                HStack {
-                                    Label("Członkowie", systemImage: "person.2.fill")
-                                        .font(.footnote.weight(.semibold))
-                                    Spacer(minLength: 8)
-                                    Text("\(householdMembers.count)")
-                                        .font(.caption2)
-                                        .fontWeight(.semibold)
-                                        .foregroundStyle(.blue)
-                                        .padding(.horizontal, 7)
-                                        .padding(.vertical, 3)
-                                        .background(Color.blue.opacity(0.14), in: Capsule())
-                                }
-
-                                if isLoadingMembers {
-                                    HStack(spacing: 8) {
-                                        ProgressView()
-                                            .controlSize(.small)
-                                        Text("Ładowanie...")
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                    .padding(.vertical, 4)
-                                } else if householdMembers.isEmpty {
-                                    Text("Brak członków do wyświetlenia.")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                } else {
-                                    ForEach(Array(householdMembers.enumerated()), id: \.element.id) { index, member in
-                                        HStack(spacing: 9) {
-                                            memberAvatar(for: member)
-                                            VStack(alignment: .leading, spacing: 1) {
-                                                HStack(spacing: 6) {
-                                                    Text(member.displayName)
-                                                        .font(.footnote)
-                                                        .fontWeight(.medium)
-                                                    if member.id == sessionStore.currentUserId {
-                                                        Text("Ty")
-                                                            .font(.caption2)
-                                                            .fontWeight(.semibold)
-                                                            .padding(.horizontal, 6)
-                                                            .padding(.vertical, 2)
-                                                            .background(Color.blue.opacity(0.16), in: Capsule())
-                                                            .foregroundStyle(.blue)
-                                                    }
-                                                }
-                                                Text(member.email ?? "Brak e-maila")
-                                                    .font(.caption2)
-                                                    .foregroundStyle(.secondary)
-                                            }
-                                            Spacer()
-
-                                            Text(roleTitle(for: member.role))
-                                                .font(.caption2)
-                                                .fontWeight(.semibold)
-                                                .foregroundStyle(roleTint(for: member.role))
-                                                .padding(.horizontal, 7)
-                                                .padding(.vertical, 3)
-                                                .background(roleTint(for: member.role).opacity(0.16), in: Capsule())
-                                        }
-                                        .padding(.vertical, 6)
-
-                                        if index < householdMembers.count - 1 {
-                                            Divider()
-                                                .padding(.leading, 38)
-                                        }
-                                    }
-                                }
-                            }
-                            .padding(14)
-                            .dashboardLiquidCard(cornerRadius: 18, strokeOpacity: 0.18)
+                            householdOverviewCard
+                            householdMembersCard
                         } else {
-                            sheetIntroCard(
-                                icon: "house.fill",
-                                title: "Brak gospodarstwa",
-                                subtitle: "Utwórz gospodarstwo, aby wspólnie planować i dzielić listę zakupów.",
-                                accent: .blue
-                            )
-
-                            Button {
-                                createHouseholdName = ""
-                                showCreateHouseholdSheet = true
-                            } label: {
-                                HStack(spacing: 8) {
-                                    Image(systemName: "house.badge.plus")
-                                    Text("Utwórz gospodarstwo")
-                                        .fontWeight(.semibold)
-                                }
-                                .font(.footnote)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 10)
-                                .foregroundStyle(.white)
-                                .background(
-                                    LinearGradient(
-                                        colors: [.blue.opacity(0.92), .cyan.opacity(0.84)],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    ),
-                                    in: RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                )
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                        .stroke(Color.white.opacity(0.22), lineWidth: 1)
-                                )
-                            }
-                            .buttonStyle(.plain)
+                            householdEmptyCard
                         }
                     }
                     .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
+                    .padding(.vertical, 14)
                 }
             }
             .navigationTitle("Gospodarstwo")
@@ -745,12 +330,137 @@ struct SettingsView: View {
                     await preloadHouseholdContextIfNeeded(force: true)
                 }
             }
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Zamknij") { showHouseholdSheet = false }
+            .alert("Opuścić gospodarstwo?", isPresented: $showLeaveHouseholdAlert) {
+                Button("Anuluj", role: .cancel) {}
+                Button("Opuść", role: .destructive) {
+                    Task {
+                        await sessionStore.leaveCurrentHousehold()
+                        if sessionStore.currentHouseholdId == nil {
+                            persistedHouseholdName = ""
+                            showHouseholdSheet = false
+                        }
+                    }
                 }
+            } message: {
+                Text("Stracisz dostęp do wspólnego planu i listy zakupów.")
             }
         }
+    }
+
+    private var householdOverviewCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(persistedHouseholdName)
+                        .font(.title2.weight(.semibold))
+                    Text("\(householdMembers.count) \(membersLabel(for: householdMembers.count)) w gospodarstwie")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer(minLength: 0)
+
+                DashboardActionButton(
+                    title: nil,
+                    systemImage: "rectangle.portrait.and.arrow.right",
+                    tone: .destructive,
+                    controlSize: 30
+                ) {
+                    showLeaveHouseholdAlert = true
+                }
+                .disabled(sessionStore.isSigningIn)
+                .accessibilityLabel("Opuść gospodarstwo")
+            }
+        }
+        .padding(18)
+        .dashboardLiquidCard(cornerRadius: 22, strokeOpacity: 0.16)
+    }
+
+    private var householdMembersCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                Text("Członkowie")
+                    .font(.headline.weight(.semibold))
+
+                Spacer(minLength: 0)
+
+                if canCreateInvitations {
+                    if let invitationLink {
+                        ShareLink(item: invitationLink) {
+                            DashboardActionLabel(
+                                title: nil,
+                                systemImage: "plus",
+                                tone: .accent(.blue),
+                                controlSize: 30
+                            )
+                        }
+                        .accessibilityLabel("Udostępnij zaproszenie")
+                    } else if isCreatingInvitation {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        DashboardActionButton(
+                            title: nil,
+                            systemImage: "plus",
+                            tone: .accent(.blue),
+                            controlSize: 30
+                        ) {
+                            Task { await createInvitationLink() }
+                        }
+                        .accessibilityLabel("Przygotuj zaproszenie")
+                    }
+                }
+            }
+
+            if isLoadingMembers {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Ładowanie...")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 4)
+            } else if householdMembers.isEmpty {
+                Text("Brak członków do wyświetlenia.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                VStack(spacing: 8) {
+                    ForEach(householdMembers, id: \.id) { member in
+                        memberRow(member)
+                    }
+                }
+            }
+
+            if let error = sessionStore.authError, !error.isEmpty {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+        }
+        .padding(18)
+        .dashboardLiquidCard(cornerRadius: 22, strokeOpacity: 0.16)
+    }
+
+    private var householdEmptyCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Brak gospodarstwa")
+                .font(.title2.weight(.semibold))
+            Text("Utwórz wspólne miejsce do planowania posiłków i listy zakupów.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+
+            Button {
+                createHouseholdName = ""
+                showCreateHouseholdSheet = true
+            } label: {
+                householdPrimaryButton(title: "Utwórz gospodarstwo", icon: "house.badge.plus")
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(18)
+        .dashboardLiquidCard(cornerRadius: 22, strokeOpacity: 0.16)
     }
 
     private var preferencesSheet: some View {
@@ -760,108 +470,64 @@ struct SettingsView: View {
                     .ignoresSafeArea()
 
                 ScrollView {
-                    VStack(spacing: 10) {
-                        sheetIntroCard(
-                            icon: "slider.horizontal.3",
-                            title: "Preferencje aplikacji",
-                            subtitle: "Dopasuj powiadomienia i motyw.",
-                            accent: .indigo
-                        )
-
-                        VStack(alignment: .leading, spacing: 10) {
-                            Label("Powiadomienia", systemImage: "bell.badge.fill")
-                                .font(.footnote.weight(.semibold))
-
-                            VStack(spacing: 0) {
-                                preferenceToggleRow(
-                                    title: "Powiadomienia",
-                                    subtitle: "Włącz główne powiadomienia aplikacji",
-                                    isOn: $notificationsEnabled
-                                )
-
-                                Divider().padding(.leading, 12)
-
-                                preferenceToggleRow(
-                                    title: "Przypomnienia o planie",
-                                    subtitle: "Informacje o tygodniowym planie",
-                                    isOn: $planRemindersEnabled
-                                )
-                                .disabled(!notificationsEnabled)
-                                .opacity(notificationsEnabled ? 1 : 0.55)
-
-                                Divider().padding(.leading, 12)
-
-                                preferenceToggleRow(
-                                    title: "Przypomnienia o zakupach",
-                                    subtitle: "Powiadomienia o liście zakupów",
-                                    isOn: $shoppingRemindersEnabled
-                                )
-                                .disabled(!notificationsEnabled)
-                                .opacity(notificationsEnabled ? 1 : 0.55)
-                            }
-                            .dashboardLiquidCard(cornerRadius: 16, strokeOpacity: 0.16)
+                    VStack(spacing: 14) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Preferencje")
+                                .font(.title2.weight(.semibold))
+                            Text("Powiadomienia i wygląd aplikacji.")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
                         }
-                        .padding(14)
-                        .dashboardLiquidCard(cornerRadius: 18, strokeOpacity: 0.18)
+                        .frame(maxWidth: .infinity, alignment: .leading)
 
-                        VStack(alignment: .leading, spacing: 10) {
-                            Label("Wygląd", systemImage: "paintbrush.fill")
-                                .font(.footnote.weight(.semibold))
+                        VStack(spacing: 0) {
+                            preferenceToggleRow(
+                                title: "Powiadomienia",
+                                subtitle: "Włącz główne powiadomienia aplikacji",
+                                isOn: $notificationsEnabled
+                            )
 
-                            HStack(spacing: 8) {
+                            Divider().padding(.leading, 16)
+
+                            preferenceToggleRow(
+                                title: "Plan tygodniowy",
+                                subtitle: "Przypomnienia o planie posiłków",
+                                isOn: $planRemindersEnabled
+                            )
+                            .disabled(!notificationsEnabled)
+                            .opacity(notificationsEnabled ? 1 : 0.5)
+
+                            Divider().padding(.leading, 16)
+
+                            preferenceToggleRow(
+                                title: "Lista zakupów",
+                                subtitle: "Przypomnienia o zakupach",
+                                isOn: $shoppingRemindersEnabled
+                            )
+                            .disabled(!notificationsEnabled)
+                            .opacity(notificationsEnabled ? 1 : 0.5)
+                        }
+                        .dashboardLiquidCard(cornerRadius: 22, strokeOpacity: 0.16)
+
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Wygląd")
+                                .font(.headline.weight(.semibold))
+
+                            VStack(spacing: 8) {
                                 ForEach(AppTheme.allCases) { theme in
-                                    let selected = theme.rawValue == themeRawValue
-                                    Button {
-                                        themeRawValue = theme.rawValue
-                                    } label: {
-                                        VStack(spacing: 4) {
-                                            Image(systemName: themeIcon(for: theme))
-                                                .font(.caption.weight(.semibold))
-                                            Text(theme.title)
-                                                .font(.caption2)
-                                                .fontWeight(.semibold)
-                                                .lineLimit(1)
-                                        }
-                                        .foregroundStyle(selected ? .primary : .secondary)
-                                        .padding(.vertical, 7)
-                                        .frame(maxWidth: .infinity)
-                                        .background(
-                                            selected
-                                            ? AnyShapeStyle(
-                                                LinearGradient(
-                                                    colors: [.blue.opacity(0.3), .cyan.opacity(0.2)],
-                                                    startPoint: .leading,
-                                                    endPoint: .trailing
-                                                )
-                                            )
-                                            : AnyShapeStyle(Color.white.opacity(0.1)),
-                                            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                        )
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                                .stroke(
-                                                    selected ? Color.blue.opacity(0.34) : Color.white.opacity(0.14),
-                                                    lineWidth: 1
-                                                )
-                                        )
-                                    }
-                                    .buttonStyle(.plain)
+                                    themeRow(theme)
                                 }
                             }
                         }
-                        .padding(14)
-                        .dashboardLiquidCard(cornerRadius: 18, strokeOpacity: 0.18)
+                        .padding(18)
+                        .dashboardLiquidCard(cornerRadius: 22, strokeOpacity: 0.16)
                     }
                     .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
+                    .padding(.vertical, 14)
                 }
             }
             .navigationTitle("Preferencje")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Gotowe") { showPreferencesSheet = false }
-                }
-            }
+            .navigationBarTitleDisplayMode(.inline)
         }
     }
 
@@ -870,24 +536,63 @@ struct SettingsView: View {
         subtitle: String,
         isOn: Binding<Bool>
     ) -> some View {
-        HStack(spacing: 10) {
-            VStack(alignment: .leading, spacing: 1) {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.footnote)
-                    .fontWeight(.semibold)
+                    .font(.footnote.weight(.semibold))
                 Text(subtitle)
-                    .font(.caption2)
+                    .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            Spacer(minLength: 8)
+
+            Spacer(minLength: 0)
 
             Toggle("", isOn: isOn)
                 .labelsHidden()
                 .tint(.blue)
-                .scaleEffect(0.88)
+                .scaleEffect(0.9)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 9)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+    }
+
+    private func themeRow(_ theme: AppTheme) -> some View {
+        let selected = theme.rawValue == themeRawValue
+
+        return Button {
+            themeRawValue = theme.rawValue
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: themeIcon(for: theme))
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(selected ? .blue : .secondary)
+                    .frame(width: 28, height: 28)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill((selected ? Color.blue : Color.white).opacity(selected ? 0.16 : 0.08))
+                    )
+
+                Text(theme.title)
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.primary)
+
+                Spacer(minLength: 0)
+
+                if selected {
+                    Image(systemName: "checkmark")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.blue)
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 13)
+            .background(Color.white.opacity(selected ? 0.08 : 0.04), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(selected ? Color.blue.opacity(0.2) : Color.white.opacity(0.08), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
     }
 
     @MainActor
@@ -912,34 +617,6 @@ struct SettingsView: View {
         }
     }
 
-    private func sheetIntroCard(
-        icon: String,
-        title: String,
-        subtitle: String,
-        accent: Color
-    ) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: icon)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(accent)
-                .frame(width: 26, height: 26)
-                .background(accent.opacity(colorScheme == .dark ? 0.2 : 0.14), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-
-            VStack(alignment: .leading, spacing: 1) {
-                Text(title)
-                    .font(.footnote)
-                    .fontWeight(.semibold)
-                Text(subtitle)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer(minLength: 0)
-        }
-        .padding(12)
-        .dashboardLiquidCard(cornerRadius: 16, strokeOpacity: 0.17)
-    }
-
     private func membersLabel(for count: Int) -> String {
         switch count {
         case 1:
@@ -951,65 +628,27 @@ struct SettingsView: View {
         }
     }
 
-    private func roleTitle(for role: String) -> String {
-        role.uppercased() == "OWNER" ? "Właściciel" : "Członek"
-    }
-
-    private func roleTint(for role: String) -> Color {
-        role.uppercased() == "OWNER" ? .green : .blue
-    }
-
-    private func householdRoleBadge(title: String, tint: Color) -> some View {
-        Text(title)
-            .font(.caption2)
-            .fontWeight(.semibold)
-            .foregroundStyle(tint)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(tint.opacity(0.15), in: Capsule())
-            .overlay(
-                Capsule()
-                    .stroke(tint.opacity(0.24), lineWidth: 1)
-            )
-    }
-
-    private func householdMetaChip(icon: String, text: String, tint: Color) -> some View {
-        HStack(spacing: 5) {
-            Image(systemName: icon)
-            Text(text)
-                .lineLimit(1)
-        }
-        .font(.caption2)
-        .fontWeight(.semibold)
-        .foregroundStyle(tint)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 5)
-        .background(tint.opacity(0.13), in: Capsule())
-    }
-
-    private func householdActionLabel(title: String, icon: String, tint: Color) -> some View {
+    private func householdPrimaryButton(title: String, icon: String) -> some View {
         HStack(spacing: 6) {
             Image(systemName: icon)
             Text(title)
                 .lineLimit(1)
         }
-        .font(.caption)
-        .fontWeight(.semibold)
-        .foregroundStyle(.primary)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 9)
+        .font(.footnote.weight(.semibold))
+        .foregroundStyle(.white)
         .frame(maxWidth: .infinity)
+        .padding(.vertical, 14)
         .background(
             LinearGradient(
-                colors: [tint.opacity(0.25), tint.opacity(0.14)],
+                colors: [.blue.opacity(0.9), .cyan.opacity(0.78)],
                 startPoint: .leading,
                 endPoint: .trailing
             ),
-            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(tint.opacity(0.3), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color.white.opacity(0.18), lineWidth: 1)
         )
     }
 
@@ -1026,9 +665,8 @@ struct SettingsView: View {
         let value = trimmedCreateHouseholdName
         Task {
             await sessionStore.createHousehold(name: value)
-            if let currentId = sessionStore.currentHouseholdId {
+            if sessionStore.currentHouseholdId != nil {
                 persistedHouseholdName = value
-                householdId = currentId
                 showCreateHouseholdSheet = false
             }
         }
@@ -1068,16 +706,46 @@ struct SettingsView: View {
                     role: $0.role
                 )
             }
+
             if !canCreateInvitations {
                 sessionStore.authError = nil
             }
         } catch is CancellationError {
-            // Sheet/task lifecycle cancellation is expected; do not surface as UI error.
             return
         } catch {
             sessionStore.authError = UserFacingErrorMapper.message(from: error)
             householdMembers = []
         }
+    }
+
+    private func memberRow(_ member: HouseholdMember) -> some View {
+        HStack(spacing: 12) {
+            memberAvatar(for: member)
+
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Text(member.displayName)
+                        .font(.footnote.weight(.semibold))
+
+                    if member.id == sessionStore.currentUserId {
+                        Text("Ty")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.blue)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.blue.opacity(0.12), in: Capsule())
+                    }
+                }
+                Text(member.email ?? "Brak e-maila")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     @ViewBuilder
@@ -1090,16 +758,15 @@ struct SettingsView: View {
             } placeholder: {
                 Circle().fill(Color.gray.opacity(0.22))
             }
-            .frame(width: 30, height: 30)
+            .frame(width: 34, height: 34)
             .clipShape(Circle())
         } else {
             Circle()
-                .fill(Color.blue.opacity(0.2))
-                .frame(width: 30, height: 30)
+                .fill(Color.blue.opacity(0.18))
+                .frame(width: 34, height: 34)
                 .overlay(
                     Text(initials(for: member.displayName))
-                        .font(.caption2)
-                        .fontWeight(.semibold)
+                        .font(.caption2.weight(.semibold))
                         .foregroundStyle(.blue)
                 )
         }
@@ -1118,8 +785,10 @@ struct SettingsView: View {
             invitationLink = nil
             return
         }
+
         isCreatingInvitation = true
         defer { isCreatingInvitation = false }
+
         do {
             invitationLink = try await sessionStore.createInvitationLink()
         } catch is CancellationError {
@@ -1129,7 +798,6 @@ struct SettingsView: View {
             invitationLink = nil
         }
     }
-
 }
 
 private struct SettingsLiquidBackground: View {

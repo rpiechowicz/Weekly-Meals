@@ -7,6 +7,7 @@ struct ArchivedShoppingList: Identifiable, Codable, Hashable {
     let weekLabel: String
     let revision: Int
     let archivedAt: Date
+    let isCurrentClosed: Bool
     let items: [ShoppingItem]
 
     var id: String { archiveId }
@@ -20,6 +21,7 @@ struct ArchivedShoppingList: Identifiable, Codable, Hashable {
         case weekLabel
         case revision
         case archivedAt
+        case isCurrentClosed
         case items
     }
 
@@ -29,6 +31,7 @@ struct ArchivedShoppingList: Identifiable, Codable, Hashable {
         weekLabel: String,
         revision: Int,
         archivedAt: Date,
+        isCurrentClosed: Bool,
         items: [ShoppingItem]
     ) {
         self.archiveId = archiveId
@@ -36,6 +39,7 @@ struct ArchivedShoppingList: Identifiable, Codable, Hashable {
         self.weekLabel = weekLabel
         self.revision = revision
         self.archivedAt = archivedAt
+        self.isCurrentClosed = isCurrentClosed
         self.items = items
     }
 
@@ -46,25 +50,39 @@ struct ArchivedShoppingList: Identifiable, Codable, Hashable {
         weekLabel = try container.decode(String.self, forKey: .weekLabel)
         revision = try container.decodeIfPresent(Int.self, forKey: .revision) ?? 1
         archivedAt = try container.decode(Date.self, forKey: .archivedAt)
+        isCurrentClosed = try container.decodeIfPresent(Bool.self, forKey: .isCurrentClosed) ?? false
         items = try container.decode([ShoppingItem].self, forKey: .items)
     }
 }
 
-private struct OpenShoppingRevision: Codable {
+private struct OpenShoppingRevision {
     let baseArchiveId: String
     let pendingAmounts: [String: Double]
 }
 
+struct ShoppingListState {
+    let items: [ShoppingItem]
+    let archives: [ArchivedShoppingList]
+}
+
 protocol ShoppingListRepository {
-    func fetchShoppingList(weekStart: String) async throws -> [ShoppingItem]
+    func fetchShoppingListState(weekStart: String) async throws -> ShoppingListState
     func setChecked(weekStart: String, productKey: String, isChecked: Bool) async throws
+    func archiveShoppingList(weekStart: String, weekLabel: String) async throws
+    func selectArchivedList(archiveId: String) async throws
+    func deleteArchivedList(archiveId: String) async throws
+    func deleteAllArchivedLists(weekStart: String) async throws
     func observeShoppingListChanges(_ onChange: @escaping (_ event: BackendShoppingListChangedDTO) -> Void)
     func observeRealtimeReconnect(_ onReconnect: @escaping () -> Void)
 }
 
 protocol ShoppingListTransportClient {
-    func fetchShoppingList(weekStart: String) async throws -> [BackendShoppingItemDTO]
+    func fetchShoppingListState(weekStart: String) async throws -> BackendShoppingListStateDTO
     func setChecked(weekStart: String, productKey: String, isChecked: Bool) async throws
+    func archiveShoppingList(weekStart: String, weekLabel: String) async throws
+    func selectArchivedList(archiveId: String) async throws
+    func deleteArchivedList(archiveId: String) async throws
+    func deleteAllArchivedLists(weekStart: String) async throws
     func observeShoppingListChanges(_ onChange: @escaping (_ event: BackendShoppingListChangedDTO) -> Void)
     func observeRealtimeReconnect(_ onReconnect: @escaping () -> Void)
 }
@@ -76,6 +94,30 @@ struct BackendShoppingItemDTO: Codable {
     let department: String
     let totalAmount: Double
     let isChecked: Bool
+}
+
+struct BackendShoppingListArchiveItemDTO: Codable {
+    let productKey: String
+    let name: String
+    let unit: String
+    let department: String
+    let totalAmount: Double
+    let isChecked: Bool
+}
+
+struct BackendShoppingListArchiveDTO: Codable {
+    let archiveId: String
+    let weekStart: String
+    let weekLabel: String
+    let revision: Int
+    let archivedAt: Double
+    let isCurrentClosed: Bool
+    let items: [BackendShoppingListArchiveItemDTO]
+}
+
+struct BackendShoppingListStateDTO: Codable {
+    let items: [BackendShoppingItemDTO]
+    let archives: [BackendShoppingListArchiveDTO]
 }
 
 struct BackendHouseholdDTO: Codable {
@@ -95,6 +137,31 @@ struct BackendShoppingListChangedDTO: Codable {
     let productKey: String?
     let isChecked: Bool?
     let changeVersion: Int64?
+}
+
+private struct ArchiveShoppingListPayload: Encodable {
+    let userId: String
+    let householdId: String
+    let weekStart: String
+    let weekLabel: String
+}
+
+private struct ArchiveSelectionPayload: Encodable {
+    let userId: String
+    let householdId: String
+    let archiveId: String
+}
+
+private struct DeleteAllArchivedListsPayload: Encodable {
+    let userId: String
+    let householdId: String
+    let weekStart: String
+}
+
+private struct BackendMutationResultDTO: Codable {
+    let success: Bool?
+    let archiveId: String?
+    let weekStart: String?
 }
 
 private struct HouseholdListPayload: Encodable {
@@ -128,6 +195,33 @@ private extension BackendShoppingItemDTO {
             unit: unit,
             department: department,
             isChecked: isChecked
+        )
+    }
+}
+
+private extension BackendShoppingListArchiveItemDTO {
+    func toAppModel() -> ShoppingItem {
+        ShoppingItem(
+            productKey: productKey,
+            name: name,
+            totalAmount: totalAmount,
+            unit: unit,
+            department: department,
+            isChecked: isChecked
+        )
+    }
+}
+
+private extension BackendShoppingListArchiveDTO {
+    func toAppModel() -> ArchivedShoppingList {
+        ArchivedShoppingList(
+            archiveId: archiveId,
+            weekStart: weekStart,
+            weekLabel: weekLabel,
+            revision: revision,
+            archivedAt: Date(timeIntervalSince1970: archivedAt / 1000),
+            isCurrentClosed: isCurrentClosed,
+            items: items.map { $0.toAppModel() }
         )
     }
 }
@@ -204,7 +298,7 @@ final class WebSocketShoppingListTransportClient: ShoppingListTransportClient {
         return first.id
     }
 
-    func fetchShoppingList(weekStart: String) async throws -> [BackendShoppingItemDTO] {
+    func fetchShoppingListState(weekStart: String) async throws -> BackendShoppingListStateDTO {
         let householdId = try await resolveHouseholdId()
         let payload = try makePayload(
             ShoppingListPayload(
@@ -213,16 +307,16 @@ final class WebSocketShoppingListTransportClient: ShoppingListTransportClient {
                 weekStart: weekStart
             )
         )
-        let envelope: WsEnvelope<[BackendShoppingItemDTO]> = try await socket.emitWithAck(
-            event: "weeklyPlans:getShoppingList",
+        let envelope: WsEnvelope<BackendShoppingListStateDTO> = try await socket.emitWithAck(
+            event: "weeklyPlans:getShoppingListState",
             payload: payload,
-            as: WsEnvelope<[BackendShoppingItemDTO]>.self
+            as: WsEnvelope<BackendShoppingListStateDTO>.self
         )
 
         if envelope.ok, let data = envelope.data {
             return data
         }
-        throw RecipeDataError.serverError(message: envelope.error ?? "Nieznany błąd weeklyPlans:getShoppingList.")
+        throw RecipeDataError.serverError(message: envelope.error ?? "Nieznany błąd weeklyPlans:getShoppingListState.")
     }
 
     func setChecked(weekStart: String, productKey: String, isChecked: Bool) async throws {
@@ -248,6 +342,91 @@ final class WebSocketShoppingListTransportClient: ShoppingListTransportClient {
             return
         }
         throw RecipeDataError.serverError(message: envelope.error ?? "Nieznany błąd weeklyPlans:setShoppingItemChecked.")
+    }
+
+    func archiveShoppingList(weekStart: String, weekLabel: String) async throws {
+        let householdId = try await resolveHouseholdId()
+        let payload = try makePayload(
+            ArchiveShoppingListPayload(
+                userId: userId,
+                householdId: householdId,
+                weekStart: weekStart,
+                weekLabel: weekLabel
+            )
+        )
+        let envelope: WsEnvelope<BackendMutationResultDTO> = try await socket.emitWithAck(
+            event: "weeklyPlans:archiveShoppingList",
+            payload: payload,
+            as: WsEnvelope<BackendMutationResultDTO>.self
+        )
+
+        if envelope.ok {
+            return
+        }
+        throw RecipeDataError.serverError(message: envelope.error ?? "Nieznany błąd weeklyPlans:archiveShoppingList.")
+    }
+
+    func selectArchivedList(archiveId: String) async throws {
+        let householdId = try await resolveHouseholdId()
+        let payload = try makePayload(
+            ArchiveSelectionPayload(
+                userId: userId,
+                householdId: householdId,
+                archiveId: archiveId
+            )
+        )
+        let envelope: WsEnvelope<BackendMutationResultDTO> = try await socket.emitWithAck(
+            event: "weeklyPlans:selectShoppingListArchive",
+            payload: payload,
+            as: WsEnvelope<BackendMutationResultDTO>.self
+        )
+
+        if envelope.ok {
+            return
+        }
+        throw RecipeDataError.serverError(message: envelope.error ?? "Nieznany błąd weeklyPlans:selectShoppingListArchive.")
+    }
+
+    func deleteArchivedList(archiveId: String) async throws {
+        let householdId = try await resolveHouseholdId()
+        let payload = try makePayload(
+            ArchiveSelectionPayload(
+                userId: userId,
+                householdId: householdId,
+                archiveId: archiveId
+            )
+        )
+        let envelope: WsEnvelope<BackendMutationResultDTO> = try await socket.emitWithAck(
+            event: "weeklyPlans:deleteShoppingListArchive",
+            payload: payload,
+            as: WsEnvelope<BackendMutationResultDTO>.self
+        )
+
+        if envelope.ok {
+            return
+        }
+        throw RecipeDataError.serverError(message: envelope.error ?? "Nieznany błąd weeklyPlans:deleteShoppingListArchive.")
+    }
+
+    func deleteAllArchivedLists(weekStart: String) async throws {
+        let householdId = try await resolveHouseholdId()
+        let payload = try makePayload(
+            DeleteAllArchivedListsPayload(
+                userId: userId,
+                householdId: householdId,
+                weekStart: weekStart
+            )
+        )
+        let envelope: WsEnvelope<BackendMutationResultDTO> = try await socket.emitWithAck(
+            event: "weeklyPlans:deleteAllShoppingListArchives",
+            payload: payload,
+            as: WsEnvelope<BackendMutationResultDTO>.self
+        )
+
+        if envelope.ok {
+            return
+        }
+        throw RecipeDataError.serverError(message: envelope.error ?? "Nieznany błąd weeklyPlans:deleteAllShoppingListArchives.")
     }
 
     func observeShoppingListChanges(_ onChange: @escaping (_ event: BackendShoppingListChangedDTO) -> Void) {
@@ -287,13 +466,34 @@ final class ApiShoppingListRepository: ShoppingListRepository {
         self.client = client
     }
 
-    func fetchShoppingList(weekStart: String) async throws -> [ShoppingItem] {
-        let dtos = try await client.fetchShoppingList(weekStart: weekStart)
-        return dtos.map { $0.toAppModel() }
+    func fetchShoppingListState(weekStart: String) async throws -> ShoppingListState {
+        let state = try await client.fetchShoppingListState(weekStart: weekStart)
+        return ShoppingListState(
+            items: state.items.map { $0.toAppModel() },
+            archives: state.archives
+                .map { $0.toAppModel() }
+                .sorted { $0.archivedAt > $1.archivedAt }
+        )
     }
 
     func setChecked(weekStart: String, productKey: String, isChecked: Bool) async throws {
         try await client.setChecked(weekStart: weekStart, productKey: productKey, isChecked: isChecked)
+    }
+
+    func archiveShoppingList(weekStart: String, weekLabel: String) async throws {
+        try await client.archiveShoppingList(weekStart: weekStart, weekLabel: weekLabel)
+    }
+
+    func selectArchivedList(archiveId: String) async throws {
+        try await client.selectArchivedList(archiveId: archiveId)
+    }
+
+    func deleteArchivedList(archiveId: String) async throws {
+        try await client.deleteArchivedList(archiveId: archiveId)
+    }
+
+    func deleteAllArchivedLists(weekStart: String) async throws {
+        try await client.deleteAllArchivedLists(weekStart: weekStart)
     }
 
     func observeShoppingListChanges(_ onChange: @escaping (_ event: BackendShoppingListChangedDTO) -> Void) {
@@ -308,12 +508,6 @@ final class ApiShoppingListRepository: ShoppingListRepository {
 @MainActor
 @Observable
 final class ShoppingListStore {
-    private enum ArchiveKeys {
-        static let archivedLists = "shopping.archivedLists"
-        static let closedArchiveByWeek = "shopping.closedArchiveByWeek"
-        static let openRevisions = "shopping.openRevisions"
-    }
-
     private let repository: ShoppingListRepository
     private(set) var items: [ShoppingItem] = []
     private(set) var weekStart: String?
@@ -321,21 +515,20 @@ final class ShoppingListStore {
     private(set) var isBatchUpdating: Bool = false
     private var pendingReloadTask: Task<Void, Never>?
     private var lastChangeVersionByWeek: [String: Int64] = [:]
-    private var closedArchiveByWeek: [String: String] = [:]
     private var openRevisionsByWeek: [String: OpenShoppingRevision] = [:]
     var isLoading: Bool = false
     var errorMessage: String?
 
     init(repository: ShoppingListRepository) {
         self.repository = repository
-        self.archivedLists = Self.loadArchivedLists()
-        self.closedArchiveByWeek = Self.loadClosedArchiveByWeek()
-        self.openRevisionsByWeek = Self.loadOpenRevisions()
         self.repository.observeShoppingListChanges { [weak self] event in
             guard let self else { return }
             Task { @MainActor in
-                guard let currentWeekStart = self.weekStart, currentWeekStart == event.weekStart else { return }
+                guard let currentWeekStart = self.weekStart else { return }
                 guard !self.isBatchUpdating else { return }
+                if event.weekStart != currentWeekStart && event.productKey != nil {
+                    return
+                }
                 if let changeVersion = event.changeVersion {
                     let previous = self.lastChangeVersionByWeek[currentWeekStart] ?? 0
                     guard changeVersion > previous else { return }
@@ -359,9 +552,10 @@ final class ShoppingListStore {
         errorMessage = nil
         self.weekStart = weekStart
         do {
-            let fetchedItems = try await repository.fetchShoppingList(weekStart: weekStart)
-            items = fetchedItems
-            await syncPendingItemCheckState(for: weekStart, currentItems: fetchedItems)
+            let state = try await repository.fetchShoppingListState(weekStart: weekStart)
+            archivedLists = state.archives
+            items = state.items
+            await syncPendingItemCheckState(for: weekStart, currentItems: state.items)
         } catch {
             errorMessage = UserFacingErrorMapper.message(from: error)
         }
@@ -424,79 +618,65 @@ final class ShoppingListStore {
               !items.isEmpty,
               items.allSatisfy(\.isChecked)
         else { return }
-
-        let currentSignature = itemSignature(for: items)
-        if let existingIndex = archivedLists.firstIndex(where: {
-            $0.weekStart == weekStart && itemSignature(for: $0.items) == currentSignature
-        }) {
-            let existingArchive = archivedLists.remove(at: existingIndex)
-            let refreshedArchive = ArchivedShoppingList(
-                archiveId: existingArchive.archiveId,
-                weekStart: weekStart,
-                weekLabel: weekLabel,
-                revision: existingArchive.revision,
-                archivedAt: Date(),
-                items: items
-            )
-
-            archivedLists.insert(refreshedArchive, at: 0)
-            closedArchiveByWeek[weekStart] = refreshedArchive.id
-            openRevisionsByWeek.removeValue(forKey: weekStart)
-            persistArchivedLists()
-            persistClosedArchiveByWeek()
-            persistOpenRevisions()
-            return
+        Task {
+            do {
+                try await repository.archiveShoppingList(weekStart: weekStart, weekLabel: weekLabel)
+                openRevisionsByWeek.removeValue(forKey: weekStart)
+                await load(weekStart: weekStart, force: true)
+            } catch {
+                errorMessage = UserFacingErrorMapper.message(from: error)
+            }
         }
-
-        let nextRevision = (archivedLists.filter { $0.weekStart == weekStart }.map(\.revision).max() ?? 0) + 1
-        let snapshot = ArchivedShoppingList(
-            weekStart: weekStart,
-            weekLabel: weekLabel,
-            revision: nextRevision,
-            archivedAt: Date(),
-            items: items
-        )
-
-        archivedLists.insert(snapshot, at: 0)
-        closedArchiveByWeek[weekStart] = snapshot.id
-        openRevisionsByWeek.removeValue(forKey: weekStart)
-        persistArchivedLists()
-        persistClosedArchiveByWeek()
-        persistOpenRevisions()
     }
 
-    func restoreArchivedList(weekStart: String) {
-        closedArchiveByWeek.removeValue(forKey: weekStart)
-        openRevisionsByWeek.removeValue(forKey: weekStart)
-        persistClosedArchiveByWeek()
-        persistOpenRevisions()
+    func selectArchivedList(archiveId: String) {
+        guard let currentWeekStart = weekStart else { return }
+        Task {
+            do {
+                try await repository.selectArchivedList(archiveId: archiveId)
+                openRevisionsByWeek.removeValue(forKey: currentWeekStart)
+                await load(weekStart: currentWeekStart, force: true)
+            } catch {
+                errorMessage = UserFacingErrorMapper.message(from: error)
+            }
+        }
     }
 
     func deleteArchivedList(archiveId: String) {
-        archivedLists.removeAll { $0.id == archiveId }
-        closedArchiveByWeek = closedArchiveByWeek.filter { $0.value != archiveId }
-        openRevisionsByWeek = openRevisionsByWeek.filter { $0.value.baseArchiveId != archiveId }
-        persistArchivedLists()
-        persistClosedArchiveByWeek()
-        persistOpenRevisions()
+        guard let currentWeekStart = weekStart else { return }
+        Task {
+            do {
+                let deletedArchiveIds = Set(
+                    archivedLists
+                        .filter { $0.archiveId == archiveId }
+                        .map(\.archiveId)
+                )
+                try await repository.deleteArchivedList(archiveId: archiveId)
+                if !deletedArchiveIds.isEmpty {
+                    openRevisionsByWeek = openRevisionsByWeek.filter { !deletedArchiveIds.contains($0.value.baseArchiveId) }
+                }
+                await load(weekStart: currentWeekStart, force: true)
+            } catch {
+                errorMessage = UserFacingErrorMapper.message(from: error)
+            }
+        }
     }
 
     func deleteAllArchivedLists() {
-        archivedLists.removeAll()
-        closedArchiveByWeek.removeAll()
-        openRevisionsByWeek.removeAll()
-        persistArchivedLists()
-        persistClosedArchiveByWeek()
-        persistOpenRevisions()
-    }
-
-    func isArchived(weekStart: String) -> Bool {
-        closedArchiveByWeek[weekStart] != nil
+        guard let currentWeekStart = weekStart else { return }
+        Task {
+            do {
+                try await repository.deleteAllArchivedLists(weekStart: currentWeekStart)
+                openRevisionsByWeek.removeAll()
+                await load(weekStart: currentWeekStart, force: true)
+            } catch {
+                errorMessage = UserFacingErrorMapper.message(from: error)
+            }
+        }
     }
 
     func currentClosedArchive(for weekStart: String) -> ArchivedShoppingList? {
-        guard let archiveId = closedArchiveByWeek[weekStart] else { return nil }
-        return archivedLists.first { $0.id == archiveId }
+        archivedLists.first { $0.weekStart == weekStart && $0.isCurrentClosed }
     }
 
     func hasOpenRevision(for weekStart: String) -> Bool {
@@ -538,56 +718,14 @@ final class ShoppingListStore {
         }
     }
 
-    private func persistArchivedLists() {
-        if let data = try? JSONEncoder().encode(archivedLists) {
-            UserDefaults.standard.set(data, forKey: ArchiveKeys.archivedLists)
-        }
-    }
-
-    private func persistClosedArchiveByWeek() {
-        UserDefaults.standard.set(closedArchiveByWeek, forKey: ArchiveKeys.closedArchiveByWeek)
-    }
-
-    private func persistOpenRevisions() {
-        if let data = try? JSONEncoder().encode(openRevisionsByWeek) {
-            UserDefaults.standard.set(data, forKey: ArchiveKeys.openRevisions)
-        }
-    }
-
-    private static func loadArchivedLists() -> [ArchivedShoppingList] {
-        guard let data = UserDefaults.standard.data(forKey: ArchiveKeys.archivedLists),
-              let decoded = try? JSONDecoder().decode([ArchivedShoppingList].self, from: data)
-        else {
-            return []
-        }
-
-        return decoded.sorted { $0.archivedAt > $1.archivedAt }
-    }
-
-    private static func loadClosedArchiveByWeek() -> [String: String] {
-        UserDefaults.standard.dictionary(forKey: ArchiveKeys.closedArchiveByWeek) as? [String: String] ?? [:]
-    }
-
-    private static func loadOpenRevisions() -> [String: OpenShoppingRevision] {
-        guard let data = UserDefaults.standard.data(forKey: ArchiveKeys.openRevisions),
-              let decoded = try? JSONDecoder().decode([String: OpenShoppingRevision].self, from: data)
-        else {
-            return [:]
-        }
-
-        return decoded
-    }
-
     private func syncPendingItemCheckState(for weekStart: String, currentItems: [ShoppingItem]) async {
         guard let archive = currentClosedArchive(for: weekStart) else {
             openRevisionsByWeek.removeValue(forKey: weekStart)
-            persistOpenRevisions()
             return
         }
 
         guard itemSignature(for: currentItems) != itemSignature(for: archive.items) else {
             openRevisionsByWeek.removeValue(forKey: weekStart)
-            persistOpenRevisions()
             return
         }
 
@@ -638,7 +776,6 @@ final class ShoppingListStore {
             baseArchiveId: archive.id,
             pendingAmounts: pendingAmounts
         )
-        persistOpenRevisions()
     }
 
     private func makePendingItems(currentItems: [ShoppingItem], archivedItems: [ShoppingItem]) -> [ShoppingItem] {

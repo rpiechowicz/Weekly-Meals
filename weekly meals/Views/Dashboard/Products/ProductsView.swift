@@ -12,6 +12,7 @@ struct ProductsView: View {
     @State private var archivePendingDeletion: ArchivedShoppingList?
     @State private var showDeleteAllHistoryAlert = false
     @State private var selectedFilter: ProductsFilter = .toBuy
+    @State private var previewArchiveId: String?
 
     private static let weekRangeFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -22,6 +23,20 @@ struct ProductsView: View {
 
     private var shoppingItems: [ShoppingItem] {
         shoppingListStore.items
+    }
+
+    private var previewedArchive: ArchivedShoppingList? {
+        guard let previewArchiveId else { return nil }
+        return shoppingListStore.archivedLists.first { $0.archiveId == previewArchiveId }
+    }
+
+    private var previewArchiveSheetBinding: Binding<ArchivedShoppingList?> {
+        Binding(
+            get: { previewedArchive },
+            set: { updatedValue in
+                previewArchiveId = updatedValue?.archiveId
+            }
+        )
     }
 
     private var archivedCurrentWeek: ArchivedShoppingList? {
@@ -56,6 +71,10 @@ struct ProductsView: View {
         groupItemsByDepartment(readonlyItems)
     }
 
+    private var groupedPreviewItemsByDepartment: [(department: String, items: [ShoppingItem])] {
+        groupItemsByDepartment(previewedArchive?.items ?? [])
+    }
+
     private func groupItemsByDepartment(_ items: [ShoppingItem]) -> [(department: String, items: [ShoppingItem])] {
         let departmentOrder: [String: Int] = [
             ProductConstants.Department.vegetables: 1,
@@ -80,7 +99,7 @@ struct ProductsView: View {
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
 
-        return Dictionary(grouping: activeItems, by: \.department)
+        return Dictionary(grouping: items, by: \.department)
             .sorted {
                 let leftKey = $0.key.trimmingCharacters(in: .whitespacesAndNewlines)
                 let rightKey = $1.key.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -140,6 +159,9 @@ struct ProductsView: View {
                 }
                 Button("Usuń", role: .destructive) {
                     if let archivePendingDeletion {
+                        if previewArchiveId == archivePendingDeletion.archiveId {
+                            previewArchiveId = nil
+                        }
                         shoppingListStore.deleteArchivedList(archiveId: archivePendingDeletion.id)
                     }
                     archivePendingDeletion = nil
@@ -150,6 +172,7 @@ struct ProductsView: View {
             .alert("Usunąć całą historię list?", isPresented: $showDeleteAllHistoryAlert) {
                 Button("Anuluj", role: .cancel) { }
                 Button("Usuń wszystko", role: .destructive) {
+                    previewArchiveId = nil
                     shoppingListStore.deleteAllArchivedLists()
                 }
             } message: {
@@ -157,7 +180,13 @@ struct ProductsView: View {
             }
             .task(id: datesViewModel.weekStartISO) {
                 selectedFilter = .toBuy
+                previewArchiveId = nil
                 await shoppingListStore.load(weekStart: datesViewModel.weekStartISO)
+            }
+            .sheet(item: previewArchiveSheetBinding) { archive in
+                archivePreview(archive)
+                    .presentationDetents([.large])
+                    .dashboardLiquidSheet()
             }
         }
     }
@@ -228,8 +257,6 @@ struct ProductsView: View {
                 }
                 .padding(18)
                 .dashboardLiquidCard(cornerRadius: 24, strokeOpacity: 0.2)
-
-                historySection
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
@@ -244,11 +271,11 @@ struct ProductsView: View {
                 VStack(alignment: .leading, spacing: 18) {
                     HStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("Lista przeniesiona do historii")
+                            Text("Archiwum tygodnia")
                                 .font(.headline)
                                 .fontWeight(.semibold)
 
-                            Text("Tydzień \(weekRangeText) jest już zamknięty. Nowe produkty utworzą kolejną listę.")
+                            Text("Tydzień \(weekRangeText) jest zamknięty. Nowe produkty utworzą kolejną listę.")
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
                         }
@@ -261,15 +288,6 @@ struct ProductsView: View {
                             .frame(width: 42, height: 42)
                             .background(Color.blue.opacity(0.12), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                     }
-
-                    if let archivedCurrentWeek {
-                        HStack(spacing: 8) {
-                            statPill(value: "\(archivedCurrentWeek.revision)", title: "Lista", tint: .purple)
-                            statPill(value: "\(archivedCurrentWeek.boughtCount)", title: "Kupione", tint: .green)
-                            statPill(value: "\(archivedCurrentWeek.totalCount)", title: "Razem", tint: .blue)
-                        }
-                    }
-
                 }
                 .padding(18)
                 .dashboardLiquidCard(cornerRadius: 24, strokeOpacity: 0.2)
@@ -278,6 +296,51 @@ struct ProductsView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
+            .padding(.bottom, 14)
+        }
+        .scrollContentBackground(.hidden)
+    }
+
+    private func archivePreview(_ archive: ArchivedShoppingList) -> some View {
+        ScrollView {
+            VStack(spacing: 14) {
+                VStack(alignment: .leading, spacing: 18) {
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Lista \(archive.revision)")
+                                .font(.headline)
+                                .fontWeight(.semibold)
+
+                            Text(archive.weekLabel)
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        Spacer(minLength: 0)
+
+                        DashboardActionButton(
+                            title: "Zamknij",
+                            systemImage: "xmark",
+                            foregroundColor: .secondary
+                        ) {
+                            previewArchiveId = nil
+                        }
+                    }
+                }
+                .padding(18)
+                .dashboardLiquidCard(cornerRadius: 24, strokeOpacity: 0.2)
+
+                if groupedPreviewItemsByDepartment.isEmpty {
+                    compactEmptyCard
+                } else {
+                    ForEach(groupedPreviewItemsByDepartment, id: \.department) { department, items in
+                        archivedDepartmentSection(department: department, items: items)
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 20)
+            .padding(.bottom, 12)
             .padding(.bottom, 14)
         }
         .scrollContentBackground(.hidden)
@@ -315,8 +378,6 @@ struct ProductsView: View {
                 if hasOpenRevision && selectedFilter == .all && !groupedReadonlyByDepartment.isEmpty {
                     readonlySection
                 }
-
-                historySection
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 9)
@@ -412,30 +473,14 @@ struct ProductsView: View {
         isDisabled: Bool,
         action: @escaping () -> Void
     ) -> some View {
-        Button(action: action) {
-            HStack(spacing: 7) {
-                Image(systemName: icon)
-                Text(title)
-                    .lineLimit(1)
-            }
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(isDisabled ? .secondary : .primary)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 10)
-            .background(
-                (isDisabled ? Color.white.opacity(0.05) : tint.opacity(0.12)),
-                in: RoundedRectangle(cornerRadius: 14, style: .continuous)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(
-                        isDisabled ? Color.white.opacity(0.08) : tint.opacity(0.18),
-                        lineWidth: 1
-                    )
-            )
-        }
-        .buttonStyle(.plain)
-        .disabled(isDisabled)
+        DashboardActionButton(
+            title: title,
+            systemImage: icon,
+            tone: .accent(tint),
+            fullWidth: true,
+            isDisabled: isDisabled,
+            action: action
+        )
     }
 
     private func emptyHintChip(icon: String, title: String) -> some View {
@@ -541,18 +586,6 @@ struct ProductsView: View {
 
                         Spacer(minLength: 0)
 
-                        Button {
-                            showDeleteAllHistoryAlert = true
-                        } label: {
-                            Image(systemName: "trash")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.secondary)
-                                .frame(width: 28, height: 28)
-                                .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Usuń całą historię")
-
                         Text("\(shoppingListStore.archivedLists.count)")
                             .font(.caption2)
                             .fontWeight(.semibold)
@@ -560,6 +593,15 @@ struct ProductsView: View {
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
                             .background(Color.white.opacity(0.08), in: Capsule())
+
+                        DashboardActionButton(
+                            title: nil,
+                            systemImage: "trash",
+                            tone: .destructive
+                        ) {
+                            showDeleteAllHistoryAlert = true
+                        }
+                        .accessibilityLabel("Usuń całą historię")
                     }
 
                     VStack(spacing: 8) {
@@ -615,30 +657,22 @@ struct ProductsView: View {
 
             Spacer(minLength: 0)
 
-            if archive.weekStart == datesViewModel.weekStartISO {
-                Button {
-                    shoppingListStore.restoreArchivedList(weekStart: archive.weekStart)
-                } label: {
-                    Image(systemName: "arrow.uturn.backward")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 28, height: 28)
-                        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Otwórz listę \(archive.revision)")
+            DashboardActionButton(
+                title: nil,
+                systemImage: "eye",
+                foregroundColor: .secondary
+            ) {
+                previewArchiveId = archive.archiveId
             }
+            .accessibilityLabel("Pokaż listę \(archive.revision)")
 
-            Button {
+            DashboardActionButton(
+                title: nil,
+                systemImage: "trash",
+                tone: .destructive
+            ) {
                 archivePendingDeletion = archive
-            } label: {
-                Image(systemName: "trash")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 28, height: 28)
-                    .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
-            .buttonStyle(.plain)
             .accessibilityLabel("Usuń z historii")
         }
         .padding(.horizontal, 12)
@@ -739,13 +773,6 @@ struct ProductsView: View {
                     .foregroundStyle(.secondary)
 
                 Spacer()
-
-                Text("Readonly")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color.white.opacity(0.08), in: Capsule())
             }
             .padding(.horizontal, 12)
             .padding(.top, 12)
@@ -765,6 +792,65 @@ struct ProductsView: View {
             .padding(.bottom, 4)
         }
         .dashboardLiquidCard(cornerRadius: 18, strokeOpacity: 0.14)
+    }
+
+    private func archivedDepartmentSection(department: String, items: [ShoppingItem]) -> some View {
+        let icon = ProductConstants.departmentIcon(for: department)
+        let color = ProductConstants.departmentColor(for: department)
+        let boughtInSection = items.filter(\.isChecked).count
+        let allBought = boughtInSection == items.count
+
+        return VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 8) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(color.opacity(colorScheme == .dark ? 0.24 : 0.14))
+                    Image(systemName: icon)
+                        .font(.caption2)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(color)
+                }
+                .frame(width: 26, height: 26)
+
+                Text(verbatim: department)
+                    .font(.footnote)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(allBought ? .secondary : .primary)
+
+                Spacer()
+
+                Text("\(boughtInSection)/\(items.count)")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(allBought ? .green : .secondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule()
+                            .fill(
+                                allBought
+                                ? Color.green.opacity(colorScheme == .dark ? 0.2 : 0.12)
+                                : Color.white.opacity(0.12)
+                            )
+                    )
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 12)
+            .padding(.bottom, 6)
+
+            VStack(spacing: 0) {
+                ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                    archivedShoppingRow(item, color: color)
+
+                    if index < items.count - 1 {
+                        Divider()
+                            .padding(.leading, 46)
+                            .padding(.trailing, 12)
+                    }
+                }
+            }
+            .padding(.bottom, 4)
+        }
+        .dashboardLiquidCard(cornerRadius: 18, strokeOpacity: 0.16)
     }
 
     private func shoppingRow(_ item: ShoppingItem, color: Color) -> some View {
@@ -865,6 +951,53 @@ struct ProductsView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 9)
         .opacity(0.72)
+    }
+
+    private func archivedShoppingRow(_ item: ShoppingItem, color: Color) -> some View {
+        HStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(
+                        item.isChecked
+                        ? Color.green.opacity(colorScheme == .dark ? 0.2 : 0.12)
+                        : Color.white.opacity(0.08)
+                    )
+
+                Image(systemName: item.isChecked ? "checkmark" : "circle")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(item.isChecked ? .green : Color(.tertiaryLabel))
+            }
+            .frame(width: 28, height: 28)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(verbatim: item.name)
+                    .font(.footnote)
+                    .fontWeight(item.isChecked ? .regular : .medium)
+                    .strikethrough(item.isChecked)
+                    .foregroundStyle(item.isChecked ? .secondary : .primary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+            }
+
+            Spacer(minLength: 8)
+
+            Text(verbatim: "\(item.formattedAmount) \(item.unit)")
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundStyle(item.isChecked ? Color.secondary : color)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 5)
+                .background(
+                    Capsule()
+                        .fill(
+                            item.isChecked
+                            ? Color.white.opacity(0.08)
+                            : color.opacity(colorScheme == .dark ? 0.18 : 0.1)
+                        )
+                )
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
     }
 
     private var canCloseCurrentList: Bool {

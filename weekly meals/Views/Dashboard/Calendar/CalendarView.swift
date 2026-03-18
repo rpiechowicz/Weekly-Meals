@@ -3,6 +3,7 @@ import SwiftUI
 struct CalendarView: View {
     @Environment(\.weeklyMealStore) private var mealStore
     @Environment(\.datesViewModel) private var datesViewModel
+    @Environment(\.recipeCatalogStore) private var recipeCatalogStore
 
     @State private var slotToPick: MealSlot? = nil
     @State private var detailRecipe: Recipe? = nil
@@ -218,54 +219,72 @@ struct CalendarView: View {
     }
 
     private var nutritionPanel: some View {
-        HStack(spacing: 8) {
-            nutritionStatPill(title: "Kalorie", value: "\(dayNutrition.kcal)", unit: "kcal", icon: "flame.fill", tint: .orange)
-            nutritionStatPill(title: "Białko", value: "\(dayNutrition.protein)", unit: "g", icon: "bolt.fill", tint: .blue)
-            nutritionStatPill(title: "Tłuszcz", value: "\(dayNutrition.fat)", unit: "g", icon: "drop.fill", tint: .pink)
-            nutritionStatPill(title: "Węgle", value: "\(dayNutrition.carbs)", unit: "g", icon: "leaf.fill", tint: .green)
+        LazyVGrid(
+            columns: [
+                GridItem(.flexible(), spacing: 8),
+                GridItem(.flexible(), spacing: 8)
+            ],
+            spacing: 8
+        ) {
+            nutritionStatRow(title: "Kalorie", value: "\(dayNutrition.kcal)", unit: "kcal", icon: "flame.fill", tint: .orange)
+            nutritionStatRow(title: "Białko", value: "\(dayNutrition.protein)", unit: "g", icon: "bolt.fill", tint: .blue)
+            nutritionStatRow(title: "Tłuszcze", value: "\(dayNutrition.fat)", unit: "g", icon: "drop.fill", tint: .pink)
+            nutritionStatRow(title: "Węglowodany", value: "\(dayNutrition.carbs)", unit: "g", icon: "leaf.fill", tint: .green)
         }
     }
 
-    private func nutritionStatPill(
+    private func nutritionStatRow(
         title: String,
         value: String,
         unit: String,
         icon: String,
         tint: Color
     ) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 5) {
+        HStack(spacing: 8) {
+            ZStack {
+                Circle()
+                    .fill(tint.opacity(0.16))
+
                 Image(systemName: icon)
-                    .font(.caption2.weight(.semibold))
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(tint)
+            }
+            .frame(width: 28, height: 28)
+
+            VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.caption2)
                     .fontWeight(.semibold)
                     .foregroundStyle(.secondary)
+
+                HStack(alignment: .firstTextBaseline, spacing: 3) {
+                    Text(value)
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .foregroundStyle(.primary)
+                        .monospacedDigit()
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.72)
+
+                    Text(unit)
+                        .font(.caption2)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
             }
 
-            HStack(alignment: .firstTextBaseline, spacing: 2) {
-                Text(value)
-                    .font(.system(size: 18, weight: .bold, design: .rounded))
-                    .foregroundStyle(.primary)
-                    .monospacedDigit()
-
-                Text(unit)
-                    .font(.caption2)
-                    .fontWeight(.medium)
-                    .foregroundStyle(.secondary)
-            }
+            Spacer(minLength: 0)
         }
         .padding(.horizontal, 10)
-        .padding(.vertical, 10)
+        .padding(.vertical, 9)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.white.opacity(0.07))
+                .fill(Color.white.opacity(0.05))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(tint.opacity(0.16), lineWidth: 1)
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
         )
     }
 
@@ -273,7 +292,9 @@ struct CalendarView: View {
 
     private func handleTap(_ slot: MealSlot) {
         if let recipe = recipe(for: slot) {
-            detailRecipe = recipe
+            Task {
+                detailRecipe = await recipeCatalogStore.loadRecipeDetail(recipeId: recipe.id) ?? recipe
+            }
         } else if isDayEditable {
             slotToPick = slot
         }

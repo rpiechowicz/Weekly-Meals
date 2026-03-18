@@ -264,7 +264,7 @@ struct ProductConstants {
         case Department.bakery.lowercased():        return .orange
         case Department.dairy.lowercased():         return .blue
         case Department.grains.lowercased():        return .yellow
-        case Department.canned.lowercased():        return .gray
+        case Department.canned.lowercased():        return .teal
         case Department.beverages.lowercased():     return .blue
         case Department.snacks.lowercased():        return .pink
         case Department.household.lowercased():     return .purple

@@ -8,36 +8,55 @@ struct NutritionCard: View {
     let color: Color
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
+        HStack(spacing: 8) {
+            ZStack {
+                Circle()
+                    .fill(color.opacity(0.16))
+                
                 Image(systemName: icon)
                     .foregroundStyle(color)
-                    .font(.title3)
-                
-                Text(title)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                
-                Spacer()
+                    .font(.caption.weight(.semibold))
             }
-            
+            .frame(width: 28, height: 28)
+
             VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.caption2)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+                    .allowsTightening(true)
+
                 HStack(alignment: .firstTextBaseline, spacing: 2) {
                     Text(value)
-                        .font(.title3)
-                        .fontWeight(.bold)
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .foregroundStyle(.primary)
+                        .monospacedDigit()
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.72)
+
                     Text(unit)
                         .font(.caption)
+                        .fontWeight(.medium)
                         .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
-                
-                
             }
+
+            Spacer(minLength: 0)
         }
-        .padding(12)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 9)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .myBackground()
-        .myBorderOverlay()
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.white.opacity(0.05))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+        )
     }
 }
 

@@ -54,3 +54,115 @@ extension View {
         }
     }
 }
+
+enum DashboardActionTone {
+    case neutral
+    case accent(Color)
+    case destructive
+}
+
+struct DashboardActionLabel: View {
+    let title: String?
+    let systemImage: String
+    var tone: DashboardActionTone = .neutral
+    var fullWidth: Bool = false
+    var isDisabled: Bool = false
+    var foregroundColor: Color? = nil
+    var controlSize: CGFloat = 34
+
+    private var resolvedForegroundColor: Color {
+        if let foregroundColor {
+            return foregroundColor
+        }
+
+        switch tone {
+        case .destructive:
+            return .red
+        case .neutral, .accent:
+            return .primary
+        }
+    }
+
+    private var backgroundColor: Color {
+        if isDisabled {
+            return Color.white.opacity(0.05)
+        }
+
+        switch tone {
+        case .neutral:
+            return Color.white.opacity(0.06)
+        case .accent(let color):
+            return color.opacity(0.12)
+        case .destructive:
+            return Color.red.opacity(0.08)
+        }
+    }
+
+    private var borderColor: Color {
+        if isDisabled {
+            return Color.white.opacity(0.08)
+        }
+
+        switch tone {
+        case .neutral:
+            return Color.white.opacity(0.12)
+        case .accent(let color):
+            return color.opacity(0.2)
+        case .destructive:
+            return Color.red.opacity(0.18)
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: title == nil ? 0 : 6) {
+            Image(systemName: systemImage)
+                .font(.caption.weight(.semibold))
+
+            if let title {
+                Text(title)
+                    .lineLimit(1)
+            }
+        }
+        .font(.caption.weight(.semibold))
+        .foregroundStyle(isDisabled ? .secondary : resolvedForegroundColor)
+        .frame(maxWidth: fullWidth ? .infinity : nil)
+        .frame(width: title == nil ? controlSize : nil, height: controlSize)
+        .padding(.horizontal, title == nil ? 0 : 12)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(backgroundColor)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(borderColor, lineWidth: 1)
+        )
+        .opacity(isDisabled ? 0.72 : 1)
+    }
+}
+
+struct DashboardActionButton: View {
+    let title: String?
+    let systemImage: String
+    var tone: DashboardActionTone = .neutral
+    var fullWidth: Bool = false
+    var isDisabled: Bool = false
+    var foregroundColor: Color? = nil
+    var controlSize: CGFloat = 34
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            DashboardActionLabel(
+                title: title,
+                systemImage: systemImage,
+                tone: tone,
+                fullWidth: fullWidth,
+                isDisabled: isDisabled,
+                foregroundColor: foregroundColor,
+                controlSize: controlSize
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(isDisabled)
+    }
+}

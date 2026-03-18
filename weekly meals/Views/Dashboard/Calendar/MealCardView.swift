@@ -49,6 +49,8 @@ enum MealSlot: String, CaseIterable, Identifiable, Codable {
 }
 
 struct MealCardView: View {
+    private static let contentAreaMinHeight: CGFloat = 76
+
     let slot: MealSlot
     let recipe: Recipe? // nil => brak wybranego posiłku
     var isEditable: Bool = true
@@ -155,7 +157,8 @@ struct MealCardView: View {
 
                     Spacer(minLength: 0)
                 }
-                .padding(10)
+                .frame(maxWidth: .infinity, minHeight: Self.contentAreaMinHeight, alignment: .leading)
+                .padding(8)
                 .background(
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
                         .fill(surfaceFill)
@@ -174,7 +177,7 @@ struct MealCardView: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
-                .frame(maxWidth: .infinity, minHeight: 52, alignment: .center)
+                .frame(maxWidth: .infinity, minHeight: Self.contentAreaMinHeight, alignment: .center)
                 .background(
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
                         .fill(surfaceFill)
@@ -230,7 +233,7 @@ struct MealCardView: View {
                     lineWidth: 1
                 )
         )
-        .frame(maxWidth: .infinity, minHeight: 68, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: Self.contentAreaMinHeight, alignment: .leading)
     }
 
     private func recipeMetaPill(icon: String, text: String) -> some View {

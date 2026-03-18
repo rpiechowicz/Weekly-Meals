@@ -136,7 +136,7 @@ struct RecipeDetailView: View {
                                 NutritionCard(title: "Kalorie", value: formatNutritionValue(recipe.nutritionPerServing.kcal, maximumFractionDigits: 0), unit: "kcal", icon: "flame.fill", color: .orange)
                                 NutritionCard(title: "Białko", value: formatNutritionValue(recipe.nutritionPerServing.protein), unit: "g", icon: "bolt.fill", color: .blue)
                                 NutritionCard(title: "Węglowodany", value: formatNutritionValue(recipe.nutritionPerServing.carbs), unit: "g", icon: "leaf.fill", color: .green)
-                                NutritionCard(title: "Tłuszcze", value: formatNutritionValue(recipe.nutritionPerServing.fat), unit: "g", icon: "drop.fill", color: .purple)
+                                NutritionCard(title: "Tłuszcze", value: formatNutritionValue(recipe.nutritionPerServing.fat), unit: "g", icon: "drop.fill", color: .pink)
                                 NutritionCard(title: "Błonnik", value: formatNutritionValue(recipe.nutritionPerServing.fiber), unit: "g", icon: "heart.fill", color: .pink)
                                 NutritionCard(title: "Sól", value: formatNutritionValue(recipe.nutritionPerServing.salt), unit: "g", icon: "sparkles", color: .cyan)
                             }

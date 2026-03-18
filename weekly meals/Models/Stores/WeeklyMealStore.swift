@@ -1383,19 +1383,25 @@ final class RecipeCatalogStore {
 
     @MainActor
     func loadRecipeDetail(recipeId: UUID) async -> Recipe? {
-        guard let index = recipes.firstIndex(where: { $0.id == recipeId }) else { return nil }
-        let current = recipes[index]
-        if !current.ingredients.isEmpty || !current.preparationSteps.isEmpty {
-            return current
+        if let index = recipes.firstIndex(where: { $0.id == recipeId }) {
+            let current = recipes[index]
+            if !current.ingredients.isEmpty && !current.preparationSteps.isEmpty {
+                return current
+            }
         }
 
         do {
             let detailed = try await repository.fetchRecipeById(recipeId)
-            recipes[index] = detailed
+            if let index = recipes.firstIndex(where: { $0.id == recipeId }) {
+                recipes[index] = detailed
+            } else {
+                recipes.append(detailed)
+            }
+            saveCache()
             return detailed
         } catch {
             errorMessage = UserFacingErrorMapper.message(from: error)
-            return current
+            return recipes.first(where: { $0.id == recipeId })
         }
     }
 

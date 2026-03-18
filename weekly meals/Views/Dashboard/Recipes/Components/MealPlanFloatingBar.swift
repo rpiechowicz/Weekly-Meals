@@ -8,16 +8,10 @@ struct MealPlanFloatingBar: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 12) {
-                Image(systemName: "square.stack.3d.up.fill")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.green)
-                    .frame(width: 30, height: 30)
-                    .background(Color.white.opacity(0.14), in: Circle())
-
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Wybrane przepisy")
-                        .font(.caption)
-                        .foregroundStyle(.white.opacity(0.75))
+                HStack(spacing: 8) {
+                    Image(systemName: "square.stack.3d.up.fill")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.95))
 
                     Text("\(totalCount)/\(maxCount)")
                         .font(.subheadline)
@@ -25,23 +19,43 @@ struct MealPlanFloatingBar: View {
                         .monospacedDigit()
                         .foregroundStyle(.white)
                 }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(Color.black.opacity(0.14))
+                )
 
                 Spacer()
+
                 Text("Podsumuj")
-                    .font(.caption)
+                    .font(.subheadline)
                     .fontWeight(.semibold)
-                    .foregroundStyle(.white.opacity(0.9))
+                    .foregroundStyle(.white)
 
                 Image(systemName: "chevron.up")
                     .font(.caption.weight(.bold))
-                    .foregroundStyle(.white.opacity(0.9))
+                    .foregroundStyle(.white.opacity(0.95))
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 13)
             .background(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(Color.green.opacity(0.9))
-                    .shadow(color: .green.opacity(0.24), radius: 12, y: 6)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(red: 0.18, green: 0.80, blue: 0.34),
+                                Color(red: 0.12, green: 0.69, blue: 0.29)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                    )
+                    .shadow(color: Color.black.opacity(0.18), radius: 18, y: 10)
             )
         }
         .buttonStyle(.plain)

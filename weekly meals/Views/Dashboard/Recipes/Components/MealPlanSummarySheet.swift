@@ -81,9 +81,12 @@ struct MealPlanSummarySheet: View {
                                 Text(slot.title)
                                 Spacer()
                                 Text("\(mealPlan.count(for: slot))/\(MealPlanViewModel.maxPerSlot)")
-                                    .font(.caption)
-                                    .fontWeight(.medium)
+                                    .font(.caption.weight(.semibold))
                                     .foregroundStyle(.secondary)
+                                    .monospacedDigit()
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color.white.opacity(0.08), in: Capsule())
                             }
                             .font(.subheadline)
                             .fontWeight(.semibold)
@@ -117,7 +120,10 @@ struct MealPlanSummarySheet: View {
             Text("Brak wybranych posiłków")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
+
+            Spacer(minLength: 0)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, 4)
     }
 
