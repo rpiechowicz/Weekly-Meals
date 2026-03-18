@@ -10,6 +10,7 @@ struct ProductsView: View {
     @Environment(\.datesViewModel) private var datesViewModel
     @Environment(\.colorScheme) private var colorScheme
     @State private var archivePendingDeletion: ArchivedShoppingList?
+    @State private var showDeleteAllHistoryAlert = false
     @State private var selectedFilter: ProductsFilter = .toBuy
 
     private static let weekRangeFormatter: DateFormatter = {
@@ -146,6 +147,14 @@ struct ProductsView: View {
             } message: {
                 Text("Ta operacja usunie zapisany wpis historyczny dla wybranego tygodnia.")
             }
+            .alert("Usunąć całą historię list?", isPresented: $showDeleteAllHistoryAlert) {
+                Button("Anuluj", role: .cancel) { }
+                Button("Usuń wszystko", role: .destructive) {
+                    shoppingListStore.deleteAllArchivedLists()
+                }
+            } message: {
+                Text("Ta operacja usunie wszystkie zapisane listy produktów z historii.")
+            }
             .task(id: datesViewModel.weekStartISO) {
                 selectedFilter = .toBuy
                 await shoppingListStore.load(weekStart: datesViewModel.weekStartISO)
@@ -261,25 +270,6 @@ struct ProductsView: View {
                         }
                     }
 
-                    Button {
-                        shoppingListStore.restoreArchivedList(weekStart: datesViewModel.weekStartISO)
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "arrow.uturn.backward")
-                            Text("Pokaż listę ponownie")
-                                .fontWeight(.semibold)
-                        }
-                        .font(.footnote)
-                        .foregroundStyle(.primary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .stroke(Color.white.opacity(0.12), lineWidth: 1)
-                        )
-                    }
-                    .buttonStyle(.plain)
                 }
                 .padding(18)
                 .dashboardLiquidCard(cornerRadius: 24, strokeOpacity: 0.2)
@@ -551,6 +541,18 @@ struct ProductsView: View {
 
                         Spacer(minLength: 0)
 
+                        Button {
+                            showDeleteAllHistoryAlert = true
+                        } label: {
+                            Image(systemName: "trash")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                                .frame(width: 28, height: 28)
+                                .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Usuń całą historię")
+
                         Text("\(shoppingListStore.archivedLists.count)")
                             .font(.caption2)
                             .fontWeight(.semibold)
@@ -612,6 +614,20 @@ struct ProductsView: View {
             }
 
             Spacer(minLength: 0)
+
+            if archive.weekStart == datesViewModel.weekStartISO {
+                Button {
+                    shoppingListStore.restoreArchivedList(weekStart: archive.weekStart)
+                } label: {
+                    Image(systemName: "arrow.uturn.backward")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 28, height: 28)
+                        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Otwórz listę \(archive.revision)")
+            }
 
             Button {
                 archivePendingDeletion = archive

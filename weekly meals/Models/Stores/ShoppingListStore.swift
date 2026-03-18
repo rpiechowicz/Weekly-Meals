@@ -425,6 +425,29 @@ final class ShoppingListStore {
               items.allSatisfy(\.isChecked)
         else { return }
 
+        let currentSignature = itemSignature(for: items)
+        if let existingIndex = archivedLists.firstIndex(where: {
+            $0.weekStart == weekStart && itemSignature(for: $0.items) == currentSignature
+        }) {
+            let existingArchive = archivedLists.remove(at: existingIndex)
+            let refreshedArchive = ArchivedShoppingList(
+                archiveId: existingArchive.archiveId,
+                weekStart: weekStart,
+                weekLabel: weekLabel,
+                revision: existingArchive.revision,
+                archivedAt: Date(),
+                items: items
+            )
+
+            archivedLists.insert(refreshedArchive, at: 0)
+            closedArchiveByWeek[weekStart] = refreshedArchive.id
+            openRevisionsByWeek.removeValue(forKey: weekStart)
+            persistArchivedLists()
+            persistClosedArchiveByWeek()
+            persistOpenRevisions()
+            return
+        }
+
         let nextRevision = (archivedLists.filter { $0.weekStart == weekStart }.map(\.revision).max() ?? 0) + 1
         let snapshot = ArchivedShoppingList(
             weekStart: weekStart,
@@ -453,6 +476,15 @@ final class ShoppingListStore {
         archivedLists.removeAll { $0.id == archiveId }
         closedArchiveByWeek = closedArchiveByWeek.filter { $0.value != archiveId }
         openRevisionsByWeek = openRevisionsByWeek.filter { $0.value.baseArchiveId != archiveId }
+        persistArchivedLists()
+        persistClosedArchiveByWeek()
+        persistOpenRevisions()
+    }
+
+    func deleteAllArchivedLists() {
+        archivedLists.removeAll()
+        closedArchiveByWeek.removeAll()
+        openRevisionsByWeek.removeAll()
         persistArchivedLists()
         persistClosedArchiveByWeek()
         persistOpenRevisions()
