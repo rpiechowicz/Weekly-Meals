@@ -4,6 +4,7 @@ struct CalendarView: View {
     @Environment(\.weeklyMealStore) private var mealStore
     @Environment(\.datesViewModel) private var datesViewModel
     @Environment(\.recipeCatalogStore) private var recipeCatalogStore
+    @Environment(\.colorScheme) private var colorScheme
 
     @State private var slotToPick: MealSlot? = nil
     @State private var detailRecipe: Recipe? = nil
@@ -179,19 +180,14 @@ struct CalendarView: View {
 
     private var dayHeader: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .top, spacing: 10) {
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(datesViewModel.formattedDate(datesViewModel.selectedDate))
-                        .font(.system(size: 18, weight: .semibold, design: .rounded))
-                        .fontWeight(.semibold)
-                }
+            HStack(spacing: 10) {
+                Text(datesViewModel.formattedDate(datesViewModel.selectedDate))
+                    .font(.system(size: 18, weight: .semibold, design: .rounded))
+                    .fontWeight(.semibold)
 
                 Spacer(minLength: 8)
-
-                if !isDayEditable {
-                    pastDayBadge
-                }
             }
+            .frame(minHeight: 30, alignment: .leading)
 
             nutritionPanel
         }
@@ -199,23 +195,6 @@ struct CalendarView: View {
         .padding(12)
         .dashboardLiquidCard(cornerRadius: 20, strokeOpacity: 0.18)
         .padding(.horizontal, 16)
-    }
-
-    private var pastDayBadge: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "lock.fill")
-            Text("Archiwum")
-        }
-        .font(.caption)
-        .fontWeight(.semibold)
-        .foregroundStyle(.secondary)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(Color.white.opacity(0.16), in: Capsule())
-        .overlay(
-            Capsule()
-                .stroke(Color.white.opacity(0.24), lineWidth: 1)
-        )
     }
 
     private var nutritionPanel: some View {
@@ -280,11 +259,11 @@ struct CalendarView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.white.opacity(0.05))
+                .fill(DashboardPalette.surface(colorScheme, level: .secondary))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                .stroke(DashboardPalette.neutralBorder(colorScheme, opacity: 0.08), lineWidth: 1)
         )
     }
 
@@ -325,12 +304,8 @@ private struct CalendarLiquidBackground: View {
         ZStack {
             LinearGradient(
                 colors: [
-                    colorScheme == .dark
-                        ? Color(red: 0.08, green: 0.09, blue: 0.11)
-                        : Color(red: 0.95, green: 0.96, blue: 0.98),
-                    colorScheme == .dark
-                        ? Color(red: 0.05, green: 0.06, blue: 0.07)
-                        : Color(red: 0.92, green: 0.94, blue: 0.97)
+                    DashboardPalette.backgroundTop(for: colorScheme),
+                    DashboardPalette.backgroundBottom(for: colorScheme)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing

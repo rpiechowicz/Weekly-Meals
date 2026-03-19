@@ -24,6 +24,28 @@ struct WeeklyPlanView: View {
         return "\(Self.weekRangeFormatter.string(from: first)) - \(Self.weekRangeFormatter.string(from: last))"
     }
 
+    private var plannedMealsCount: Int {
+        MealSlot.allCases.reduce(into: 0) { result, slot in
+            result += mealStore.savedPlan.entries(for: slot).count
+        }
+    }
+
+    private var totalMealCapacity: Int {
+        MealSlot.allCases.count * MealPlanViewModel.maxPerSlot
+    }
+
+    private var heroHelperText: String {
+        if plannedMealsCount == 0 {
+            return "Ten plan będzie później bazą do szybkiego układania dni w kalendarzu i tworzenia listy zakupów."
+        }
+
+        if plannedMealsCount == totalMealCapacity {
+            return "Możesz teraz zostawić go tak, jak jest, albo wejść w edycję i podmienić przepisy przed użyciem w kalendarzu."
+        }
+
+        return "To Twój tygodniowy szablon posiłków. Możesz go dalej uzupełniać albo już teraz wykorzystać jako bazę do kalendarza i zakupów."
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -62,7 +84,6 @@ struct WeeklyPlanView: View {
                             weekStart: datesViewModel.weekStartISO,
                             dates: datesViewModel.dates
                         )
-                        await mealStore.clearSavedPlanFromBackend(weekStart: datesViewModel.weekStartISO)
                         await shoppingListStore.load(weekStart: datesViewModel.weekStartISO, force: true)
                     }
                 }
@@ -74,24 +95,21 @@ struct WeeklyPlanView: View {
     }
 
     private var heroCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .top, spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(weekRangeText)
-                        .font(.title3)
-                        .fontWeight(.bold)
-                        .fontDesign(.rounded)
-
-                    Text(mealStore.hasSavedPlan ? "Plan gotowy do użycia w kalendarzu" : "Ułóż zestaw posiłków na ten tydzień")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                }
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .center, spacing: 12) {
+                Text(weekRangeText)
+                    .font(.system(size: 22, weight: .bold, design: .rounded))
 
                 Spacer(minLength: 8)
 
                 heroActions
             }
+            .padding(.bottom, 6)
+
+            Text(heroHelperText)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -131,10 +149,13 @@ struct WeeklyPlanView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
                 Image(systemName: slot.icon)
-                    .font(.subheadline)
+                    .font(.subheadline.weight(.semibold))
                     .foregroundStyle(slot.accentColor)
-                    .frame(width: 30, height: 30)
-                    .background(slot.accentColor.opacity(0.14), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .frame(width: 36, height: 36)
+                    .background(
+                        slot.accentColor.opacity(colorScheme == .dark ? 0.22 : 0.18),
+                        in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    )
 
                 Text(slot.title)
                     .font(.subheadline)
@@ -175,11 +196,11 @@ struct WeeklyPlanView: View {
                 .padding(.vertical, 8)
                 .background(
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(Color.white.opacity(0.05))
+                        .fill(DashboardPalette.surface(colorScheme, level: .tertiary))
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                        .stroke(DashboardPalette.neutralBorder(colorScheme, opacity: 0.1), lineWidth: 1)
                 )
             } else {
                 VStack(spacing: 8) {
@@ -208,12 +229,8 @@ struct WeeklyPlanView: View {
         ZStack {
             LinearGradient(
                 colors: [
-                    colorScheme == .dark
-                        ? Color(red: 0.08, green: 0.09, blue: 0.11)
-                        : Color(red: 0.95, green: 0.96, blue: 0.98),
-                    colorScheme == .dark
-                        ? Color(red: 0.05, green: 0.06, blue: 0.07)
-                        : Color(red: 0.92, green: 0.94, blue: 0.97)
+                    DashboardPalette.backgroundTop(for: colorScheme),
+                    DashboardPalette.backgroundBottom(for: colorScheme)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
@@ -306,18 +323,18 @@ private struct PlanRecipeRow: View {
                 .background(slot.accentColor, in: Capsule())
                 .overlay(
                     Capsule()
-                        .stroke(Color.white.opacity(0.28), lineWidth: 1)
+                        .stroke(DashboardPalette.neutralBorder(colorScheme, opacity: 0.12), lineWidth: 1)
                 )
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 9)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.white.opacity(colorScheme == .dark ? 0.1 : 0.16))
+                .fill(DashboardPalette.surface(colorScheme, level: .secondary))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color.white.opacity(0.18), lineWidth: 1)
+                .stroke(DashboardPalette.neutralBorder(colorScheme, opacity: 0.14), lineWidth: 1)
         )
     }
 
@@ -332,7 +349,7 @@ private struct PlanRecipeRow: View {
         .padding(.vertical, 3.5)
         .background(
             Capsule()
-                .fill(Color.white.opacity(colorScheme == .dark ? 0.09 : 0.2))
+                .fill(DashboardPalette.surface(colorScheme, level: .tertiary))
         )
     }
 
@@ -348,6 +365,7 @@ private struct WeeklyPlanEditorView: View {
     @Environment(\.weeklyMealStore) private var mealStore
     @Environment(\.datesViewModel) private var datesViewModel
     @Environment(\.recipeCatalogStore) private var recipeCatalogStore
+    @Environment(\.colorScheme) private var colorScheme
 
     @State private var selectedCategory: RecipesCategory = .all
     @State private var searchText = ""
@@ -415,12 +433,10 @@ private struct WeeklyPlanEditorView: View {
 
                 ScrollView {
                     VStack(spacing: 0) {
-                        editorStatusCard
+                        editorSelectionOverview
                             .padding(.horizontal, 12)
                             .padding(.top, 8)
-                            .padding(.bottom, 8)
-
-                        RecipeFilters(categories: categories, selectedCategory: $selectedCategory)
+                        .padding(.bottom, 10)
 
                         if let errorMessage = recipeCatalogStore.errorMessage {
                             Text(errorMessage)
@@ -435,7 +451,7 @@ private struct WeeklyPlanEditorView: View {
                             LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: 16)], spacing: 16) {
                                 ForEach(0..<6, id: \.self) { _ in
                                     RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                        .fill(Color.white.opacity(0.06))
+                                        .fill(DashboardPalette.surface(colorScheme, level: .tertiary))
                                         .frame(height: 250)
                                         .redacted(reason: .placeholder)
                                 }
@@ -590,53 +606,137 @@ private struct WeeklyPlanEditorView: View {
     }
 
     private var editorStatusCard: some View {
-        HStack(spacing: 10) {
-            editorSlotSummaryTile(slot: .breakfast, count: mealPlan.count(for: .breakfast), tint: .orange)
-            editorSlotSummaryTile(slot: .lunch, count: mealPlan.count(for: .lunch), tint: .blue)
-            editorSlotSummaryTile(slot: .dinner, count: mealPlan.count(for: .dinner), tint: .purple)
+        VStack(spacing: 0) {
+            ForEach(Array(MealSlot.allCases.enumerated()), id: \.element.id) { index, slot in
+                editorSlotProgressRow(slot: slot, tint: slot.accentColor)
+
+                if index < MealSlot.allCases.count - 1 {
+                    Rectangle()
+                        .fill(DashboardPalette.neutralBorder(colorScheme, opacity: 0.08))
+                        .frame(height: 1)
+                        .padding(.leading, 52)
+                        .padding(.vertical, 2)
+                }
+            }
         }
-        .padding(10)
+        .padding(.horizontal, 10)
+        .padding(.top, 10)
+        .padding(.bottom, 16)
         .background(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Color.white.opacity(0.07))
+                .fill(DashboardPalette.surface(colorScheme, level: .tertiary))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                .stroke(DashboardPalette.neutralBorder(colorScheme, opacity: 0.12), lineWidth: 1)
         )
     }
 
-    private func editorSlotSummaryTile(slot: MealSlot, count: Int, tint: Color) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Image(systemName: slot.icon)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(tint)
-                    .frame(width: 24, height: 24)
-                    .background(tint.opacity(0.12), in: Circle())
+    private var editorSelectionOverview: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .top, spacing: 14) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Wybierz przepisy")
+                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                        .fontDesign(.rounded)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
 
-                Text(slot.title)
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.85)
+                    Text("Dobierz przepisy na cały tydzień i użyj filtra po prawej, żeby szybciej zbudować śniadania, obiady oraz kolacje. Ten wybór od razu układa rytm całego planu poniżej.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .layoutPriority(1)
+
+                Spacer(minLength: 8)
+
+                RecipeFilters(categories: categories, selectedCategory: $selectedCategory)
+                    .padding(.top, 4)
             }
 
-            Text("\(count)/\(MealPlanViewModel.maxPerSlot)")
-                .font(.headline)
-                .fontWeight(.bold)
-                .monospacedDigit()
-                .foregroundStyle(.primary)
+            editorStatusCard
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 11)
-        .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(tint.opacity(0.18), lineWidth: 1)
-        )
+    }
+
+    private func editorSlotProgressRow(slot: MealSlot, tint: Color) -> some View {
+        let count = mealPlan.count(for: slot)
+        let remaining = max(MealPlanViewModel.maxPerSlot - count, 0)
+        let progress = CGFloat(count) / CGFloat(MealPlanViewModel.maxPerSlot)
+
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .center, spacing: 12) {
+                Image(systemName: slot.icon)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(tint)
+                    .frame(width: 32, height: 32)
+                    .background(tint.opacity(colorScheme == .dark ? 0.16 : 0.14), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(slot.title)
+                        .font(.subheadline.weight(.semibold))
+                        .fontDesign(.rounded)
+
+                    Text(editorSlotProgressDescription(count: count, remaining: remaining))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 8)
+
+                Text("\(count)/\(MealPlanViewModel.maxPerSlot)")
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(.primary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(DashboardPalette.surface(colorScheme, level: .secondary), in: Capsule())
+            }
+
+            GeometryReader { geometry in
+                let width = geometry.size.width
+                let progressWidth = count == 0 ? 0 : max(width * progress, 8)
+
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(DashboardPalette.surface(colorScheme, level: .secondary))
+
+                    Capsule()
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    tint.opacity(colorScheme == .dark ? 0.92 : 0.86),
+                                    slot.secondaryAccentColor.opacity(colorScheme == .dark ? 0.74 : 0.62)
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(width: progressWidth)
+                }
+            }
+            .frame(height: 8)
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 8)
+        .accessibilityLabel("\(slot.title): \(count) z \(MealPlanViewModel.maxPerSlot)")
+    }
+
+    private func editorSlotProgressDescription(count: Int, remaining: Int) -> String {
+        if count == 0 {
+            return "Jeszcze nic tu nie wybrano."
+        }
+
+        if remaining == 0 {
+            return "Ta pora dnia jest już domknięta na cały tydzień."
+        }
+
+        if remaining == 1 {
+            return "Brakuje jeszcze 1 przepisu."
+        }
+
+        return "Brakuje jeszcze \(remaining) przepisów."
     }
 
     private var emptyStateMessage: String {
@@ -658,27 +758,6 @@ private struct WeeklyPlanEditorView: View {
 
 private struct WeeklyPlanEditorBackground: View {
     var body: some View {
-        ZStack {
-            LinearGradient(
-                colors: [
-                    Color(red: 0.12, green: 0.15, blue: 0.18),
-                    Color(red: 0.09, green: 0.11, blue: 0.14)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-
-            Circle()
-                .fill(Color.blue.opacity(0.14))
-                .frame(width: 260, height: 260)
-                .blur(radius: 90)
-                .offset(x: -140, y: -220)
-
-            Circle()
-                .fill(Color.cyan.opacity(0.08))
-                .frame(width: 280, height: 280)
-                .blur(radius: 100)
-                .offset(x: 160, y: 260)
-        }
+        DashboardSheetBackground(theme: .plan)
     }
 }

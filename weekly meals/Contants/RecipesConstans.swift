@@ -1,4 +1,4 @@
-import Foundation
+import SwiftUI
 /// Stałe i pomocnicze funkcje związane z widokiem/przepisami.
 enum RecipesConstants {
     /// Polski tytuł dla kategorii przepisu.
@@ -30,5 +30,21 @@ enum RecipesConstants {
         @unknown default: return "questionmark.circle"
         }
     }
-}
 
+    static func tint(for category: RecipesCategory) -> Color {
+        switch category {
+        case .all:
+            return .blue
+        case .favourite:
+            return .pink
+        case .breakfast:
+            return .orange
+        case .lunch:
+            return .blue
+        case .dinner:
+            return .purple
+        @unknown default:
+            return .teal
+        }
+    }
+}

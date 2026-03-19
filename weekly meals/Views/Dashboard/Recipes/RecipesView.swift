@@ -2,6 +2,7 @@ import SwiftUI
 
 struct RecipesView: View {
     @Environment(\.recipeCatalogStore) private var recipeCatalogStore
+    @Environment(\.colorScheme) private var colorScheme
 
     @State private var selectedCategory: RecipesCategory = .all
     @State private var searchText = ""
@@ -37,21 +38,19 @@ struct RecipesView: View {
         recipeCatalogStore.isLoading && recipeCatalogStore.recipes.isEmpty
     }
 
-    private var selectedCategoryTitle: String {
-        selectedCategory == .all
-        ? "Wszystkie przepisy"
-        : RecipesConstants.displayName(for: selectedCategory)
-    }
+    private var recipesHelperText: String {
+        if !searchText.isEmpty {
+            return "Przeglądaj wyniki, zmień filtr po prawej i stuknij przepis, aby zobaczyć szczegóły."
+        }
 
-    private var hasActiveFilters: Bool {
-        selectedCategory != .all || !searchText.isEmpty
+        return "Przeglądaj bazę przepisów, filtruj kategorie i otwieraj dania, aby podejrzeć składniki oraz opis."
     }
 
     private var recipesSummaryCard: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top, spacing: 12) {
+            HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(searchText.isEmpty ? selectedCategoryTitle : "Wyniki wyszukiwania")
+                    Text(searchText.isEmpty ? "Wszystkie przepisy" : "Wyniki wyszukiwania")
                         .font(.title3)
                         .fontWeight(.bold)
                         .fontDesign(.rounded)
@@ -64,85 +63,20 @@ struct RecipesView: View {
 
                 Spacer(minLength: 8)
 
-                if hasActiveFilters {
-                    Button("Wyczyść") {
-                        withAnimation(.easeInOut(duration: 0.18)) {
-                            selectedCategory = .all
-                            searchText = ""
-                            debouncedSearchText = ""
-                        }
-                    }
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(.blue)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(Color.blue.opacity(0.13), in: Capsule())
-                    .buttonStyle(.plain)
-                }
+                RecipeFilters(categories: categories, selectedCategory: $selectedCategory)
             }
 
-            categoryChips
+            Text(recipesHelperText)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(16)
         .dashboardLiquidCard(cornerRadius: 22, strokeOpacity: 0.22)
     }
 
-    private var categoryChips: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(categories, id: \.self) { category in
-                    let isSelected = selectedCategory == category
-                    let tint = categoryColor(for: category)
-
-                    Button {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.84)) {
-                            selectedCategory = category
-                        }
-                    } label: {
-                        HStack(spacing: 5) {
-                            Image(systemName: RecipesConstants.icon(for: category))
-                                .font(.caption.weight(.semibold))
-
-                            Text(RecipesConstants.displayName(for: category))
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                        }
-                        .foregroundStyle(isSelected ? tint : Color.primary)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 7)
-                        .background(
-                            Capsule()
-                                .fill(isSelected ? tint.opacity(0.18) : Color.white.opacity(0.14))
-                        )
-                        .overlay(
-                            Capsule()
-                                .stroke(
-                                    isSelected ? tint.opacity(0.36) : Color.white.opacity(0.2),
-                                    lineWidth: 1
-                                )
-                        )
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.horizontal, 1)
-        }
-    }
-
     private func resultsLabel(for count: Int) -> String {
         count == 1 ? "przepis" : "przepisy"
-    }
-
-    private func categoryColor(for category: RecipesCategory) -> Color {
-        switch category {
-        case .all: return .blue
-        case .favourite: return .pink
-        case .breakfast: return .orange
-        case .lunch: return .blue
-        case .dinner: return .purple
-        @unknown default: return .teal
-        }
     }
 
     var body: some View {
@@ -169,7 +103,7 @@ struct RecipesView: View {
                             LazyVGrid(columns: [GridItem(.adaptive(minimum: 165), spacing: 12)], spacing: 12) {
                                 ForEach(0..<6, id: \.self) { _ in
                                     RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                        .fill(Color.white.opacity(0.08))
+                                        .fill(DashboardPalette.surface(colorScheme, level: .tertiary))
                                         .frame(height: 232)
                                         .redacted(reason: .placeholder)
                                 }
@@ -269,12 +203,8 @@ private struct RecipesLiquidBackground: View {
         ZStack {
             LinearGradient(
                 colors: [
-                    colorScheme == .dark
-                        ? Color(red: 0.08, green: 0.09, blue: 0.11)
-                        : Color(red: 0.95, green: 0.96, blue: 0.98),
-                    colorScheme == .dark
-                        ? Color(red: 0.05, green: 0.06, blue: 0.07)
-                        : Color(red: 0.92, green: 0.94, blue: 0.97)
+                    DashboardPalette.backgroundTop(for: colorScheme),
+                    DashboardPalette.backgroundBottom(for: colorScheme)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
@@ -321,10 +251,10 @@ private struct RecipeGridCard: View {
                             .font(.caption.weight(.bold))
                             .foregroundStyle(.pink)
                             .frame(width: 26, height: 26)
-                            .background(Color.white.opacity(colorScheme == .dark ? 0.16 : 0.26), in: Circle())
+                            .background(DashboardPalette.surface(colorScheme, level: .secondary), in: Circle())
                             .overlay(
                                 Circle()
-                                    .stroke(Color.white.opacity(0.25), lineWidth: 1)
+                                    .stroke(DashboardPalette.neutralBorder(colorScheme, opacity: 0.12), lineWidth: 1)
                             )
                             .padding(.trailing, 10)
                             .padding(.top, 10)
@@ -383,7 +313,7 @@ private struct RecipeGridCard: View {
     private var placeholderThumb: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(categoryTint.opacity(colorScheme == .dark ? 0.22 : 0.14))
+                .fill(categoryTint.opacity(colorScheme == .dark ? 0.22 : 0.18))
 
             Image(systemName: "fork.knife")
                 .font(.title3)
@@ -406,11 +336,11 @@ private struct RecipeGridCard: View {
         .padding(.vertical, 5)
         .background(
             Capsule()
-                .fill(Color.black.opacity(colorScheme == .dark ? 0.44 : 0.28))
+                .fill(Color.black.opacity(colorScheme == .dark ? 0.44 : 0.4))
         )
         .overlay(
             Capsule()
-                .stroke(Color.white.opacity(0.22), lineWidth: 0.8)
+                .stroke(DashboardPalette.neutralBorder(colorScheme, opacity: 0.1), lineWidth: 0.8)
         )
         .shadow(color: .black.opacity(0.22), radius: 6, x: 0, y: 2)
     }
@@ -425,7 +355,7 @@ private struct RecipeGridCard: View {
         .foregroundStyle(.secondary)
         .padding(.horizontal, 7)
         .padding(.vertical, 4)
-        .background(Color.white.opacity(colorScheme == .dark ? 0.09 : 0.2), in: Capsule())
+        .background(DashboardPalette.surface(colorScheme, level: .tertiary), in: Capsule())
     }
 
     private var categoryTint: Color {

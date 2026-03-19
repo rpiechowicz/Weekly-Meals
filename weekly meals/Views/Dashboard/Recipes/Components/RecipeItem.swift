@@ -129,7 +129,12 @@ struct RecipeItemView: View {
         .background(cardFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(isSelected ? Color.green.opacity(0.8) : Color.white.opacity(0.12), lineWidth: isSelected ? 2 : 1)
+                .stroke(
+                    isSelected
+                        ? Color.green.opacity(colorScheme == .dark ? 0.8 : 0.65)
+                        : DashboardPalette.neutralBorder(colorScheme, opacity: 0.12),
+                    lineWidth: isSelected ? 2 : 1
+                )
         )
         .frame(height: 286)
     }
@@ -152,7 +157,7 @@ struct RecipeItemView: View {
             .foregroundStyle(.secondary)
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
-            .background(Color.white.opacity(colorScheme == .dark ? 0.08 : 0.16), in: Capsule())
+            .background(DashboardPalette.surface(colorScheme, level: .tertiary), in: Capsule())
     }
 
     private func infoPill(icon: String, text: String) -> some View {
@@ -164,7 +169,7 @@ struct RecipeItemView: View {
         .foregroundStyle(.secondary)
         .padding(.horizontal, 7)
         .padding(.vertical, 4)
-        .background(Color.white.opacity(colorScheme == .dark ? 0.08 : 0.16), in: Capsule())
+        .background(DashboardPalette.surface(colorScheme, level: .tertiary), in: Capsule())
     }
 
     private var planningFooter: some View {
@@ -186,12 +191,10 @@ struct RecipeItemView: View {
 
     private var cardFill: Color {
         if isSelected {
-            return Color.green.opacity(colorScheme == .dark ? 0.12 : 0.08)
+            return DashboardPalette.tintFill(.green, scheme: colorScheme, dark: 0.12, light: 0.13)
         }
 
-        return colorScheme == .dark
-            ? Color.white.opacity(0.08)
-            : Color.white.opacity(0.18)
+        return DashboardPalette.surface(colorScheme, level: .secondary)
     }
 }
 

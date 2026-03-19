@@ -72,7 +72,12 @@ struct SettingsView: View {
                     .ignoresSafeArea()
 
                 ScrollView {
-                    VStack(spacing: 14) {
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text("Zarządzaj kontem, gospodarstwem domowym oraz ustawieniami aplikacji w jednym miejscu.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+
                         profileCard
                         menuCard
                     }
@@ -221,7 +226,7 @@ struct SettingsView: View {
     private var createHouseholdSheet: some View {
         NavigationStack {
             ZStack {
-                SettingsLiquidBackground()
+                DashboardSheetBackground(theme: .indigo)
                     .ignoresSafeArea()
 
                 ScrollView {
@@ -242,10 +247,10 @@ struct SettingsView: View {
                                 .textInputAutocapitalization(.words)
                                 .padding(.horizontal, 14)
                                 .padding(.vertical, 14)
-                                .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                                .background(DashboardPalette.surface(colorScheme, level: .secondary), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                        .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                                        .stroke(DashboardPalette.neutralBorder(colorScheme, opacity: 0.12), lineWidth: 1)
                                 )
                         }
                         .padding(18)
@@ -268,12 +273,17 @@ struct SettingsView: View {
                                             endPoint: .trailing
                                         )
                                     )
-                                    : AnyShapeStyle(Color.white.opacity(0.08)),
+                                    : AnyShapeStyle(DashboardPalette.surface(colorScheme, level: .secondary)),
                                     in: RoundedRectangle(cornerRadius: 16, style: .continuous)
                                 )
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                        .stroke(Color.white.opacity(canSubmitCreateHousehold ? 0.2 : 0.12), lineWidth: 1)
+                                        .stroke(
+                                            canSubmitCreateHousehold
+                                                ? DashboardPalette.neutralBorder(colorScheme, opacity: 0.18)
+                                                : DashboardPalette.neutralBorder(colorScheme, opacity: 0.12),
+                                            lineWidth: 1
+                                        )
                                 )
                         }
                         .buttonStyle(.plain)
@@ -302,7 +312,7 @@ struct SettingsView: View {
     private var householdManagementSheet: some View {
         NavigationStack {
             ZStack {
-                SettingsLiquidBackground()
+                DashboardSheetBackground(theme: .spring)
                     .ignoresSafeArea()
 
                 ScrollView {
@@ -363,7 +373,8 @@ struct SettingsView: View {
                 DashboardActionButton(
                     title: nil,
                     systemImage: "rectangle.portrait.and.arrow.right",
-                    tone: .destructive,
+                    tone: colorScheme == .dark ? .destructive : .neutral,
+                    foregroundColor: colorScheme == .dark ? nil : .red,
                     controlSize: 30
                 ) {
                     showLeaveHouseholdAlert = true
@@ -373,7 +384,7 @@ struct SettingsView: View {
             }
         }
         .padding(18)
-        .dashboardLiquidCard(cornerRadius: 22, strokeOpacity: 0.16)
+        .dashboardLiquidCard(cornerRadius: 22, strokeOpacity: 0.18)
     }
 
     private var householdMembersCard: some View {
@@ -390,7 +401,8 @@ struct SettingsView: View {
                             DashboardActionLabel(
                                 title: nil,
                                 systemImage: "plus",
-                                tone: .accent(.blue),
+                                tone: colorScheme == .dark ? .accent(.blue) : .neutral,
+                                foregroundColor: colorScheme == .dark ? nil : .blue,
                                 controlSize: 30
                             )
                         }
@@ -402,7 +414,8 @@ struct SettingsView: View {
                         DashboardActionButton(
                             title: nil,
                             systemImage: "plus",
-                            tone: .accent(.blue),
+                            tone: colorScheme == .dark ? .accent(.blue) : .neutral,
+                            foregroundColor: colorScheme == .dark ? nil : .blue,
                             controlSize: 30
                         ) {
                             Task { await createInvitationLink() }
@@ -440,7 +453,7 @@ struct SettingsView: View {
             }
         }
         .padding(18)
-        .dashboardLiquidCard(cornerRadius: 22, strokeOpacity: 0.16)
+        .dashboardLiquidCard(cornerRadius: 22, strokeOpacity: 0.18)
     }
 
     private var householdEmptyCard: some View {
@@ -466,7 +479,7 @@ struct SettingsView: View {
     private var preferencesSheet: some View {
         NavigationStack {
             ZStack {
-                SettingsLiquidBackground()
+                DashboardSheetBackground(theme: .twilight)
                     .ignoresSafeArea()
 
                 ScrollView {
@@ -586,10 +599,20 @@ struct SettingsView: View {
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 13)
-            .background(Color.white.opacity(selected ? 0.08 : 0.04), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .background(
+                selected
+                    ? DashboardPalette.surface(colorScheme, level: .emphasized)
+                    : DashboardPalette.surface(colorScheme, level: .secondary),
+                in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+            )
             .overlay(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(selected ? Color.blue.opacity(0.2) : Color.white.opacity(0.08), lineWidth: 1)
+                    .stroke(
+                        selected
+                            ? Color.blue.opacity(colorScheme == .dark ? 0.2 : 0.32)
+                            : DashboardPalette.neutralBorder(colorScheme, opacity: 0.08),
+                        lineWidth: 1
+                    )
             )
         }
         .buttonStyle(.plain)
@@ -648,7 +671,7 @@ struct SettingsView: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color.white.opacity(0.18), lineWidth: 1)
+                .stroke(DashboardPalette.neutralBorder(colorScheme, opacity: 0.14), lineWidth: 1)
         )
     }
 
@@ -745,7 +768,17 @@ struct SettingsView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(
+            DashboardPalette.surface(
+                colorScheme,
+                level: colorScheme == .dark ? .secondary : .tertiary
+            ),
+            in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(DashboardPalette.neutralBorder(colorScheme, opacity: colorScheme == .dark ? 0.08 : 0.11), lineWidth: 1)
+        )
     }
 
     @ViewBuilder
@@ -807,12 +840,8 @@ private struct SettingsLiquidBackground: View {
         ZStack {
             LinearGradient(
                 colors: [
-                    colorScheme == .dark
-                        ? Color(red: 0.08, green: 0.09, blue: 0.11)
-                        : Color(red: 0.95, green: 0.96, blue: 0.98),
-                    colorScheme == .dark
-                        ? Color(red: 0.05, green: 0.06, blue: 0.07)
-                        : Color(red: 0.92, green: 0.94, blue: 0.97)
+                    DashboardPalette.backgroundTop(for: colorScheme),
+                    DashboardPalette.backgroundBottom(for: colorScheme)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing

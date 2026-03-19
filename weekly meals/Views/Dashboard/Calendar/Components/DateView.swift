@@ -53,23 +53,19 @@ struct DateView: View {
         if isSelected {
             return colorScheme == .dark
                 ? Color.blue.opacity(0.26)
-                : Color.blue.opacity(0.18)
+                : Color.blue.opacity(0.22)
         }
 
-        return colorScheme == .dark
-            ? Color.white.opacity(0.07)
-            : Color.white.opacity(0.24)
+        return DashboardPalette.surface(colorScheme, level: .secondary)
     }
 
     private var cardStroke: Color {
         if isSelected {
             return colorScheme == .dark
                 ? Color.cyan.opacity(0.5)
-                : Color.blue.opacity(0.42)
+                : Color.blue.opacity(0.5)
         }
 
-        return colorScheme == .dark
-            ? Color.white.opacity(0.16)
-            : Color.white.opacity(0.3)
+        return DashboardPalette.neutralBorder(colorScheme, opacity: 0.16)
     }
 }

@@ -67,7 +67,7 @@ struct MealPickerSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                MealPickerLiquidBackground(slot: slot)
+                DashboardSheetBackground(theme: slot.mealPickerSheetTheme)
                     .ignoresSafeArea()
 
                 ScrollView {
@@ -196,7 +196,7 @@ struct MealPickerSheet: View {
                     .foregroundStyle(slot.accentColor)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 8)
-                    .background(slot.accentColor.opacity(0.14), in: Capsule())
+                    .background(slot.accentColor.opacity(colorScheme == .dark ? 0.14 : 0.18), in: Capsule())
             }
         }
         .padding(.horizontal, 2)
@@ -252,7 +252,7 @@ struct MealPickerSheet: View {
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
                         .background(
-                            isAvailable ? slot.accentColor : Color.white.opacity(0.18),
+                            isAvailable ? slot.accentColor : DashboardPalette.surface(colorScheme, level: .emphasized),
                             in: Capsule()
                         )
 
@@ -264,12 +264,12 @@ struct MealPickerSheet: View {
             .padding(14)
             .background(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(Color.white.opacity(colorScheme == .dark ? 0.1 : 0.22))
+                    .fill(DashboardPalette.surface(colorScheme, level: .secondary))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
                     .stroke(
-                        isAvailable ? slot.accentColor.opacity(0.36) : Color.white.opacity(0.2),
+                        isAvailable ? slot.accentColor.opacity(colorScheme == .dark ? 0.36 : 0.48) : DashboardPalette.neutralBorder(colorScheme, opacity: 0.12),
                         lineWidth: 1
                     )
             )
@@ -330,40 +330,19 @@ struct MealPickerSheet: View {
         .foregroundStyle(.secondary)
         .padding(.horizontal, 7)
         .padding(.vertical, 4)
-        .background(Color.white.opacity(0.16), in: Capsule())
+        .background(DashboardPalette.surface(colorScheme, level: .tertiary), in: Capsule())
     }
 }
 
-private struct MealPickerLiquidBackground: View {
-    @Environment(\.colorScheme) private var colorScheme
-    let slot: MealSlot
-
-    var body: some View {
-        ZStack {
-            LinearGradient(
-                colors: [
-                    colorScheme == .dark
-                        ? Color(red: 0.07, green: 0.08, blue: 0.1)
-                        : Color(red: 0.94, green: 0.96, blue: 0.98),
-                    colorScheme == .dark
-                        ? Color(red: 0.05, green: 0.06, blue: 0.08)
-                        : Color(red: 0.91, green: 0.94, blue: 0.97)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-
-            Circle()
-                .fill(slot.accentColor.opacity(colorScheme == .dark ? 0.26 : 0.14))
-                .frame(width: 260, height: 260)
-                .blur(radius: 95)
-                .offset(x: -130, y: -220)
-
-            Circle()
-                .fill(slot.secondaryAccentColor.opacity(colorScheme == .dark ? 0.2 : 0.12))
-                .frame(width: 280, height: 280)
-                .blur(radius: 100)
-                .offset(x: 150, y: 250)
+private extension MealSlot {
+    var mealPickerSheetTheme: DashboardSheetTheme {
+        switch self {
+        case .breakfast:
+            return .sunrise
+        case .lunch:
+            return .ocean
+        case .dinner:
+            return .plum
         }
     }
 }

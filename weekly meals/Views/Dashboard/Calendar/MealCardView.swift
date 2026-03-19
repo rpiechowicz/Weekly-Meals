@@ -49,7 +49,9 @@ enum MealSlot: String, CaseIterable, Identifiable, Codable {
 }
 
 struct MealCardView: View {
+    private static let headerMinHeight: CGFloat = 42
     private static let contentAreaMinHeight: CGFloat = 76
+    private static let contentPanelHeight: CGFloat = 92
 
     let slot: MealSlot
     let recipe: Recipe? // nil => brak wybranego posiłku
@@ -100,7 +102,7 @@ struct MealCardView: View {
     private var placeholderThumb: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(slot.accentColor.opacity(colorScheme == .dark ? 0.22 : 0.15))
+                .fill(slot.accentColor.opacity(colorScheme == .dark ? 0.22 : 0.18))
             Image(systemName: "fork.knife")
                 .font(.title3)
                 .foregroundStyle(slot.accentColor)
@@ -114,7 +116,7 @@ struct MealCardView: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(slot.accentColor)
                     .frame(width: 36, height: 36)
-                    .background(slot.accentColor.opacity(colorScheme == .dark ? 0.22 : 0.14), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .background(slot.accentColor.opacity(colorScheme == .dark ? 0.22 : 0.18), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 1) {
                     Text(slot.title)
@@ -123,6 +125,8 @@ struct MealCardView: View {
                     Text(statusSubtitle)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.92)
                 }
 
                 Spacer(minLength: 8)
@@ -134,9 +138,10 @@ struct MealCardView: View {
                         .foregroundStyle(slot.accentColor)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
-                        .background(slot.accentColor.opacity(colorScheme == .dark ? 0.2 : 0.12), in: Capsule())
+                        .background(slot.accentColor.opacity(colorScheme == .dark ? 0.2 : 0.16), in: Capsule())
                 }
             }
+            .frame(minHeight: Self.headerMinHeight)
 
             if let recipe {
                 HStack(spacing: 12) {
@@ -159,6 +164,7 @@ struct MealCardView: View {
                 }
                 .frame(maxWidth: .infinity, minHeight: Self.contentAreaMinHeight, alignment: .leading)
                 .padding(8)
+                .frame(maxWidth: .infinity, minHeight: Self.contentPanelHeight, maxHeight: Self.contentPanelHeight, alignment: .leading)
                 .background(
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
                         .fill(surfaceFill)
@@ -178,6 +184,8 @@ struct MealCardView: View {
                         .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, minHeight: Self.contentAreaMinHeight, alignment: .center)
+                .padding(8)
+                .frame(maxWidth: .infinity, minHeight: Self.contentPanelHeight, maxHeight: Self.contentPanelHeight, alignment: .center)
                 .background(
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
                         .fill(surfaceFill)
@@ -200,7 +208,7 @@ struct MealCardView: View {
                 .font(.subheadline.weight(.bold))
                 .foregroundStyle(slot.accentColor)
                 .frame(width: 30, height: 30)
-                .background(slot.accentColor.opacity(colorScheme == .dark ? 0.2 : 0.12), in: Circle())
+                .background(slot.accentColor.opacity(colorScheme == .dark ? 0.2 : 0.16), in: Circle())
 
             VStack(alignment: .leading, spacing: 3) {
                 Text("Dodaj posiłek")
@@ -222,9 +230,11 @@ struct MealCardView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, minHeight: Self.contentAreaMinHeight, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: Self.contentPanelHeight, maxHeight: Self.contentPanelHeight, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(slot.accentColor.opacity(colorScheme == .dark ? 0.14 : 0.09))
+                .fill(slot.accentColor.opacity(colorScheme == .dark ? 0.14 : 0.12))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -233,7 +243,6 @@ struct MealCardView: View {
                     lineWidth: 1
                 )
         )
-        .frame(maxWidth: .infinity, minHeight: Self.contentAreaMinHeight, alignment: .leading)
     }
 
     private func recipeMetaPill(icon: String, text: String) -> some View {
@@ -252,15 +261,11 @@ struct MealCardView: View {
     }
 
     private var surfaceFill: Color {
-        colorScheme == .dark
-            ? Color.white.opacity(0.08)
-            : Color.white.opacity(0.22)
+        DashboardPalette.surface(colorScheme, level: .secondary)
     }
 
     private var borderStroke: Color {
-        colorScheme == .dark
-            ? Color.white.opacity(0.16)
-            : Color.white.opacity(0.28)
+        DashboardPalette.neutralBorder(colorScheme, opacity: 0.16)
     }
 
 }

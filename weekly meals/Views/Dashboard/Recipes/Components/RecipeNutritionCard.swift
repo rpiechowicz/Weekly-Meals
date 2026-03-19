@@ -6,6 +6,7 @@ struct NutritionCard: View {
     let unit: String
     let icon: String
     let color: Color
+    @Environment(\.colorScheme) private var colorScheme
     
     var body: some View {
         HStack(spacing: 8) {
@@ -51,11 +52,11 @@ struct NutritionCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.white.opacity(0.05))
+                .fill(DashboardPalette.surface(colorScheme, level: .secondary))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                .stroke(DashboardPalette.neutralBorder(colorScheme, opacity: 0.08), lineWidth: 1)
         )
     }
 }

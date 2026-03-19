@@ -4,6 +4,19 @@ struct RecipeDetailView: View {
     @Environment(\.dismiss) private var dismiss
     let recipe: Recipe
     var onToggleFavorite: (() -> Void)?
+
+    private var sheetTheme: DashboardSheetTheme {
+        switch recipe.category {
+        case .breakfast:
+            return .sunrise
+        case .lunch:
+            return .spring
+        case .dinner:
+            return .plum
+        case .all, .favourite:
+            return .ocean
+        }
+    }
     
     private var placeholderHeader: some View {
         LinearGradient(
@@ -60,6 +73,9 @@ struct RecipeDetailView: View {
     
     var body: some View {
         ZStack(alignment: .topTrailing) {
+            DashboardSheetBackground(theme: sheetTheme)
+                .ignoresSafeArea()
+
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     // Image Header

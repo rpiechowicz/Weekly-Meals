@@ -207,7 +207,7 @@ struct ProductsView: View {
                             .foregroundStyle(.primary)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 6)
-                            .background(Color.white.opacity(0.08), in: Capsule())
+                            .background(DashboardPalette.surface(colorScheme, level: .tertiary), in: Capsule())
                     }
 
                     VStack(spacing: 14) {
@@ -249,10 +249,10 @@ struct ProductsView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.horizontal, 18)
                     .padding(.vertical, 28)
-                    .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                    .background(DashboardPalette.surface(colorScheme, level: .tertiary), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
                     .overlay(
                         RoundedRectangle(cornerRadius: 24, style: .continuous)
-                            .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                            .stroke(DashboardPalette.neutralBorder(colorScheme, opacity: 0.08), lineWidth: 1)
                     )
                 }
                 .padding(18)
@@ -302,46 +302,51 @@ struct ProductsView: View {
     }
 
     private func archivePreview(_ archive: ArchivedShoppingList) -> some View {
-        ScrollView {
-            VStack(spacing: 14) {
-                VStack(alignment: .leading, spacing: 18) {
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Lista \(archive.revision)")
-                                .font(.headline)
-                                .fontWeight(.semibold)
+        ZStack {
+            DashboardSheetBackground(theme: .spring)
+                .ignoresSafeArea()
 
-                            Text(archive.weekLabel)
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
+            ScrollView {
+                VStack(spacing: 14) {
+                    VStack(alignment: .leading, spacing: 18) {
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Lista \(archive.revision)")
+                                    .font(.headline)
+                                    .fontWeight(.semibold)
+
+                                Text(archive.weekLabel)
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            Spacer(minLength: 0)
+
+                            DashboardActionButton(
+                                title: "Zamknij",
+                                systemImage: "xmark",
+                                foregroundColor: .secondary
+                            ) {
+                                previewArchiveId = nil
+                            }
                         }
+                    }
+                    .padding(18)
+                    .dashboardLiquidCard(cornerRadius: 24, strokeOpacity: 0.2)
 
-                        Spacer(minLength: 0)
-
-                        DashboardActionButton(
-                            title: "Zamknij",
-                            systemImage: "xmark",
-                            foregroundColor: .secondary
-                        ) {
-                            previewArchiveId = nil
+                    if groupedPreviewItemsByDepartment.isEmpty {
+                        compactEmptyCard
+                    } else {
+                        ForEach(groupedPreviewItemsByDepartment, id: \.department) { department, items in
+                            archivedDepartmentSection(department: department, items: items)
                         }
                     }
                 }
-                .padding(18)
-                .dashboardLiquidCard(cornerRadius: 24, strokeOpacity: 0.2)
-
-                if groupedPreviewItemsByDepartment.isEmpty {
-                    compactEmptyCard
-                } else {
-                    ForEach(groupedPreviewItemsByDepartment, id: \.department) { department, items in
-                        archivedDepartmentSection(department: department, items: items)
-                    }
-                }
+                .padding(.horizontal, 16)
+                .padding(.top, 20)
+                .padding(.bottom, 12)
+                .padding(.bottom, 14)
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 20)
-            .padding(.bottom, 12)
-            .padding(.bottom, 14)
         }
         .scrollContentBackground(.hidden)
     }
@@ -459,10 +464,10 @@ struct ProductsView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(DashboardPalette.surface(colorScheme, level: .secondary), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                .stroke(DashboardPalette.neutralBorder(colorScheme, opacity: 0.08), lineWidth: 1)
         )
     }
 
@@ -473,12 +478,15 @@ struct ProductsView: View {
         isDisabled: Bool,
         action: @escaping () -> Void
     ) -> some View {
-        DashboardActionButton(
+        let buttonTone: DashboardActionTone = colorScheme == .dark ? .accent(tint) : .neutral
+
+        return DashboardActionButton(
             title: title,
             systemImage: icon,
-            tone: .accent(tint),
+            tone: buttonTone,
             fullWidth: true,
             isDisabled: isDisabled,
+            foregroundColor: colorScheme == .dark ? nil : tint,
             action: action
         )
     }
@@ -493,7 +501,7 @@ struct ProductsView: View {
         .foregroundStyle(.secondary)
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-        .background(Color.white.opacity(0.08), in: Capsule())
+        .background(DashboardPalette.surface(colorScheme, level: .tertiary), in: Capsule())
     }
 
     private var revisionFilterBar: some View {
@@ -521,13 +529,17 @@ struct ProductsView: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 10)
             .background(
-                (isSelected ? Color.white.opacity(0.12) : Color.white.opacity(0.05)),
+                (isSelected
+                    ? DashboardPalette.surface(colorScheme, level: .emphasized)
+                    : DashboardPalette.surface(colorScheme, level: .secondary)),
                 in: RoundedRectangle(cornerRadius: 14, style: .continuous)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .stroke(
-                        isSelected ? Color.white.opacity(0.16) : Color.white.opacity(0.08),
+                        isSelected
+                            ? DashboardPalette.neutralBorder(colorScheme, opacity: 0.16)
+                            : DashboardPalette.neutralBorder(colorScheme, opacity: 0.08),
                         lineWidth: 1
                     )
             )
@@ -592,7 +604,7 @@ struct ProductsView: View {
                             .foregroundStyle(.secondary)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
-                            .background(Color.white.opacity(0.08), in: Capsule())
+                            .background(DashboardPalette.surface(colorScheme, level: .tertiary), in: Capsule())
 
                         DashboardActionButton(
                             title: nil,
@@ -632,6 +644,7 @@ struct ProductsView: View {
                 readonlyDepartmentSection(department: department, items: items)
             }
         }
+        .padding(.top, 12)
     }
 
     private func archiveRow(_ archive: ArchivedShoppingList) -> some View {
@@ -677,7 +690,7 @@ struct ProductsView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(DashboardPalette.surface(colorScheme, level: .secondary), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     private var archiveDeleteAlertBinding: Binding<Bool> {
@@ -727,7 +740,7 @@ struct ProductsView: View {
                             .fill(
                                 allBought
                                 ? Color.green.opacity(colorScheme == .dark ? 0.2 : 0.12)
-                                : Color.white.opacity(0.12)
+                                : DashboardPalette.surface(colorScheme, level: .emphasized)
                             )
                     )
             }
@@ -829,7 +842,7 @@ struct ProductsView: View {
                             .fill(
                                 allBought
                                 ? Color.green.opacity(colorScheme == .dark ? 0.2 : 0.12)
-                                : Color.white.opacity(0.12)
+                                : DashboardPalette.surface(colorScheme, level: .emphasized)
                             )
                     )
             }
@@ -869,7 +882,7 @@ struct ProductsView: View {
                         .fill(
                             bought
                             ? Color.green.opacity(colorScheme == .dark ? 0.2 : 0.12)
-                            : Color.white.opacity(0.08)
+                            : DashboardPalette.surface(colorScheme, level: .tertiary)
                         )
 
                     Image(systemName: bought ? "checkmark" : "circle")
@@ -901,7 +914,7 @@ struct ProductsView: View {
                         Capsule()
                             .fill(
                                 bought
-                                ? Color.white.opacity(0.08)
+                                ? DashboardPalette.surface(colorScheme, level: .tertiary)
                                 : color.opacity(colorScheme == .dark ? 0.18 : 0.1)
                             )
                     )
@@ -919,7 +932,7 @@ struct ProductsView: View {
         HStack(spacing: 12) {
             ZStack {
                 Circle()
-                    .fill(Color.white.opacity(0.06))
+                    .fill(DashboardPalette.surface(colorScheme, level: .tertiary))
 
                 Image(systemName: "lock.fill")
                     .font(.caption2.weight(.bold))
@@ -960,7 +973,7 @@ struct ProductsView: View {
                     .fill(
                         item.isChecked
                         ? Color.green.opacity(colorScheme == .dark ? 0.2 : 0.12)
-                        : Color.white.opacity(0.08)
+                        : DashboardPalette.surface(colorScheme, level: .tertiary)
                     )
 
                 Image(systemName: item.isChecked ? "checkmark" : "circle")
@@ -987,14 +1000,14 @@ struct ProductsView: View {
                 .foregroundStyle(item.isChecked ? Color.secondary : color)
                 .padding(.horizontal, 9)
                 .padding(.vertical, 5)
-                .background(
-                    Capsule()
-                        .fill(
-                            item.isChecked
-                            ? Color.white.opacity(0.08)
-                            : color.opacity(colorScheme == .dark ? 0.18 : 0.1)
-                        )
-                )
+                    .background(
+                        Capsule()
+                            .fill(
+                                item.isChecked
+                                ? DashboardPalette.surface(colorScheme, level: .tertiary)
+                                : color.opacity(colorScheme == .dark ? 0.18 : 0.1)
+                            )
+                    )
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 9)
@@ -1042,7 +1055,7 @@ struct ProductsView: View {
 
             ZStack(alignment: .leading) {
                 Capsule()
-                    .fill(Color.white.opacity(0.08))
+                    .fill(DashboardPalette.surface(colorScheme, level: .tertiary))
 
                 Capsule()
                     .fill(
@@ -1071,12 +1084,8 @@ private struct ProductsLiquidBackground: View {
         ZStack {
             LinearGradient(
                 colors: [
-                    colorScheme == .dark
-                        ? Color(red: 0.08, green: 0.09, blue: 0.11)
-                        : Color(red: 0.95, green: 0.96, blue: 0.98),
-                    colorScheme == .dark
-                        ? Color(red: 0.05, green: 0.06, blue: 0.07)
-                        : Color(red: 0.92, green: 0.94, blue: 0.97)
+                    DashboardPalette.backgroundTop(for: colorScheme),
+                    DashboardPalette.backgroundBottom(for: colorScheme)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing

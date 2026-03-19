@@ -100,14 +100,12 @@ struct DatesView: View {
     }
 
     private func weekControlButton(systemName: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: systemName)
-                .font(.system(size: 12, weight: .bold))
-                .foregroundStyle(.primary)
-                .frame(width: 34, height: 34)
-                .background(Color.blue.opacity(0.14), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        }
-        .buttonStyle(.plain)
+        DashboardActionButton(
+            title: nil,
+            systemImage: systemName,
+            controlSize: 34,
+            action: action
+        )
     }
 
     private func scrollTo(date: Date, with proxy: ScrollViewProxy, animated: Bool) {
