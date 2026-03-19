@@ -436,7 +436,7 @@ private struct WeeklyPlanEditorView: View {
                         editorSelectionOverview
                             .padding(.horizontal, 12)
                             .padding(.top, 8)
-                        .padding(.bottom, 10)
+                            .padding(.bottom, 20)
 
                         if let errorMessage = recipeCatalogStore.errorMessage {
                             Text(errorMessage)
@@ -621,7 +621,7 @@ private struct WeeklyPlanEditorView: View {
         }
         .padding(.horizontal, 10)
         .padding(.top, 10)
-        .padding(.bottom, 16)
+        .padding(.bottom, 22)
         .background(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .fill(DashboardPalette.surface(colorScheme, level: .tertiary))
@@ -686,11 +686,11 @@ private struct WeeklyPlanEditorView: View {
                 Spacer(minLength: 8)
 
                 Text("\(count)/\(MealPlanViewModel.maxPerSlot)")
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
                     .monospacedDigit()
                     .foregroundStyle(.primary)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 5)
                     .background(DashboardPalette.surface(colorScheme, level: .secondary), in: Capsule())
             }
 

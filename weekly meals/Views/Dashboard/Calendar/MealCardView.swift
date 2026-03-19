@@ -49,9 +49,9 @@ enum MealSlot: String, CaseIterable, Identifiable, Codable {
 }
 
 struct MealCardView: View {
-    private static let headerMinHeight: CGFloat = 42
-    private static let contentAreaMinHeight: CGFloat = 76
-    private static let contentPanelHeight: CGFloat = 92
+    private static let headerMinHeight: CGFloat = 40
+    private static let contentAreaMinHeight: CGFloat = 68
+    private static let contentPanelHeight: CGFloat = 82
 
     let slot: MealSlot
     let recipe: Recipe? // nil => brak wybranego posiłku
@@ -95,7 +95,7 @@ struct MealCardView: View {
                 placeholderThumb
             }
         }
-        .frame(width: 56, height: 56)
+        .frame(width: 52, height: 52)
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
@@ -110,12 +110,12 @@ struct MealCardView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 12) {
                 Image(systemName: slot.icon)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(slot.accentColor)
-                    .frame(width: 36, height: 36)
+                    .frame(width: 34, height: 34)
                     .background(slot.accentColor.opacity(colorScheme == .dark ? 0.22 : 0.18), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 1) {
@@ -163,7 +163,7 @@ struct MealCardView: View {
                     Spacer(minLength: 0)
                 }
                 .frame(maxWidth: .infinity, minHeight: Self.contentAreaMinHeight, alignment: .leading)
-                .padding(8)
+                .padding(7)
                 .frame(maxWidth: .infinity, minHeight: Self.contentPanelHeight, maxHeight: Self.contentPanelHeight, alignment: .leading)
                 .background(
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -184,7 +184,7 @@ struct MealCardView: View {
                         .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, minHeight: Self.contentAreaMinHeight, alignment: .center)
-                .padding(8)
+                .padding(7)
                 .frame(maxWidth: .infinity, minHeight: Self.contentPanelHeight, maxHeight: Self.contentPanelHeight, alignment: .center)
                 .background(
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -195,9 +195,8 @@ struct MealCardView: View {
                         .stroke(borderStroke, lineWidth: 1)
                 )
             }
-
         }
-        .padding(16)
+        .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .dashboardLiquidCard(cornerRadius: 24, strokeOpacity: 0.2)
     }
@@ -207,17 +206,17 @@ struct MealCardView: View {
             Image(systemName: "plus")
                 .font(.subheadline.weight(.bold))
                 .foregroundStyle(slot.accentColor)
-                .frame(width: 30, height: 30)
+                .frame(width: 26, height: 26)
                 .background(slot.accentColor.opacity(colorScheme == .dark ? 0.2 : 0.16), in: Circle())
 
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text("Dodaj posiłek")
-                    .font(.subheadline)
+                    .font(.callout)
                     .fontWeight(.semibold)
                     .foregroundStyle(.primary)
 
                 Text("Wybierz przepis z planu tygodniowego")
-                    .font(.caption)
+                    .font(.caption2)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
@@ -228,8 +227,8 @@ struct MealCardView: View {
                 .font(.caption.weight(.bold))
                 .foregroundStyle(slot.accentColor)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
         .frame(maxWidth: .infinity, minHeight: Self.contentAreaMinHeight, alignment: .leading)
         .frame(maxWidth: .infinity, minHeight: Self.contentPanelHeight, maxHeight: Self.contentPanelHeight, alignment: .leading)
         .background(

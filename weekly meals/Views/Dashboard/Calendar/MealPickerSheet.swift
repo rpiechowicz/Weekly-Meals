@@ -212,11 +212,11 @@ struct MealPickerSheet: View {
             onSelect(recipe)
             dismiss()
         } label: {
-            HStack(spacing: 14) {
+            HStack(alignment: .top, spacing: 14) {
                 recipeThumbnail(recipe, isAvailable: isAvailable)
 
                 VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 6) {
+                    HStack(alignment: .top, spacing: 8) {
                         Text(recipe.name)
                             .font(.subheadline)
                             .fontWeight(.semibold)
@@ -228,12 +228,9 @@ struct MealPickerSheet: View {
                                 .font(.caption)
                                 .foregroundStyle(.pink)
                         }
-                    }
 
-                    Text(recipe.description)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
+                        Spacer(minLength: 0)
+                    }
 
                     HStack(spacing: 6) {
                         rowMetaPill(icon: "clock", text: "\(recipe.prepTimeMinutes) min")
@@ -256,10 +253,13 @@ struct MealPickerSheet: View {
                             in: Capsule()
                         )
 
+                    Spacer(minLength: 0)
+
                     Image(systemName: isAvailable ? "chevron.right.circle.fill" : "xmark.circle")
                         .font(.subheadline)
                         .foregroundStyle(isAvailable ? slot.accentColor : Color.secondary)
                 }
+                .frame(maxHeight: .infinity, alignment: .top)
             }
             .padding(14)
             .background(

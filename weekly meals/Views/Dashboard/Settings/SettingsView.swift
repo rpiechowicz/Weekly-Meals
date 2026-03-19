@@ -317,6 +317,11 @@ struct SettingsView: View {
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 14) {
+                        Text("Zarządzaj domownikami, zaproszeniami i wspólną przestrzenią do planowania posiłków oraz zakupów.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+
                         if hasHousehold {
                             householdOverviewCard
                             householdMembersCard
@@ -487,16 +492,17 @@ struct SettingsView: View {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("Preferencje")
                                 .font(.title2.weight(.semibold))
-                            Text("Powiadomienia i wygląd aplikacji.")
+                            Text("Dopasuj powiadomienia, przypomnienia i wygląd aplikacji tak, żeby lepiej pasowały do Twojego rytmu korzystania.")
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
 
                         VStack(spacing: 0) {
                             preferenceToggleRow(
                                 title: "Powiadomienia",
-                                subtitle: "Włącz główne powiadomienia aplikacji",
+                                subtitle: "Włącz główne powiadomienia aplikacji, aby dostawać przypomnienia o planie tygodnia i liście zakupów.",
                                 isOn: $notificationsEnabled
                             )
 
@@ -523,8 +529,15 @@ struct SettingsView: View {
                         .dashboardLiquidCard(cornerRadius: 22, strokeOpacity: 0.16)
 
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("Wygląd")
-                                .font(.headline.weight(.semibold))
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Wygląd")
+                                    .font(.headline.weight(.semibold))
+
+                                Text("Wybierz motyw, który będzie domyślnie używany podczas przeglądania aplikacji.")
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
 
                             VStack(spacing: 8) {
                                 ForEach(AppTheme.allCases) { theme in

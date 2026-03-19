@@ -120,15 +120,9 @@ struct MealPlanSummarySheet: View {
                     .font(.title3.weight(.bold))
                     .fontDesign(.rounded)
 
-                Text(summarySubtitle)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-
                 Text(summaryHelperText)
-                    .font(.caption.weight(.medium))
-                    .fontDesign(.rounded)
-                    .foregroundStyle(.tertiary)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
@@ -167,18 +161,6 @@ struct MealPlanSummarySheet: View {
         }
         .padding(16)
         .dashboardLiquidCard(cornerRadius: 18, strokeOpacity: 0.16)
-    }
-
-    private var summarySubtitle: String {
-        if mealPlan.totalCount == 0 {
-            return "Dodaj przepisy do planu, aby zapisać gotowy tydzień."
-        }
-
-        if remainingCount == 0 {
-            return "Plan jest kompletny i gotowy do zapisania w kalendarzu."
-        }
-
-        return "Możesz zapisać obecny układ albo dobrać jeszcze \(remainingCount) pozycji."
     }
 
     private var summaryHelperText: String {

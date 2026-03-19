@@ -47,19 +47,13 @@ struct RecipesView: View {
     }
 
     private var recipesSummaryCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .center, spacing: 12) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(searchText.isEmpty ? "Wszystkie przepisy" : "Wyniki wyszukiwania")
-                        .font(.title3)
-                        .fontWeight(.bold)
-                        .fontDesign(.rounded)
-
-                    Text("\(filteredRecipes.count) \(resultsLabel(for: filteredRecipes.count))")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-                }
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .top, spacing: 12) {
+                Text(searchText.isEmpty ? "Wszystkie przepisy" : "Wyniki wyszukiwania")
+                    .font(.title3)
+                    .fontWeight(.bold)
+                    .fontDesign(.rounded)
+                    .fixedSize(horizontal: false, vertical: true)
 
                 Spacer(minLength: 8)
 
@@ -75,10 +69,6 @@ struct RecipesView: View {
         .dashboardLiquidCard(cornerRadius: 22, strokeOpacity: 0.22)
     }
 
-    private func resultsLabel(for count: Int) -> String {
-        count == 1 ? "przepis" : "przepisy"
-    }
-
     var body: some View {
         NavigationStack {
             ZStack {
@@ -86,7 +76,7 @@ struct RecipesView: View {
                     .ignoresSafeArea()
 
                 ScrollView {
-                    VStack(spacing: 12) {
+                    VStack(spacing: 8) {
                         recipesSummaryCard
 
                         if let errorMessage = recipeCatalogStore.errorMessage {
@@ -108,6 +98,7 @@ struct RecipesView: View {
                                         .redacted(reason: .placeholder)
                                 }
                             }
+                            .padding(.top, 6)
                             .padding(.horizontal, 2)
                             .padding(.bottom, 12)
                         } else if filteredRecipes.isEmpty {
@@ -125,6 +116,7 @@ struct RecipesView: View {
                                     .foregroundStyle(.secondary)
                             }
                             .frame(maxWidth: .infinity)
+                            .padding(.top, 6)
                             .padding(.vertical, 44)
                             .padding(.horizontal, 16)
                             .dashboardLiquidCard(cornerRadius: 20, strokeOpacity: 0.2)
@@ -144,6 +136,7 @@ struct RecipesView: View {
                                     }
                                 }
                             }
+                            .padding(.top, 6)
                             .padding(.horizontal, 2)
                             .padding(.bottom, 18)
 
@@ -336,13 +329,13 @@ private struct RecipeGridCard: View {
         .padding(.vertical, 5)
         .background(
             Capsule()
-                .fill(Color.black.opacity(colorScheme == .dark ? 0.44 : 0.4))
+                .fill(Color.black.opacity(colorScheme == .dark ? 0.58 : 0.5))
         )
         .overlay(
             Capsule()
-                .stroke(DashboardPalette.neutralBorder(colorScheme, opacity: 0.1), lineWidth: 0.8)
+                .stroke(DashboardPalette.neutralBorder(colorScheme, opacity: 0.16), lineWidth: 0.8)
         )
-        .shadow(color: .black.opacity(0.22), radius: 6, x: 0, y: 2)
+        .shadow(color: .black.opacity(0.28), radius: 6, x: 0, y: 2)
     }
 
     private func metaPill(icon: String, text: String) -> some View {
