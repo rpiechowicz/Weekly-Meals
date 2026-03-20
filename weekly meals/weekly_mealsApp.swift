@@ -12,7 +12,6 @@ import UserNotifications
 enum AppEnvironment {
     private static let apiBaseURLKey = "API_BASE_URL"
     private static let productionBaseURL = URL(string: "https://weakly-meals-backend-production.up.railway.app")!
-    private static let simulatorDebugBaseURL = URL(string: "http://127.0.0.1:3000")!
 
     static var apiBaseURL: URL {
         if let environmentURL = resolvedURL(
@@ -27,11 +26,7 @@ enum AppEnvironment {
             return plistURL
         }
 
-        #if DEBUG
-        return simulatorDebugBaseURL
-        #else
         return productionBaseURL
-        #endif
     }
 
     private static func resolvedURL(from rawValue: String?, allowLocalhost: Bool) -> URL? {
