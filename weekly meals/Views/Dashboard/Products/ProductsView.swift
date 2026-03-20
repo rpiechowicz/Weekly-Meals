@@ -142,7 +142,7 @@ struct ProductsView: View {
 
                 Group {
                     if shoppingListStore.isLoading && shoppingItems.isEmpty && readonlyItems.isEmpty {
-                        ProgressView("Ładowanie listy zakupów...")
+                        loadingState
                     } else if isCurrentWeekArchived {
                         archivedState
                     } else if shoppingItems.isEmpty && !hasOpenRevision {
@@ -189,6 +189,77 @@ struct ProductsView: View {
                     .dashboardLiquidSheet()
             }
         }
+    }
+
+    private var loadingState: some View {
+        ScrollView {
+            VStack(spacing: 14) {
+                VStack(alignment: .leading, spacing: 18) {
+                    HStack(spacing: 12) {
+                        Text("Tydzień")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                        Spacer(minLength: 0)
+
+                        Text(weekRangeText)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.primary)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(DashboardPalette.surface(colorScheme, level: .tertiary), in: Capsule())
+                    }
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(spacing: 10) {
+                            ProgressView()
+                                .tint(.blue)
+
+                            Text("Przygotowuję listę zakupów")
+                                .font(.headline)
+                                .fontWeight(.semibold)
+                        }
+
+                        Text("Pobieram aktualny stan dla tego tygodnia. Przy kolejnych wejściach aplikacja pokaże zapisany stan od razu.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(18)
+                    .background(
+                        DashboardPalette.surface(colorScheme, level: .tertiary),
+                        in: RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 22, style: .continuous)
+                            .stroke(DashboardPalette.neutralBorder(colorScheme, opacity: 0.08), lineWidth: 1)
+                    )
+                }
+                .padding(18)
+                .dashboardLiquidCard(cornerRadius: 24, strokeOpacity: 0.2)
+
+                VStack(spacing: 12) {
+                    ForEach(0..<6, id: \.self) { _ in
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .fill(DashboardPalette.surface(colorScheme, level: .tertiary))
+                            .frame(height: 72)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                    .stroke(DashboardPalette.neutralBorder(colorScheme, opacity: 0.06), lineWidth: 1)
+                            )
+                            .redacted(reason: .placeholder)
+                    }
+                }
+                .padding(18)
+                .dashboardLiquidCard(cornerRadius: 24, strokeOpacity: 0.16)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .padding(.bottom, 14)
+        }
+        .scrollIndicators(.hidden)
+        .scrollContentBackground(.hidden)
     }
 
     private var emptyState: some View {

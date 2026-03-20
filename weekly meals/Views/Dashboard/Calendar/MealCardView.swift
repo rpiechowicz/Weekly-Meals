@@ -84,12 +84,17 @@ struct MealCardView: View {
     private var thumbnail: some View {
         Group {
             if let url = recipe?.imageURL {
-                AsyncImage(url: url) { image in
-                    image
-                        .resizable()
-                        .scaledToFill()
-                } placeholder: {
-                    placeholderThumb
+                CachedAsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    case .empty, .failure:
+                        placeholderThumb
+                    @unknown default:
+                        placeholderThumb
+                    }
                 }
             } else {
                 placeholderThumb

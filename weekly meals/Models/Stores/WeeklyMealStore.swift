@@ -1290,7 +1290,7 @@ final class RecipeCatalogStore {
     var errorMessage: String?
     private var currentPage: Int = 0
     private let pageSize: Int = 24
-    private let cacheMaxAge: TimeInterval = 60 * 30 // 30 min
+    private let cacheMaxAge: TimeInterval = 60 * 60 * 12 // 12 h
     private let maxFetchAttempts: Int = 3
     private var pendingRealtimeReloadTask: Task<Void, Never>?
 
@@ -1336,13 +1336,14 @@ final class RecipeCatalogStore {
         guard !didLoad else { return }
         if loadCacheIfFresh() {
             didLoad = true
-            Task { await reload() }
+            errorMessage = nil
             return
         }
         await reload()
     }
 
     func reload() async {
+        guard !isLoading else { return }
         isLoading = true
         isLoadingMore = false
         errorMessage = nil

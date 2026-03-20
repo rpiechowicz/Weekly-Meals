@@ -81,12 +81,17 @@ struct RecipeDetailView: View {
                     // Image Header
                     ZStack(alignment: .bottomLeading) {
                         if let imageURL = recipe.imageURL {
-                            AsyncImage(url: imageURL) { image in
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                            } placeholder: {
-                                placeholderHeader
+                            CachedAsyncImage(url: imageURL) { phase in
+                                switch phase {
+                                case .success(let image):
+                                    image
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                case .empty, .failure:
+                                    placeholderHeader
+                                @unknown default:
+                                    placeholderHeader
+                                }
                             }
                             .frame(height: 275)
                             .clipped()

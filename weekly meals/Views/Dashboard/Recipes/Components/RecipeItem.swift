@@ -16,7 +16,7 @@ struct RecipeItemView: View {
                     Color(.secondarySystemFill)
                         .frame(height: 140)
                         .overlay(
-                            AsyncImage(url: imageURL) { phase in
+                            CachedAsyncImage(url: imageURL) { phase in
                                 switch phase {
                                 case .success(let image):
                                     image

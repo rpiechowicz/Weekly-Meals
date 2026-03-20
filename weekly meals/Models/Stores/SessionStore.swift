@@ -241,6 +241,8 @@ final class SessionStore {
         currentUserId = userId
         currentHouseholdId = householdId
         currentHouseholdName = householdName
+        let datesViewModel = DatesViewModel()
+        self.datesViewModel = datesViewModel
         let socketClient = SocketIORecipeSocketClient(baseURL: baseURL)
         self.realtimeSocket = socketClient
 
@@ -267,11 +269,17 @@ final class SessionStore {
         self.recipeCatalogStore = RecipeCatalogStore(
             repository: ApiRecipeRepository(client: recipeTransport)
         )
-        self.shoppingListStore = ShoppingListStore(
-            repository: ApiShoppingListRepository(client: shoppingTransport)
+        let shoppingListStore = ShoppingListStore(
+            repository: ApiShoppingListRepository(client: shoppingTransport),
+            cacheNamespace: "\(userId)_\(householdId)"
         )
-        self.datesViewModel = DatesViewModel()
+        self.shoppingListStore = shoppingListStore
         observeHouseholdRealtime()
+
+        let initialWeekStart = datesViewModel.weekStartISO
+        Task {
+            await shoppingListStore.load(weekStart: initialWeekStart)
+        }
     }
 
     private func clearRuntimeStores() {

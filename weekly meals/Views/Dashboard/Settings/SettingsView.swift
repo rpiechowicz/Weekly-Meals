@@ -797,12 +797,17 @@ struct SettingsView: View {
     @ViewBuilder
     private func memberAvatar(for member: HouseholdMember) -> some View {
         if let avatarUrl = member.avatarUrl, let url = URL(string: avatarUrl) {
-            AsyncImage(url: url) { image in
-                image
-                    .resizable()
-                    .scaledToFill()
-            } placeholder: {
-                Circle().fill(Color.gray.opacity(0.22))
+            CachedAsyncImage(url: url) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFill()
+                case .empty, .failure:
+                    Circle().fill(Color.gray.opacity(0.22))
+                @unknown default:
+                    Circle().fill(Color.gray.opacity(0.22))
+                }
             }
             .frame(width: 34, height: 34)
             .clipShape(Circle())

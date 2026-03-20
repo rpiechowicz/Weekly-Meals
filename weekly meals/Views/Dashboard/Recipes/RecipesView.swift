@@ -280,7 +280,7 @@ private struct RecipeGridCard: View {
     private var thumbnail: some View {
         Group {
             if let imageURL = recipe.imageURL {
-                AsyncImage(url: imageURL) { phase in
+                CachedAsyncImage(url: imageURL) { phase in
                     switch phase {
                     case .success(let image):
                         image

@@ -228,7 +228,7 @@ private struct MealPlanSummaryRow: View {
         HStack(spacing: 12) {
             Group {
                 if let imageURL = recipe.imageURL {
-                    AsyncImage(url: imageURL) { phase in
+                    CachedAsyncImage(url: imageURL) { phase in
                         switch phase {
                         case .success(let image):
                             image

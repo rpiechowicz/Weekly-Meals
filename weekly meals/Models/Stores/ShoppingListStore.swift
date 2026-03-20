@@ -60,7 +60,7 @@ private struct OpenShoppingRevision {
     let pendingAmounts: [String: Double]
 }
 
-struct ShoppingListState {
+struct ShoppingListState: Codable {
     let items: [ShoppingItem]
     let archives: [ArchivedShoppingList]
 }
@@ -508,7 +508,12 @@ final class ApiShoppingListRepository: ShoppingListRepository {
 @MainActor
 @Observable
 final class ShoppingListStore {
+    private struct ShoppingListCachePayload: Codable {
+        let weeks: [String: ShoppingListState]
+    }
+
     private let repository: ShoppingListRepository
+    private let cacheNamespace: String
     private(set) var items: [ShoppingItem] = []
     private(set) var weekStart: String?
     private(set) var archivedLists: [ArchivedShoppingList] = []
@@ -516,17 +521,27 @@ final class ShoppingListStore {
     private var pendingReloadTask: Task<Void, Never>?
     private var lastChangeVersionByWeek: [String: Int64] = [:]
     private var openRevisionsByWeek: [String: OpenShoppingRevision] = [:]
+    private var cachedStateByWeek: [String: ShoppingListState] = [:]
+    private var invalidatedWeeks: Set<String> = []
     var isLoading: Bool = false
     var errorMessage: String?
 
-    init(repository: ShoppingListRepository) {
+    private var cacheURL: URL {
+        FileManager.default
+            .urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("shopping_list_cache_\(cacheNamespace).json")
+    }
+
+    init(repository: ShoppingListRepository, cacheNamespace: String = "default") {
         self.repository = repository
+        self.cacheNamespace = Self.sanitizedCacheNamespace(cacheNamespace)
+        loadPersistedCache()
         self.repository.observeShoppingListChanges { [weak self] event in
             guard let self else { return }
             Task { @MainActor in
                 guard let currentWeekStart = self.weekStart else { return }
                 guard !self.isBatchUpdating else { return }
-                if event.weekStart != currentWeekStart && event.productKey != nil {
+                guard event.weekStart == currentWeekStart else {
                     return
                 }
                 if let changeVersion = event.changeVersion {
@@ -534,6 +549,7 @@ final class ShoppingListStore {
                     guard changeVersion > previous else { return }
                     self.lastChangeVersionByWeek[currentWeekStart] = changeVersion
                 }
+                self.invalidatedWeeks.insert(currentWeekStart)
                 self.scheduleReload(weekStart: currentWeekStart)
             }
         }
@@ -542,28 +558,42 @@ final class ShoppingListStore {
             Task { @MainActor in
                 guard let currentWeekStart = self.weekStart else { return }
                 guard !self.isBatchUpdating else { return }
+                self.invalidatedWeeks.insert(currentWeekStart)
                 self.scheduleReload(weekStart: currentWeekStart)
             }
         }
     }
 
     func load(weekStart: String, force: Bool = false) async {
-        isLoading = true
         errorMessage = nil
         self.weekStart = weekStart
+
+        if !force,
+           let cachedState = cachedStateByWeek[weekStart],
+           !invalidatedWeeks.contains(weekStart) {
+            await apply(state: cachedState, for: weekStart)
+            return
+        }
+
+        guard !isLoading else { return }
+
+        isLoading = true
+        defer { isLoading = false }
         do {
             let state = try await repository.fetchShoppingListState(weekStart: weekStart)
-            archivedLists = state.archives
-            items = state.items
-            await syncPendingItemCheckState(for: weekStart, currentItems: state.items)
+            await apply(state: state, for: weekStart)
+            invalidatedWeeks.remove(weekStart)
         } catch {
             errorMessage = UserFacingErrorMapper.message(from: error)
+            if let cachedState = cachedStateByWeek[weekStart] {
+                await apply(state: cachedState, for: weekStart)
+            }
         }
-        isLoading = false
     }
 
     func refreshCurrentWeek() {
         guard let weekStart else { return }
+        invalidatedWeeks.insert(weekStart)
         scheduleReload(weekStart: weekStart)
     }
 
@@ -578,6 +608,7 @@ final class ShoppingListStore {
         for index in items.indices {
             items[index].isChecked = true
         }
+        cacheCurrentState(for: weekStart)
 
         do {
             for item in uncheckedItems {
@@ -592,6 +623,7 @@ final class ShoppingListStore {
         } catch {
             isBatchUpdating = false
             items = originalItems
+            cacheCurrentState(for: weekStart)
             errorMessage = UserFacingErrorMapper.message(from: error)
         }
     }
@@ -604,11 +636,13 @@ final class ShoppingListStore {
         let previous = items[index].isChecked
         let next = !previous
         items[index].isChecked = next
+        cacheCurrentState(for: weekStart)
 
         do {
             try await repository.setChecked(weekStart: weekStart, productKey: item.productKey, isChecked: next)
         } catch {
             items[index].isChecked = previous
+            cacheCurrentState(for: weekStart)
             errorMessage = UserFacingErrorMapper.message(from: error)
         }
     }
@@ -716,6 +750,44 @@ final class ShoppingListStore {
             guard let self else { return }
             await self.load(weekStart: weekStart, force: true)
         }
+    }
+
+    private func apply(state: ShoppingListState, for weekStart: String) async {
+        archivedLists = state.archives
+        items = state.items
+        await syncPendingItemCheckState(for: weekStart, currentItems: state.items)
+        cacheCurrentState(for: weekStart)
+    }
+
+    private func cacheCurrentState(for weekStart: String) {
+        cachedStateByWeek[weekStart] = ShoppingListState(items: items, archives: archivedLists)
+        persistCache()
+    }
+
+    private func loadPersistedCache() {
+        guard let data = try? Data(contentsOf: cacheURL),
+              let payload = try? JSONDecoder().decode(ShoppingListCachePayload.self, from: data) else {
+            return
+        }
+
+        cachedStateByWeek = payload.weeks
+    }
+
+    private func persistCache() {
+        do {
+            let payload = ShoppingListCachePayload(weeks: cachedStateByWeek)
+            let data = try JSONEncoder().encode(payload)
+            try data.write(to: cacheURL, options: .atomic)
+        } catch {
+            // intentionally ignore cache write failures
+        }
+    }
+
+    private static func sanitizedCacheNamespace(_ value: String) -> String {
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "_-"))
+        let scalars = value.unicodeScalars.map { allowed.contains($0) ? Character($0) : "_" }
+        let sanitized = String(scalars)
+        return sanitized.isEmpty ? "default" : sanitized
     }
 
     private func syncPendingItemCheckState(for weekStart: String, currentItems: [ShoppingItem]) async {

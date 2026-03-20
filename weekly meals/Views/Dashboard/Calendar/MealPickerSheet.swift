@@ -282,7 +282,7 @@ struct MealPickerSheet: View {
     private func recipeThumbnail(_ recipe: Recipe, isAvailable: Bool) -> some View {
         Group {
             if let url = recipe.imageURL {
-                AsyncImage(url: url) { phase in
+                CachedAsyncImage(url: url) { phase in
                     switch phase {
                     case .success(let image):
                         image
