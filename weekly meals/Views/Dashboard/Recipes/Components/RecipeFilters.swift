@@ -38,8 +38,8 @@ struct RecipeFilters: View {
                 tone: .neutral,
                 isDisabled: disabled,
                 foregroundColor: RecipesConstants.tint(for: selectedCategory),
-                controlSize: 40,
-                iconFont: .system(size: 17, weight: .semibold)
+                controlSize: 36,
+                iconFont: .system(size: 16, weight: .semibold)
             )
         }
         .buttonStyle(.plain)
