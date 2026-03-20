@@ -250,18 +250,7 @@ struct MealCardView: View {
     }
 
     private func recipeMetaPill(icon: String, text: String) -> some View {
-        HStack(spacing: 4) {
-            Image(systemName: icon)
-            Text(text)
-        }
-        .font(.caption)
-        .foregroundStyle(.secondary)
-        .padding(.horizontal, 7)
-        .padding(.vertical, 4)
-        .background(
-            Capsule()
-                .fill(surfaceFill)
-        )
+        RecipeMetricBadge(icon: icon, text: text)
     }
 
     private var surfaceFill: Color {

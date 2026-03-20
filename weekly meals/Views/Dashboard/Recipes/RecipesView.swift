@@ -260,11 +260,6 @@ private struct RecipeGridCard: View {
                     .fontWeight(.semibold)
                     .foregroundStyle(.primary)
                     .lineLimit(2)
-
-                Text(recipe.description)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
             }
 
             HStack(spacing: 6) {
@@ -273,7 +268,7 @@ private struct RecipeGridCard: View {
             }
         }
         .padding(11)
-        .frame(height: 232)
+        .frame(height: 206)
         .dashboardLiquidCard(cornerRadius: 20, strokeOpacity: 0.18)
     }
 
@@ -315,40 +310,14 @@ private struct RecipeGridCard: View {
     }
 
     private var categoryBadge: some View {
-        HStack(spacing: 5) {
-            Circle()
-                .fill(categoryTint)
-                .frame(width: 6, height: 6)
-
-            Text(RecipesConstants.displayName(for: recipe.category))
-                .lineLimit(1)
-        }
-        .font(.system(size: 10, weight: .semibold))
-        .foregroundStyle(Color.white.opacity(0.96))
-        .padding(.horizontal, 9)
-        .padding(.vertical, 5)
-        .background(
-            Capsule()
-                .fill(Color.black.opacity(colorScheme == .dark ? 0.58 : 0.5))
+        RecipeCategoryBadge(
+            text: RecipesConstants.displayName(for: recipe.category),
+            tint: categoryTint
         )
-        .overlay(
-            Capsule()
-                .stroke(DashboardPalette.neutralBorder(colorScheme, opacity: 0.16), lineWidth: 0.8)
-        )
-        .shadow(color: .black.opacity(0.28), radius: 6, x: 0, y: 2)
     }
 
     private func metaPill(icon: String, text: String) -> some View {
-        HStack(spacing: 4) {
-            Image(systemName: icon)
-            Text(text)
-                .lineLimit(1)
-        }
-        .font(.caption2)
-        .foregroundStyle(.secondary)
-        .padding(.horizontal, 7)
-        .padding(.vertical, 4)
-        .background(DashboardPalette.surface(colorScheme, level: .tertiary), in: Capsule())
+        RecipeMetricBadge(icon: icon, text: text)
     }
 
     private var categoryTint: Color {

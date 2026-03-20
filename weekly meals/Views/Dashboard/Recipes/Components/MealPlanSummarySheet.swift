@@ -101,9 +101,6 @@ struct MealPlanSummarySheet: View {
             .navigationTitle("Plan posiłków")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Zamknij") { dismiss() }
-                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Zapisz") { saveTapped() }
                         .disabled(!canSave)
@@ -116,7 +113,7 @@ struct MealPlanSummarySheet: View {
     private var summaryOverviewCard: some View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("\(mealPlan.totalCount) z \(MealPlanViewModel.maxTotal) posiłków gotowe")
+                Text("Podgląd planu")
                     .font(.title3.weight(.bold))
                     .fontDesign(.rounded)
 
@@ -152,12 +149,22 @@ struct MealPlanSummarySheet: View {
             }
             .frame(height: 10)
 
-            HStack(spacing: 6) {
-                Image(systemName: "hand.tap")
-                Text("Użyj + i -, aby szybko dopracować liczbę wybranych przepisów.")
+            HStack(alignment: .top, spacing: 12) {
+                HStack(alignment: .top, spacing: 6) {
+                    Image(systemName: "hand.tap")
+                    Text("Użyj + i -, aby szybko dopracować liczbę wybranych przepisów.")
+                }
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Text("\(mealPlan.totalCount)/\(MealPlanViewModel.maxTotal)")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+                    .padding(.top, 1)
             }
-            .font(.caption.weight(.medium))
-            .foregroundStyle(.secondary)
+            .padding(.top, 4)
         }
         .padding(16)
         .dashboardLiquidCard(cornerRadius: 18, strokeOpacity: 0.16)
@@ -314,17 +321,6 @@ private struct MealPlanSummaryRow: View {
     }
 
     private func summaryMetaPill(icon: String, text: String) -> some View {
-        HStack(spacing: 4) {
-            Image(systemName: icon)
-            Text(text)
-        }
-        .font(.caption)
-        .foregroundStyle(.secondary)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 5)
-        .background(
-            Capsule()
-                .fill(DashboardPalette.surface(colorScheme, level: .secondary))
-        )
+        RecipeMetricBadge(icon: icon, text: text)
     }
 }

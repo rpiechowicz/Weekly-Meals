@@ -43,17 +43,9 @@ struct RecipeItemView: View {
                 HStack {
                     Spacer()
                     if isSelected {
-                        Label("Wybrane", systemImage: "checkmark.circle.fill")
-                            .font(.caption2.weight(.bold))
-                            .foregroundStyle(.green)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(.ultraThinMaterial, in: Capsule())
-                            .padding(8)
+                        statusIconBadge(systemName: "checkmark.circle.fill", foreground: .green)
                     } else if recipe.favourite {
-                        Image(systemName: "heart.fill")
-                            .foregroundStyle(.red)
-                            .padding(8)
+                        statusIconBadge(systemName: "heart.fill", foreground: .pink)
                     }
                 }
 
@@ -93,36 +85,22 @@ struct RecipeItemView: View {
                         }
                     }
                 }
+
+                categoryPill
             }
             .frame(height: 140)
 
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(alignment: .top, spacing: 8) {
-                    Text(recipe.name)
-                        .font(.headline)
-                        .foregroundStyle(.primary)
-                        .lineLimit(2)
-
-                    Spacer(minLength: 0)
-
-                    categoryPill
-                }
-
-                Text(recipe.description)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
+            VStack(alignment: .leading, spacing: 10) {
+                Text(recipe.name)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
 
                 HStack(spacing: 6) {
                     infoPill(icon: "clock", text: "\(recipe.prepTimeMinutes) min")
                     infoPill(icon: "flame.fill", text: "\(Int(recipe.nutritionPerServing.kcal)) kcal")
                 }
-            }
-
-            Spacer(minLength: 0)
-
-            if isInPlanningMode {
-                planningFooter
             }
         }
         .padding(12)
@@ -136,7 +114,7 @@ struct RecipeItemView: View {
                     lineWidth: isSelected ? 2 : 1
                 )
         )
-        .frame(height: 286)
+        .frame(height: 246)
     }
 
     private var recipePlaceholder: some View {
@@ -151,42 +129,35 @@ struct RecipeItemView: View {
     }
 
     private var categoryPill: some View {
-        Text(recipe.category.rawValue)
-            .font(.caption2)
-            .fontWeight(.semibold)
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(DashboardPalette.surface(colorScheme, level: .tertiary), in: Capsule())
+        RecipeCategoryBadge(
+            text: recipe.category.rawValue,
+            tint: categoryTint,
+            style: .overlayDark
+        )
+            .padding(8)
+    }
+
+    private func statusIconBadge(systemName: String, foreground: Color) -> some View {
+        let isCheckmark = systemName == "checkmark.circle.fill"
+
+        return Image(systemName: systemName)
+        .font(.system(size: isCheckmark ? 14 : 13, weight: .bold))
+        .foregroundStyle(foreground)
+        .frame(width: 30, height: 30)
+        .background(
+            DashboardPalette.surface(colorScheme, level: .secondary),
+            in: Circle()
+        )
+        .overlay(
+            Circle()
+                .stroke(DashboardPalette.neutralBorder(colorScheme, opacity: 0.12), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.08), radius: 4, x: 0, y: 2)
+        .padding(8)
     }
 
     private func infoPill(icon: String, text: String) -> some View {
-        HStack(spacing: 4) {
-            Image(systemName: icon)
-            Text(text)
-        }
-        .font(.caption2)
-        .foregroundStyle(.secondary)
-        .padding(.horizontal, 7)
-        .padding(.vertical, 4)
-        .background(DashboardPalette.surface(colorScheme, level: .tertiary), in: Capsule())
-    }
-
-    private var planningFooter: some View {
-        HStack(spacing: 8) {
-            Image(systemName: isSelected ? "checkmark.circle.fill" : "plus.circle")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(isSelected ? .green : .secondary)
-
-            Text(isSelected ? "Kliknij, aby usunąć z planu" : "Kliknij, aby dodać do planu")
-                .font(.caption)
-                .fontWeight(.semibold)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-
-            Spacer(minLength: 0)
-        }
-        .padding(.top, 2)
+        RecipeMetricBadge(icon: icon, text: text)
     }
 
     private var cardFill: Color {
@@ -195,6 +166,21 @@ struct RecipeItemView: View {
         }
 
         return DashboardPalette.surface(colorScheme, level: .secondary)
+    }
+
+    private var categoryTint: Color {
+        switch recipe.category {
+        case .breakfast:
+            return .orange
+        case .lunch:
+            return .blue
+        case .dinner:
+            return .purple
+        case .favourite:
+            return .pink
+        case .all:
+            return .teal
+        }
     }
 }
 

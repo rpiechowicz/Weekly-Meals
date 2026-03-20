@@ -317,13 +317,21 @@ private struct PlanRecipeRow: View {
                 .font(.caption2)
                 .fontWeight(.bold)
                 .monospacedDigit()
-                .foregroundStyle(.white)
+                .foregroundStyle(slot.accentColor.opacity(colorScheme == .dark ? 0.92 : 0.84))
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
-                .background(slot.accentColor, in: Capsule())
+                .background(
+                    DashboardPalette.tintFill(
+                        slot.accentColor,
+                        scheme: colorScheme,
+                        dark: 0.2,
+                        light: 0.14
+                    ),
+                    in: Capsule()
+                )
                 .overlay(
                     Capsule()
-                        .stroke(DashboardPalette.neutralBorder(colorScheme, opacity: 0.12), lineWidth: 1)
+                        .stroke(slot.accentColor.opacity(colorScheme == .dark ? 0.18 : 0.16), lineWidth: 1)
                 )
         }
         .padding(.horizontal, 10)
@@ -339,18 +347,7 @@ private struct PlanRecipeRow: View {
     }
 
     private func metaPill(icon: String, text: String) -> some View {
-        HStack(spacing: 4) {
-            Image(systemName: icon)
-            Text(text)
-        }
-        .font(.caption2)
-        .foregroundStyle(.secondary)
-        .padding(.horizontal, 7)
-        .padding(.vertical, 3.5)
-        .background(
-            Capsule()
-                .fill(DashboardPalette.surface(colorScheme, level: .tertiary))
-        )
+        RecipeMetricBadge(icon: icon, text: text)
     }
 
     private var fallbackIcon: some View {
@@ -403,13 +400,6 @@ private struct WeeklyPlanEditorView: View {
 
     private var shouldShowSkeleton: Bool {
         recipeCatalogStore.isLoading && recipeCatalogStore.recipes.isEmpty
-    }
-
-    private func discardChangesAndDismiss() {
-        mealPlan.loadFromSaved(mealStore.savedPlan)
-        mealPlan.showSummarySheet = false
-        didSavePlan = false
-        dismiss()
     }
 
     private func pastDayAssignmentsCount(for recipe: Recipe) -> Int {
@@ -560,23 +550,6 @@ private struct WeeklyPlanEditorView: View {
                 didSavePlan = false
             }
             .searchable(text: $searchText, prompt: "Szukaj przepisów")
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Zamknij") {
-                        discardChangesAndDismiss()
-                    }
-                }
-
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        mealPlan.showSummarySheet = true
-                    } label: {
-                        Text("Podsumowanie")
-                            .fontWeight(.semibold)
-                    }
-                    .disabled(mealPlan.totalCount == 0)
-                }
-            }
             .sheet(isPresented: $mealPlan.showSummarySheet) {
                 MealPlanSummarySheet(mealPlan: mealPlan) {
                     didSavePlan = true

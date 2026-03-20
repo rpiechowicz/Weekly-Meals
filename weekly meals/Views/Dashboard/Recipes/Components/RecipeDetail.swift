@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct RecipeDetailView: View {
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
     let recipe: Recipe
     var onToggleFavorite: (() -> Void)?
 
@@ -45,6 +45,16 @@ struct RecipeDetailView: View {
         }
     }
 
+    private var categoryTint: Color {
+        switch recipe.category {
+        case .breakfast: return .orange
+        case .lunch: return .blue
+        case .dinner: return .purple
+        case .favourite: return .pink
+        case .all: return .teal
+        }
+    }
+
     private func ingredientDisplayName(_ name: String) -> String {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let first = trimmed.first else { return trimmed }
@@ -72,14 +82,14 @@ struct RecipeDetailView: View {
     }
     
     var body: some View {
-        ZStack(alignment: .topTrailing) {
+        ZStack {
             DashboardSheetBackground(theme: sheetTheme)
                 .ignoresSafeArea()
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     // Image Header
-                    ZStack(alignment: .bottomLeading) {
+                    ZStack {
                         if let imageURL = recipe.imageURL {
                             CachedAsyncImage(url: imageURL) { phase in
                                 switch phase {
@@ -108,30 +118,42 @@ struct RecipeDetailView: View {
                         )
                     }
                     .ignoresSafeArea(edges: .top)
+                    .overlay(alignment: .topTrailing) {
+                        Button {
+                            onToggleFavorite?()
+                        } label: {
+                            Image(systemName: recipe.favourite ? "heart.fill" : "heart")
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(recipe.favourite ? .pink : Color.white.opacity(0.94))
+                                .frame(width: 38, height: 38)
+                                .background(
+                                    DashboardPalette.surface(colorScheme, level: .secondary),
+                                    in: Circle()
+                                )
+                                .overlay(
+                                    Circle()
+                                        .stroke(DashboardPalette.neutralBorder(colorScheme, opacity: 0.12), lineWidth: 1)
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .padding(16)
+                    }
+                    .overlay(alignment: .topLeading) {
+                        RecipeCategoryBadge(
+                            text: RecipesConstants.displayName(for: recipe.category),
+                            tint: categoryTint,
+                            style: .overlayDark
+                        )
+                        .padding(16)
+                    }
                     
                     VStack(alignment: .leading, spacing: 16) {
-                        // Title & Category
+                        // Title
                         VStack(alignment: .leading, spacing: 8) {
-                            HStack {
-                                Text(recipe.name)
-                                    .font(.title)
-                                    .fontWeight(.bold)
-
-                                Spacer()
-
-                                Button {
-                                    onToggleFavorite?()
-                                } label: {
-                                    Image(systemName: recipe.favourite ? "heart.fill" : "heart")
-                                        .font(.title3)
-                                        .foregroundStyle(recipe.favourite ? .red : .gray)
-                                }
-                                .buttonStyle(.plain)
-                            }
-                            
-                            Text(recipe.category.rawValue)
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                            Text(recipe.name)
+                                .font(.title)
+                                .fontWeight(.bold)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                         
                         // Description
@@ -247,16 +269,6 @@ struct RecipeDetailView: View {
                     .padding(.bottom, 32)
                 }
             }
-            
-            // Close button overlay
-            Button {
-                dismiss()
-            } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.title)
-                    .foregroundStyle(.white)
-            }
-            .padding()
         }
     }
 }
