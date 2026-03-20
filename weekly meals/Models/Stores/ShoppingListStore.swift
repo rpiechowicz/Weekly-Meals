@@ -523,6 +523,7 @@ final class ShoppingListStore {
     private var openRevisionsByWeek: [String: OpenShoppingRevision] = [:]
     private var cachedStateByWeek: [String: ShoppingListState] = [:]
     private var invalidatedWeeks: Set<String> = []
+    private var pendingArchiveWeekLabel: String?
     var isLoading: Bool = false
     var errorMessage: String?
 
@@ -597,8 +598,13 @@ final class ShoppingListStore {
         scheduleReload(weekStart: weekStart)
     }
 
-    func markAllChecked() async {
+    var isArchivePendingAfterBatch: Bool {
+        pendingArchiveWeekLabel != nil
+    }
+
+    func markAllChecked() {
         guard let weekStart else { return }
+        guard !isBatchUpdating else { return }
 
         let uncheckedItems = items.filter { !$0.isChecked }
         guard !uncheckedItems.isEmpty else { return }
@@ -610,21 +616,13 @@ final class ShoppingListStore {
         }
         cacheCurrentState(for: weekStart)
 
-        do {
-            for item in uncheckedItems {
-                try await repository.setChecked(
-                    weekStart: weekStart,
-                    productKey: item.productKey,
-                    isChecked: true
-                )
-            }
-            isBatchUpdating = false
-            await load(weekStart: weekStart, force: true)
-        } catch {
-            isBatchUpdating = false
-            items = originalItems
-            cacheCurrentState(for: weekStart)
-            errorMessage = UserFacingErrorMapper.message(from: error)
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            await self.syncMarkAllChecked(
+                weekStart: weekStart,
+                uncheckedItems: uncheckedItems,
+                originalItems: originalItems
+            )
         }
     }
 
@@ -652,6 +650,10 @@ final class ShoppingListStore {
               !items.isEmpty,
               items.allSatisfy(\.isChecked)
         else { return }
+        if isBatchUpdating {
+            pendingArchiveWeekLabel = weekLabel
+            return
+        }
         Task {
             do {
                 try await repository.archiveShoppingList(weekStart: weekStart, weekLabel: weekLabel)
@@ -713,6 +715,23 @@ final class ShoppingListStore {
         archivedLists.first { $0.weekStart == weekStart && $0.isCurrentClosed }
     }
 
+    func archiveDisplayItems(archiveId: String) -> [ShoppingItem] {
+        guard let archive = archivedLists.first(where: { $0.archiveId == archiveId }) else {
+            return []
+        }
+
+        guard let previousArchive = previousArchive(for: archive) else {
+            return archive.items
+        }
+
+        return makePendingItems(currentItems: archive.items, archivedItems: previousArchive.items)
+    }
+
+    func archiveDisplayCounts(archiveId: String) -> (bought: Int, total: Int) {
+        let items = archiveDisplayItems(archiveId: archiveId)
+        return (items.filter(\.isChecked).count, items.count)
+    }
+
     func hasOpenRevision(for weekStart: String) -> Bool {
         guard self.weekStart == weekStart,
               let archive = currentClosedArchive(for: weekStart)
@@ -749,6 +768,39 @@ final class ShoppingListStore {
             try? await Task.sleep(nanoseconds: 250_000_000)
             guard let self else { return }
             await self.load(weekStart: weekStart, force: true)
+        }
+    }
+
+    private func syncMarkAllChecked(
+        weekStart: String,
+        uncheckedItems: [ShoppingItem],
+        originalItems: [ShoppingItem]
+    ) async {
+        do {
+            for item in uncheckedItems {
+                try await repository.setChecked(
+                    weekStart: weekStart,
+                    productKey: item.productKey,
+                    isChecked: true
+                )
+            }
+
+            let pendingArchiveLabel = pendingArchiveWeekLabel
+            pendingArchiveWeekLabel = nil
+            isBatchUpdating = false
+
+            if let pendingArchiveLabel {
+                try await repository.archiveShoppingList(weekStart: weekStart, weekLabel: pendingArchiveLabel)
+                openRevisionsByWeek.removeValue(forKey: weekStart)
+            }
+
+            await load(weekStart: weekStart, force: true)
+        } catch {
+            pendingArchiveWeekLabel = nil
+            isBatchUpdating = false
+            items = originalItems
+            cacheCurrentState(for: weekStart)
+            errorMessage = UserFacingErrorMapper.message(from: error)
         }
     }
 
@@ -867,6 +919,16 @@ final class ShoppingListStore {
             pendingItem.totalAmount = additionalAmount
             return pendingItem
         }
+    }
+
+    private func previousArchive(for archive: ArchivedShoppingList) -> ArchivedShoppingList? {
+        archivedLists
+            .filter { candidate in
+                candidate.weekStart == archive.weekStart && candidate.revision < archive.revision
+            }
+            .max { lhs, rhs in
+                lhs.revision < rhs.revision
+            }
     }
 
     private func itemSignature(for items: [ShoppingItem]) -> [String] {

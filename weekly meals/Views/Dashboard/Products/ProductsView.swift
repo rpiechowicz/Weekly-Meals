@@ -30,6 +30,11 @@ struct ProductsView: View {
         return shoppingListStore.archivedLists.first { $0.archiveId == previewArchiveId }
     }
 
+    private var previewedArchiveItems: [ShoppingItem] {
+        guard let previewArchiveId else { return [] }
+        return shoppingListStore.archiveDisplayItems(archiveId: previewArchiveId)
+    }
+
     private var previewArchiveSheetBinding: Binding<ArchivedShoppingList?> {
         Binding(
             get: { previewedArchive },
@@ -72,7 +77,7 @@ struct ProductsView: View {
     }
 
     private var groupedPreviewItemsByDepartment: [(department: String, items: [ShoppingItem])] {
-        groupItemsByDepartment(previewedArchive?.items ?? [])
+        groupItemsByDepartment(previewedArchiveItems)
     }
 
     private func groupItemsByDepartment(_ items: [ShoppingItem]) -> [(department: String, items: [ShoppingItem])] {
@@ -493,16 +498,14 @@ struct ProductsView: View {
                     tint: .green,
                     isDisabled: remainingCount == 0 || shoppingListStore.isBatchUpdating
                 ) {
-                    Task {
-                        await shoppingListStore.markAllChecked()
-                    }
+                    shoppingListStore.markAllChecked()
                 }
 
                 actionButton(
-                    title: "Zamknij listę",
-                    icon: "archivebox.fill",
+                    title: shoppingListStore.isArchivePendingAfterBatch ? "Zamknę po zapisie" : "Zamknij listę",
+                    icon: shoppingListStore.isArchivePendingAfterBatch ? "hourglass.circle.fill" : "archivebox.fill",
                     tint: .blue,
-                    isDisabled: !canCloseCurrentList || shoppingListStore.isBatchUpdating
+                    isDisabled: !canCloseCurrentList
                 ) {
                     shoppingListStore.archiveCurrentList(weekLabel: weekRangeText)
                 }
@@ -719,7 +722,9 @@ struct ProductsView: View {
     }
 
     private func archiveRow(_ archive: ArchivedShoppingList) -> some View {
-        HStack(spacing: 12) {
+        let counts = shoppingListStore.archiveDisplayCounts(archiveId: archive.archiveId)
+
+        return HStack(spacing: 12) {
             ZStack {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .fill(Color.blue.opacity(colorScheme == .dark ? 0.16 : 0.1))
@@ -733,7 +738,7 @@ struct ProductsView: View {
                 Text(archive.weekLabel)
                     .font(.footnote)
                     .fontWeight(.semibold)
-                Text("Lista \(archive.revision) • Kupione \(archive.boughtCount)/\(archive.totalCount)")
+                Text("Lista \(archive.revision) • Kupione \(counts.bought)/\(counts.total)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
@@ -1085,7 +1090,7 @@ struct ProductsView: View {
     }
 
     private var canCloseCurrentList: Bool {
-        if shoppingListStore.isBatchUpdating || shoppingItems.isEmpty {
+        if shoppingItems.isEmpty {
             return false
         }
 
@@ -1097,6 +1102,12 @@ struct ProductsView: View {
     }
 
     private var progressSubtitle: String {
+        if shoppingListStore.isArchivePendingAfterBatch {
+            return "Zamknę listę zaraz po zapisaniu wszystkich zmian"
+        }
+        if shoppingListStore.isBatchUpdating {
+            return "Zapisuję kupione produkty na liście"
+        }
         if hasOpenRevision && activeItems.isEmpty {
             return "Brak nowych produktów do dokupienia"
         }
