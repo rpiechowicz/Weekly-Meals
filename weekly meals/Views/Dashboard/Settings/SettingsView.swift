@@ -110,7 +110,8 @@ struct SettingsView: View {
                 Text("Sesja zostanie zakończona na tym urządzeniu.")
             }
             .task(id: sessionStore.householdRealtimeVersion) {
-                await preloadHouseholdContextIfNeeded()
+                guard sessionStore.householdRealtimeVersion > 0 else { return }
+                await handleHouseholdRealtimeUpdate()
             }
         }
     }
@@ -337,12 +338,7 @@ struct SettingsView: View {
             .navigationBarTitleDisplayMode(.inline)
             .task(id: showHouseholdSheet) {
                 if showHouseholdSheet {
-                    await preloadHouseholdContextIfNeeded(force: true)
-                }
-            }
-            .task(id: sessionStore.householdRealtimeVersion) {
-                if showHouseholdSheet {
-                    await preloadHouseholdContextIfNeeded(force: true)
+                    await preloadHouseholdContextIfNeeded()
                 }
             }
             .alert("Opuścić gospodarstwo?", isPresented: $showLeaveHouseholdAlert) {
@@ -649,6 +645,26 @@ struct SettingsView: View {
         }
 
         if force || invitationLink == nil {
+            await createInvitationLink()
+        }
+    }
+
+    @MainActor
+    private func handleHouseholdRealtimeUpdate() async {
+        guard hasHousehold else {
+            householdMembers = []
+            invitationLink = nil
+            return
+        }
+
+        await loadHouseholdMembers()
+
+        guard canCreateInvitations else {
+            invitationLink = nil
+            return
+        }
+
+        if invitationLink == nil {
             await createInvitationLink()
         }
     }

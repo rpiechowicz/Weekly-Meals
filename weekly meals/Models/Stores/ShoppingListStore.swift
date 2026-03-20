@@ -524,6 +524,8 @@ final class ShoppingListStore {
     private var cachedStateByWeek: [String: ShoppingListState] = [:]
     private var invalidatedWeeks: Set<String> = []
     private var pendingArchiveWeekLabel: String?
+    private var isReconcilingPendingChecks: Bool = false
+    private var pendingResetProductKeys: Set<String> = []
     var isLoading: Bool = false
     var errorMessage: String?
 
@@ -541,7 +543,7 @@ final class ShoppingListStore {
             guard let self else { return }
             Task { @MainActor in
                 guard let currentWeekStart = self.weekStart else { return }
-                guard !self.isBatchUpdating else { return }
+                guard !self.isMutatingState else { return }
                 guard event.weekStart == currentWeekStart else {
                     return
                 }
@@ -558,11 +560,15 @@ final class ShoppingListStore {
             guard let self else { return }
             Task { @MainActor in
                 guard let currentWeekStart = self.weekStart else { return }
-                guard !self.isBatchUpdating else { return }
+                guard !self.isMutatingState else { return }
                 self.invalidatedWeeks.insert(currentWeekStart)
                 self.scheduleReload(weekStart: currentWeekStart)
             }
         }
+    }
+
+    private var isMutatingState: Bool {
+        isBatchUpdating || isReconcilingPendingChecks
     }
 
     func load(weekStart: String, force: Bool = false) async {
@@ -609,6 +615,7 @@ final class ShoppingListStore {
         let uncheckedItems = items.filter { !$0.isChecked }
         guard !uncheckedItems.isEmpty else { return }
 
+        pendingResetProductKeys.removeAll()
         let originalItems = items
         isBatchUpdating = true
         for index in items.indices {
@@ -631,6 +638,7 @@ final class ShoppingListStore {
         guard let index = items.firstIndex(where: { $0.productKey == item.productKey }),
               let weekStart else { return }
 
+        pendingResetProductKeys.remove(item.productKey)
         let previous = items[index].isChecked
         let next = !previous
         items[index].isChecked = next
@@ -872,28 +880,36 @@ final class ShoppingListStore {
         }
 
         if !checkedPendingItems.isEmpty {
-            let originalItems = items
-            isBatchUpdating = true
-
             let keysToReset = Set(checkedPendingItems.map(\.productKey))
+            pendingResetProductKeys.formUnion(keysToReset)
+            isReconcilingPendingChecks = true
+
             for index in items.indices where keysToReset.contains(items[index].productKey) {
                 items[index].isChecked = false
             }
+            cacheCurrentState(for: weekStart)
 
             do {
                 for item in checkedPendingItems {
+                    guard pendingResetProductKeys.contains(item.productKey) else {
+                        continue
+                    }
                     try await repository.setChecked(
                         weekStart: weekStart,
                         productKey: item.productKey,
                         isChecked: false
                     )
+                    pendingResetProductKeys.remove(item.productKey)
                 }
             } catch {
-                items = originalItems
                 errorMessage = UserFacingErrorMapper.message(from: error)
+                invalidatedWeeks.insert(weekStart)
             }
-
-            isBatchUpdating = false
+            pendingResetProductKeys.subtract(keysToReset)
+            isReconcilingPendingChecks = false
+            if invalidatedWeeks.contains(weekStart) {
+                scheduleReload(weekStart: weekStart)
+            }
         }
 
         openRevisionsByWeek[weekStart] = OpenShoppingRevision(
