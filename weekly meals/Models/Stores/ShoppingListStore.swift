@@ -134,6 +134,9 @@ struct BackendShoppingItemCheckDTO: Codable {
 struct BackendShoppingListChangedDTO: Codable {
     let householdId: String
     let weekStart: String
+    let action: String?
+    let changedByUserId: String?
+    let changedByDisplayName: String?
     let productKey: String?
     let isChecked: Bool?
     let changeVersion: Int64?
@@ -513,6 +516,7 @@ final class ShoppingListStore {
     }
 
     private let repository: ShoppingListRepository
+    private let currentUserId: String
     private let cacheNamespace: String
     private(set) var items: [ShoppingItem] = []
     private(set) var weekStart: String?
@@ -535,8 +539,9 @@ final class ShoppingListStore {
             .appendingPathComponent("shopping_list_cache_\(cacheNamespace).json")
     }
 
-    init(repository: ShoppingListRepository, cacheNamespace: String = "default") {
+    init(repository: ShoppingListRepository, currentUserId: String = "", cacheNamespace: String = "default") {
         self.repository = repository
+        self.currentUserId = currentUserId
         self.cacheNamespace = Self.sanitizedCacheNamespace(cacheNamespace)
         loadPersistedCache()
         self.repository.observeShoppingListChanges { [weak self] event in
@@ -554,6 +559,14 @@ final class ShoppingListStore {
                 }
                 self.invalidatedWeeks.insert(currentWeekStart)
                 self.scheduleReload(weekStart: currentWeekStart)
+                let changedByOtherUser = event.changedByUserId != nil && event.changedByUserId != self.currentUserId
+                if changedByOtherUser {
+                    ShoppingListNotificationService.notifyRemoteShoppingListChange(
+                        action: event.action,
+                        changedByDisplayName: event.changedByDisplayName,
+                        isChecked: event.isChecked
+                    )
+                }
             }
         }
         self.repository.observeRealtimeReconnect { [weak self] in

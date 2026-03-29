@@ -363,6 +363,7 @@ private struct WeeklyPlanEditorView: View {
     @Environment(\.datesViewModel) private var datesViewModel
     @Environment(\.recipeCatalogStore) private var recipeCatalogStore
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     @State private var selectedCategory: RecipesCategory = .all
     @State private var searchText = ""
@@ -375,6 +376,15 @@ private struct WeeklyPlanEditorView: View {
     @State private var didSavePlan = false
 
     private var categories: [RecipesCategory] = RecipesCategory.allCases
+    private let editorGridSpacing: CGFloat = 12
+
+    private var editorGridColumns: [GridItem] {
+        let columnCount = horizontalSizeClass == .compact ? 2 : 3
+        return Array(
+            repeating: GridItem(.flexible(), spacing: editorGridSpacing, alignment: .top),
+            count: columnCount
+        )
+    }
 
     private var filteredRecipes: [Recipe] {
         var filtered = recipeCatalogStore.recipes
@@ -438,7 +448,7 @@ private struct WeeklyPlanEditorView: View {
                         }
 
                         if shouldShowSkeleton {
-                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: 16)], spacing: 16) {
+                            LazyVGrid(columns: editorGridColumns, spacing: editorGridSpacing) {
                                 ForEach(0..<6, id: \.self) { _ in
                                     RoundedRectangle(cornerRadius: 20, style: .continuous)
                                         .fill(DashboardPalette.surface(colorScheme, level: .tertiary))
@@ -446,7 +456,7 @@ private struct WeeklyPlanEditorView: View {
                                         .redacted(reason: .placeholder)
                                 }
                             }
-                            .padding(.horizontal, 12)
+                            .padding(.horizontal, 10)
                             .padding(.top, 4)
                             .padding(.bottom, 16)
                         } else if filteredRecipes.isEmpty {
@@ -468,7 +478,7 @@ private struct WeeklyPlanEditorView: View {
                             .padding(.top, 80)
                             .padding(.horizontal)
                         } else {
-                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: 16)], spacing: 16) {
+                            LazyVGrid(columns: editorGridColumns, spacing: editorGridSpacing) {
                                 ForEach(filteredRecipes) { recipe in
                                     Button {
                                         if mealPlan.isSelected(recipe) {
@@ -489,13 +499,14 @@ private struct WeeklyPlanEditorView: View {
                                             isSelected: mealPlan.selectedRecipeIDs.contains(recipe.id)
                                         )
                                     }
+                                    .frame(maxWidth: .infinity, alignment: .topLeading)
                                     .buttonStyle(.plain)
                                     .task {
                                         await recipeCatalogStore.loadNextPageIfNeeded(currentItemId: recipe.id, threshold: 8)
                                     }
                                 }
                             }
-                            .padding(.horizontal, 12)
+                            .padding(.horizontal, 10)
                             .padding(.top, 0)
                             .padding(.bottom, 92)
 

@@ -42,6 +42,7 @@ struct RecipeMetricBadge: View {
                 .font(.system(size: 11, weight: .semibold))
                 .monospacedDigit()
                 .lineLimit(1)
+                .truncationMode(.tail)
                 .minimumScaleFactor(0.9)
         }
         .foregroundStyle(labelColor)

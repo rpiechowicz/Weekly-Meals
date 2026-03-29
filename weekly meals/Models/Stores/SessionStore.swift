@@ -139,6 +139,11 @@ final class SessionStore {
     func refreshRealtimeStoresOnForeground() {
         weeklyMealStore?.refreshObservedState()
         shoppingListStore?.refreshCurrentWeek()
+        if let recipeCatalogStore {
+            Task {
+                await recipeCatalogStore.reload()
+            }
+        }
     }
 
     func loginDev(displayName: String, email: String?) async {
@@ -271,6 +276,7 @@ final class SessionStore {
         )
         let shoppingListStore = ShoppingListStore(
             repository: ApiShoppingListRepository(client: shoppingTransport),
+            currentUserId: userId,
             cacheNamespace: "\(userId)_\(householdId)"
         )
         self.shoppingListStore = shoppingListStore

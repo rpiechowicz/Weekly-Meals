@@ -8,6 +8,10 @@ struct RecipeItemView: View {
     var availabilityBadgeText: String? = nil
     var availabilityBadgeColor: Color = .green
     @Environment(\.colorScheme) private var colorScheme
+    private let cardCornerRadius: CGFloat = 18
+    private let cardHeight: CGFloat = 258
+    private let titleBlockHeight: CGFloat = 56
+    private let detailsBlockHeight: CGFloat = 82
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -90,23 +94,29 @@ struct RecipeItemView: View {
             }
             .frame(height: 140)
 
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(recipe.name)
                     .font(.headline)
                     .foregroundStyle(.primary)
-                    .lineLimit(3)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .lineLimit(2)
+                    .truncationMode(.tail)
+                    .frame(maxWidth: .infinity, minHeight: titleBlockHeight, maxHeight: titleBlockHeight, alignment: .topLeading)
 
                 HStack(spacing: 6) {
                     infoPill(icon: "clock", text: "\(recipe.prepTimeMinutes) min")
                     infoPill(icon: "flame.fill", text: "\(Int(recipe.nutritionPerServing.kcal)) kcal")
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .frame(maxWidth: .infinity, minHeight: detailsBlockHeight, maxHeight: detailsBlockHeight, alignment: .topLeading)
         }
         .padding(12)
-        .background(cardFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .frame(height: cardHeight, alignment: .topLeading)
+        .background(cardFill, in: RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
+            RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
                 .stroke(
                     isSelected
                         ? Color.green.opacity(colorScheme == .dark ? 0.8 : 0.65)
@@ -114,7 +124,6 @@ struct RecipeItemView: View {
                     lineWidth: isSelected ? 2 : 1
                 )
         )
-        .frame(height: 246)
     }
 
     private var recipePlaceholder: some View {

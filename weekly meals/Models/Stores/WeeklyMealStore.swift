@@ -665,7 +665,8 @@ private struct ShoppingListStoreKey: EnvironmentKey {
                 socket: UnconfiguredRecipeSocketClient(),
                 userId: "mock-user"
             )
-        )
+        ),
+        currentUserId: "mock-user"
     )
 }
 
@@ -1337,6 +1338,11 @@ final class RecipeCatalogStore {
         if loadCacheIfFresh() {
             didLoad = true
             errorMessage = nil
+            // Show cached data immediately, then revalidate in the background so
+            // a stale simulator cache does not hide newer recipes for hours.
+            Task { @MainActor [weak self] in
+                await self?.reload()
+            }
             return
         }
         await reload()
