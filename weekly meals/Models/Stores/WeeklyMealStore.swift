@@ -1298,7 +1298,7 @@ final class RecipeCatalogStore {
     private var cacheURL: URL {
         FileManager.default
             .urls(for: .documentDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("recipes_catalog_cache_v2.json")
+            .appendingPathComponent("recipes_catalog_cache_v6.json")
     }
 
     init(
