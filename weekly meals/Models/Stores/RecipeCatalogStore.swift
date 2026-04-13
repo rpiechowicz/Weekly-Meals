@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import SwiftUI
 
 // Wydzielono z WeeklyMealStore.swift — wcześniej oba Observable były w jednym pliku 1476 linii.
 
