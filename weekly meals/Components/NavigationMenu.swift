@@ -1,5 +1,6 @@
 import SwiftUI
 
+// Używa API zgodnego z iOS 17+ (Tab + init(selection:content:) to iOS 18+)
 struct NavigationMenu: View {
     private enum DashboardTab: Hashable {
         case recipes
@@ -13,30 +14,37 @@ struct NavigationMenu: View {
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            Tab(MenuConstans.Recipes.name, systemImage: MenuConstans.Recipes.icon, value: DashboardTab.recipes) {
-                RecipesView()
-            }
-            
-            Tab(MenuConstans.Plan.name, systemImage: MenuConstans.Plan.icon, value: DashboardTab.plan) {
-                WeeklyPlanView()
-            }
-            
-            Tab(MenuConstans.Calendar.name, systemImage: MenuConstans.Calendar.icon, value: DashboardTab.calendar) {
-                CalendarView()
-            }
-            
-            Tab(MenuConstans.Products.name, systemImage: MenuConstans.Products.icon, value: DashboardTab.products) {
-                ProductsView()
-            }
-            
-            Tab(MenuConstans.Settings.name, systemImage: MenuConstans.Settings.icon, value: DashboardTab.settings) {
-                SettingsView()
-            }
+            RecipesView()
+                .tabItem {
+                    Label(MenuConstans.Recipes.name, systemImage: MenuConstans.Recipes.icon)
+                }
+                .tag(DashboardTab.recipes)
+
+            WeeklyPlanView()
+                .tabItem {
+                    Label(MenuConstans.Plan.name, systemImage: MenuConstans.Plan.icon)
+                }
+                .tag(DashboardTab.plan)
+
+            CalendarView()
+                .tabItem {
+                    Label(MenuConstans.Calendar.name, systemImage: MenuConstans.Calendar.icon)
+                }
+                .tag(DashboardTab.calendar)
+
+            ProductsView()
+                .tabItem {
+                    Label(MenuConstans.Products.name, systemImage: MenuConstans.Products.icon)
+                }
+                .tag(DashboardTab.products)
+
+            SettingsView()
+                .tabItem {
+                    Label(MenuConstans.Settings.name, systemImage: MenuConstans.Settings.icon)
+                }
+                .tag(DashboardTab.settings)
         }
         .tint(.blue)
-        .onAppear {
-            selectedTab = .calendar
-        }
     }
 }
 
