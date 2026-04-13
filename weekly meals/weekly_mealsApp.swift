@@ -10,7 +10,22 @@ import SwiftUI
 import UserNotifications
 
 enum AppEnvironment {
-    static let apiBaseURL = URL(string: "http://localhost:3000")!
+    /// Adres backendu. Kolejność priorytetów:
+    /// 1. Zmienna środowiskowa API_BASE_URL (przydatna w CI/testach)
+    /// 2. Info.plist → klucz API_BASE_URL (ustawiony per scheme: Debug=localhost, Release=produkcja)
+    /// 3. Fallback: localhost:3000 (tylko development)
+    static let apiBaseURL: URL = {
+        if let envRaw = ProcessInfo.processInfo.environment["API_BASE_URL"],
+           let url = URL(string: envRaw) {
+            return url
+        }
+        if let plistRaw = Bundle.main.object(forInfoDictionaryKey: "API_BASE_URL") as? String,
+           !plistRaw.isEmpty,
+           let url = URL(string: plistRaw) {
+            return url
+        }
+        return URL(string: "http://localhost:3000")!
+    }()
 }
 
 final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {

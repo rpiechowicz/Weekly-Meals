@@ -38,6 +38,7 @@ struct SettingsView: View {
     @State private var showHouseholdSheet = false
     @State private var showPreferencesSheet = false
     @State private var createHouseholdName = ""
+    @State private var householdNameError: String? = nil
     @State private var showLogoutAlert = false
     @State private var showLeaveHouseholdAlert = false
     @State private var householdMembers: [HouseholdMember] = []
@@ -55,8 +56,23 @@ struct SettingsView: View {
         createHouseholdName.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    private static let householdNameMinLength = 2
+    private static let householdNameMaxLength = 50
+
+    private var householdNameValidationError: String? {
+        let name = trimmedCreateHouseholdName
+        if name.isEmpty { return "Nazwa jest wymagana." }
+        if name.count < Self.householdNameMinLength {
+            return "Nazwa musi mieć co najmniej \(Self.householdNameMinLength) znaki."
+        }
+        if name.count > Self.householdNameMaxLength {
+            return "Nazwa może mieć maksymalnie \(Self.householdNameMaxLength) znaków."
+        }
+        return nil
+    }
+
     private var canSubmitCreateHousehold: Bool {
-        !trimmedCreateHouseholdName.isEmpty
+        householdNameValidationError == nil && !trimmedCreateHouseholdName.isEmpty
     }
 
     private var canCreateInvitations: Bool {
@@ -251,8 +267,35 @@ struct SettingsView: View {
                                 .background(DashboardPalette.surface(colorScheme, level: .secondary), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                        .stroke(DashboardPalette.neutralBorder(colorScheme, opacity: 0.12), lineWidth: 1)
+                                        .stroke(
+                                            householdNameError != nil
+                                                ? Color.red.opacity(0.6)
+                                                : DashboardPalette.neutralBorder(colorScheme, opacity: 0.12),
+                                            lineWidth: householdNameError != nil ? 1.5 : 1
+                                        )
                                 )
+                                .onChange(of: createHouseholdName) { _, _ in
+                                    // Wyczyść błąd gdy użytkownik zaczyna pisać
+                                    if householdNameError != nil { householdNameError = nil }
+                                }
+
+                            if let error = householdNameError {
+                                Text(error)
+                                    .font(.caption)
+                                    .foregroundStyle(.red)
+                                    .padding(.horizontal, 4)
+                            }
+
+                            HStack {
+                                Spacer()
+                                Text("\(trimmedCreateHouseholdName.count)/\(Self.householdNameMaxLength)")
+                                    .font(.caption2)
+                                    .foregroundStyle(
+                                        trimmedCreateHouseholdName.count > Self.householdNameMaxLength
+                                            ? .red
+                                            : .secondary
+                                    )
+                            }
                         }
                         .padding(18)
                         .dashboardLiquidCard(cornerRadius: 22, strokeOpacity: 0.16)
@@ -713,13 +756,18 @@ struct SettingsView: View {
     }
 
     private func submitCreateHousehold() {
-        guard canSubmitCreateHousehold else { return }
+        if let error = householdNameValidationError {
+            householdNameError = error
+            return
+        }
         let value = trimmedCreateHouseholdName
         Task {
             await sessionStore.createHousehold(name: value)
             if sessionStore.currentHouseholdId != nil {
                 persistedHouseholdName = value
                 showCreateHouseholdSheet = false
+                createHouseholdName = ""
+                householdNameError = nil
             }
         }
     }

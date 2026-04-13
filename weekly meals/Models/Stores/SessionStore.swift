@@ -115,6 +115,16 @@ final class SessionStore {
 
     private let baseURL = AppEnvironment.apiBaseURL
 
+    /// Aktualny access token z Keychain. Używać do autoryzacji HTTP requestów.
+    var currentAccessToken: String? {
+        KeychainService.get(forKey: Keys.accessToken)
+    }
+
+    /// Aktualny refresh token z Keychain. Używać do odświeżania sesji.
+    var currentRefreshToken: String? {
+        KeychainService.get(forKey: Keys.refreshToken)
+    }
+
     var isSigningIn = false
     var authError: String?
     var isAuthenticated = false
@@ -590,9 +600,12 @@ final class SessionStore {
     }
 
     private func persistSession(_ response: DevLoginResponse) {
+        // Tokeny auth trafiają do Keychain (szyfrowany, chroniony przez Secure Enclave)
+        KeychainService.save(response.accessToken, forKey: Keys.accessToken)
+        KeychainService.save(response.refreshToken, forKey: Keys.refreshToken)
+
+        // Dane niechronione — UserDefaults wystarczy
         let defaults = UserDefaults.standard
-        defaults.set(response.accessToken, forKey: Keys.accessToken)
-        defaults.set(response.refreshToken, forKey: Keys.refreshToken)
         defaults.set(response.user.id, forKey: Keys.userId)
         defaults.set(response.user.displayName, forKey: Keys.displayName)
         defaults.set(response.user.email ?? "", forKey: Keys.email)
@@ -616,9 +629,12 @@ final class SessionStore {
     }
 
     private func clearPersistedSession() {
+        // Usuń tokeny z Keychain
+        KeychainService.delete(forKey: Keys.accessToken)
+        KeychainService.delete(forKey: Keys.refreshToken)
+
+        // Usuń dane sesji z UserDefaults
         let defaults = UserDefaults.standard
-        defaults.removeObject(forKey: Keys.accessToken)
-        defaults.removeObject(forKey: Keys.refreshToken)
         defaults.removeObject(forKey: Keys.userId)
         defaults.removeObject(forKey: Keys.householdId)
     }

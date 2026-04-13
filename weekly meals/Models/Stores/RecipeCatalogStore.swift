@@ -1,0 +1,202 @@
+import Foundation
+import Observation
+
+// Wydzielono z WeeklyMealStore.swift — wcześniej oba Observable były w jednym pliku 1476 linii.
+
+@Observable
+final class RecipeCatalogStore {
+    private struct RecipeCatalogCachePayload: Codable {
+        let recipes: [Recipe]
+        let savedAt: Date
+    }
+
+    private let repository: RecipeRepository
+    private(set) var recipes: [Recipe] = []
+    private(set) var didLoad: Bool = false
+    var isLoading: Bool = false
+    var isLoadingMore: Bool = false
+    var hasMore: Bool = true
+    var errorMessage: String?
+    private var currentPage: Int = 0
+    private let pageSize: Int = 24
+    private let cacheMaxAge: TimeInterval = 60 * 60 * 12 // 12 h
+    private let maxFetchAttempts: Int = 3
+    private var pendingRealtimeReloadTask: Task<Void, Never>?
+
+    private var cacheURL: URL {
+        FileManager.default
+            .urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("recipes_catalog_cache_v6.json")
+    }
+
+    init(
+        repository: RecipeRepository = ApiRecipeRepository(
+            client: WebSocketRecipeTransportClient(
+                socket: UnconfiguredRecipeSocketClient(),
+                userId: "mock-user"
+            )
+        )
+    ) {
+        self.repository = repository
+        self.repository.observeFavoritesChanges { [weak self] recipeId, isFavorite in
+            guard let self else { return }
+            Task { @MainActor in
+                if let index = self.recipes.firstIndex(where: { $0.id == recipeId }) {
+                    self.recipes[index].favourite = isFavorite
+                    self.saveCache()
+                }
+            }
+        }
+        self.repository.observeRealtimeReconnect { [weak self] in
+            guard let self else { return }
+            Task { @MainActor in
+                guard self.didLoad else { return }
+                self.pendingRealtimeReloadTask?.cancel()
+                self.pendingRealtimeReloadTask = Task { @MainActor [weak self] in
+                    try? await Task.sleep(nanoseconds: 300_000_000)
+                    guard let self else { return }
+                    await self.reload()
+                }
+            }
+        }
+    }
+
+    func loadIfNeeded() async {
+        guard !didLoad else { return }
+        if loadCacheIfFresh() {
+            didLoad = true
+            errorMessage = nil
+            Task { @MainActor [weak self] in
+                await self?.reload()
+            }
+            return
+        }
+        await reload()
+    }
+
+    func reload() async {
+        guard !isLoading else { return }
+        isLoading = true
+        isLoadingMore = false
+        errorMessage = nil
+        do {
+            let firstPage = try await fetchPageWithRetry(page: 1)
+            recipes = firstPage
+            currentPage = 1
+            hasMore = firstPage.count >= pageSize
+            didLoad = true
+            saveCache()
+        } catch {
+            errorMessage = UserFacingErrorMapper.message(from: error)
+        }
+        isLoading = false
+    }
+
+    func loadNextPageIfNeeded(currentItemId: UUID?, threshold: Int = 6) async {
+        guard let currentItemId else { return }
+        guard hasMore, !isLoading, !isLoadingMore, didLoad else { return }
+        guard let index = recipes.firstIndex(where: { $0.id == currentItemId }) else { return }
+        let triggerIndex = max(0, recipes.count - max(1, threshold))
+        guard index >= triggerIndex else { return }
+
+        isLoadingMore = true
+        defer { isLoadingMore = false }
+
+        do {
+            let nextPage = currentPage + 1
+            let items = try await fetchPageWithRetry(page: nextPage)
+            recipes.append(contentsOf: items)
+            currentPage = nextPage
+            hasMore = items.count >= pageSize
+            saveCache()
+        } catch {
+            errorMessage = UserFacingErrorMapper.message(from: error)
+        }
+    }
+
+    @MainActor
+    func loadRecipeDetail(recipeId: UUID) async -> Recipe? {
+        if let index = recipes.firstIndex(where: { $0.id == recipeId }) {
+            let current = recipes[index]
+            if !current.ingredients.isEmpty && !current.preparationSteps.isEmpty {
+                return current
+            }
+        }
+
+        do {
+            let detailed = try await repository.fetchRecipeById(recipeId)
+            if let index = recipes.firstIndex(where: { $0.id == recipeId }) {
+                recipes[index] = detailed
+            } else {
+                recipes.append(detailed)
+            }
+            saveCache()
+            return detailed
+        } catch {
+            errorMessage = UserFacingErrorMapper.message(from: error)
+            return recipes.first(where: { $0.id == recipeId })
+        }
+    }
+
+    func toggleFavorite(recipeId: UUID) async {
+        guard let index = recipes.firstIndex(where: { $0.id == recipeId }) else { return }
+        let previous = recipes[index].favourite
+        let next = !previous
+
+        recipes[index].favourite = next
+        do {
+            try await repository.setFavorite(recipeId: recipeId, isFavorite: next)
+            saveCache()
+        } catch {
+            recipes[index].favourite = previous
+            errorMessage = UserFacingErrorMapper.message(from: error)
+        }
+    }
+
+    private func saveCache() {
+        do {
+            let payload = RecipeCatalogCachePayload(recipes: recipes, savedAt: Date())
+            let data = try JSONEncoder().encode(payload)
+            try data.write(to: cacheURL, options: .atomic)
+        } catch {
+            // intentionally ignore cache write failures
+        }
+    }
+
+    private func loadCacheIfFresh() -> Bool {
+        guard let data = try? Data(contentsOf: cacheURL) else { return false }
+        guard let payload = try? JSONDecoder().decode(RecipeCatalogCachePayload.self, from: data) else { return false }
+        guard Date().timeIntervalSince(payload.savedAt) <= cacheMaxAge else { return false }
+        recipes = payload.recipes
+        currentPage = max(1, Int(ceil(Double(payload.recipes.count) / Double(pageSize))))
+        hasMore = payload.recipes.count % pageSize == 0
+        return !payload.recipes.isEmpty
+    }
+
+    private func fetchPageWithRetry(page: Int) async throws -> [Recipe] {
+        var lastError: Error?
+        for attempt in 1...maxFetchAttempts {
+            do {
+                return try await repository.fetchRecipes(page: page, limit: pageSize)
+            } catch {
+                lastError = error
+                if attempt < maxFetchAttempts {
+                    let backoffMs = UInt64(200 * attempt)
+                    try await Task.sleep(nanoseconds: backoffMs * 1_000_000)
+                }
+            }
+        }
+        throw lastError ?? RecipeDataError.serverError(message: "Nie udało się pobrać listy przepisów.")
+    }
+}
+
+private struct RecipeCatalogStoreKey: EnvironmentKey {
+    @MainActor static let defaultValue = RecipeCatalogStore()
+}
+
+extension EnvironmentValues {
+    var recipeCatalogStore: RecipeCatalogStore {
+        get { self[RecipeCatalogStoreKey.self] }
+        set { self[RecipeCatalogStoreKey.self] = newValue }
+    }
+}
