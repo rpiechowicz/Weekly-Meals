@@ -10,6 +10,9 @@ Why this works:
 Files:
 - `weekly-meals-logo-icon.svg`: rounded app-icon style version with dark base and blue/cyan glow.
 - `weekly-meals-logo-mark.svg`: clean standalone mark for monochrome usage.
+- `weekly-meals-app-icon-v2.svg`: App Store-safe primary icon source on a full square canvas.
+- `weekly-meals-app-icon-dark-v2.svg`: darker appearance variant for alternate icon treatments.
+- `weekly-meals-app-icon-tinted-v2.svg`: simplified tinted variant for monochrome-style presentation.
 
 Design intent:
 - `W` = Weekly / week rhythm.

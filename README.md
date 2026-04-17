@@ -30,6 +30,9 @@ The app resolves `API_BASE_URL` in this order:
 
 Current project default points to the production backend URL in the Xcode project build settings.
 
+For local backend development on a simulator or device, override `API_BASE_URL` in the shared Xcode scheme or in the launch environment instead of editing the checked-in project default.
+On a physical iPhone, use your Mac's LAN IP (for example `http://192.168.x.x:3000`) rather than `localhost`, which resolves to the phone itself.
+
 ## Runtime notes
 
 - URL scheme: `weeklymeals://`
@@ -39,7 +42,7 @@ Current project default points to the production backend URL in the Xcode projec
 
 ## Current auth note
 
-The current app build still uses the backend dev-login flow. That means the target backend environment must keep `/auth/dev` available until real auth is shipped.
+The current app build uses Sign in with Apple and posts the resulting token to `POST /auth/apple`.
 
 ## CI
 

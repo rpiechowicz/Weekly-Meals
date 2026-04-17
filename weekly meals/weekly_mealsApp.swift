@@ -11,9 +11,9 @@ import UserNotifications
 
 enum AppEnvironment {
     /// Adres backendu. Kolejność priorytetów:
-    /// 1. Zmienna środowiskowa API_BASE_URL (przydatna w CI/testach)
-    /// 2. Info.plist → klucz API_BASE_URL (ustawiony per scheme: Debug=localhost, Release=produkcja)
-    /// 3. Fallback: localhost:3000 (tylko development)
+    /// 1. Zmienna środowiskowa API_BASE_URL (przydatna przy lokalnym debugowaniu)
+    /// 2. Info.plist → klucz API_BASE_URL (domyślnie produkcja)
+    /// 3. Bezpieczny fallback: produkcja
     static let apiBaseURL: URL = {
         if let envRaw = ProcessInfo.processInfo.environment["API_BASE_URL"],
            let url = URL(string: envRaw) {
@@ -24,7 +24,7 @@ enum AppEnvironment {
            let url = URL(string: plistRaw) {
             return url
         }
-        return URL(string: "http://localhost:3000")!
+        return URL(string: "https://api.weeklymeals.app")!
     }()
 }
 
