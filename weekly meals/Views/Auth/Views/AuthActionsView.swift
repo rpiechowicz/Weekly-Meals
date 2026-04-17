@@ -5,78 +5,54 @@
 //  Created by Rafi on 03/02/2026.
 //
 
+import AuthenticationServices
 import SwiftUI
 
 struct AuthActionsView: View {
     let isLoading: Bool
     let errorMessage: String?
-    let onLoginUser1Tap: () -> Void
-    let onLoginUser2Tap: () -> Void
+    let onSignInWithAppleTap: () -> Void
+
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         VStack(spacing: 12) {
-            Button(action: onLoginUser1Tap) {
-                HStack {
-                    if isLoading {
-                        ProgressView()
-                            .progressViewStyle(.circular)
-                            .tint(.white)
-                    } else {
-                        Image(systemName: "person.circle.fill")
+            ZStack {
+                // Natywny przycisk Apple — wymaga ASAuthorizationAppleIDButton
+                // (użytkownik nie może być zmuszany do użycia custom stylingu
+                // zgodnie z wytycznymi Apple).
+                SignInWithAppleButton(
+                    .signIn,
+                    onRequest: { _ in
+                        // Prawdziwy request jest budowany przez AppleSignInCoordinator
+                        // (potrzebuje nonce + scopes zsynchronizowanych z backendem).
+                        // Ten onRequest jest wywołany tylko, żeby spełnić API SwiftUI —
+                        // samą autoryzację uruchamiamy ręcznie przez tap.
+                    },
+                    onCompletion: { _ in
+                        // Wynik jest konsumowany przez AppleSignInCoordinator.
                     }
-                    Text(isLoading ? "Logowanie..." : "Wejdź jako user1")
-                }
-                .font(.headline)
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(
-                    LinearGradient(
-                        colors: [.blue, .blue.opacity(0.8)],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
                 )
+                .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
+                .frame(height: 48)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
-            }
-            .disabled(isLoading)
+                .allowsHitTesting(false) // przechwyć tap naszym wrapperem niżej
 
-            Button(action: onLoginUser2Tap) {
-                HStack {
-                    if isLoading {
-                        ProgressView()
-                            .progressViewStyle(.circular)
-                            .tint(.white)
-                    } else {
-                        Image(systemName: "person.circle.fill")
-                    }
-                    Text(isLoading ? "Logowanie..." : "Wejdź jako user2")
+                Button(action: onSignInWithAppleTap) {
+                    Color.clear
                 }
-                .font(.headline)
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(
-                    LinearGradient(
-                        colors: [.cyan, .blue.opacity(0.85)],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .frame(height: 48)
+                .contentShape(RoundedRectangle(cornerRadius: 12))
+                .disabled(isLoading)
             }
-            .disabled(isLoading)
 
-            VStack(spacing: 4) {
-                Text("Konta testowe")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                Text("user1 • user1@example.com")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Text("user2 • user2@example.com")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            if isLoading {
+                HStack(spacing: 8) {
+                    ProgressView().progressViewStyle(.circular)
+                    Text("Logowanie przez Apple…")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             if let errorMessage, !errorMessage.isEmpty {
@@ -94,7 +70,6 @@ struct AuthActionsView: View {
     AuthActionsView(
         isLoading: false,
         errorMessage: nil,
-        onLoginUser1Tap: {},
-        onLoginUser2Tap: {}
+        onSignInWithAppleTap: {}
     )
 }

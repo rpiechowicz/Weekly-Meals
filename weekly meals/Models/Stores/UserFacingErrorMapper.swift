@@ -12,8 +12,12 @@ enum UserFacingErrorMapper {
         if lower.contains("cancelled") || lower.contains("cancellationerror") {
             return "Operacja została przerwana."
         }
-        if lower.contains("cannot post /auth/dev") || lower.contains("not found") && lower.contains("/auth/dev") {
+        if lower.contains("cannot post /auth/apple") || lower.contains("cannot post /auth/dev")
+            || (lower.contains("not found") && (lower.contains("/auth/apple") || lower.contains("/auth/dev"))) {
             return "Nie udało się zalogować. Sprawdź, czy backend działa."
+        }
+        if lower.contains("invalid apple identity token") || lower.contains("apple nonce does not match") {
+            return "Nie udało się zweryfikować logowania Apple. Spróbuj ponownie."
         }
         if lower.contains("only owners can") || lower.contains("only owners") {
             return "Tylko właściciel gospodarstwa może wykonać tę akcję."

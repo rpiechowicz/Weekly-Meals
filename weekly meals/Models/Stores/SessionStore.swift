@@ -1,29 +1,25 @@
+import AuthenticationServices
 import Foundation
 import Observation
 import SwiftUI
 
-private struct DevLoginRequest: Codable {
-    let displayName: String
+/// Matches backend POST /auth/apple payload exactly.
+private struct AppleSignInRequest: Codable {
+    let identityToken: String
+    let rawNonce: String
+    let givenName: String?
+    let familyName: String?
     let email: String?
-    let householdName: String?
 }
 
-private struct SessionStoreKey: EnvironmentKey {
-    @MainActor static let defaultValue = SessionStore()
-}
-
-extension EnvironmentValues {
-    var sessionStore: SessionStore {
-        get { self[SessionStoreKey.self] }
-        set { self[SessionStoreKey.self] = newValue }
-    }
-}
-
-private struct DevLoginResponse: Codable {
+/// Matches backend response envelope for both /auth/apple and /auth/dev
+/// (both funnel through AuthService.buildAuthResult → same shape).
+private struct SessionResponse: Codable {
     struct UserDTO: Codable {
         let id: String
         let displayName: String
         let email: String?
+        let provider: String?
     }
 
     struct HouseholdDTO: Codable {
@@ -35,6 +31,17 @@ private struct DevLoginResponse: Codable {
     let refreshToken: String
     let user: UserDTO
     let household: HouseholdDTO?
+}
+
+private struct SessionStoreKey: EnvironmentKey {
+    @MainActor static let defaultValue = SessionStore()
+}
+
+extension EnvironmentValues {
+    var sessionStore: SessionStore {
+        get { self[SessionStoreKey.self] }
+        set { self[SessionStoreKey.self] = newValue }
+    }
 }
 
 private struct HouseholdLeaveAckDTO: Codable {
@@ -106,6 +113,7 @@ final class SessionStore {
         static let accessToken = "auth.accessToken"
         static let refreshToken = "auth.refreshToken"
         static let userId = "auth.userId"
+        static let appleUserIdentifier = "auth.appleUserIdentifier"
         static let householdId = "auth.householdId"
         static let displayName = "settings.user.displayName"
         static let email = "settings.user.email"
@@ -140,6 +148,7 @@ final class SessionStore {
     var datesViewModel = DatesViewModel()
     private var realtimeSocket: RecipeSocketClient?
     private var pendingPushDeviceToken: String?
+    private let appleSignInCoordinator = AppleSignInCoordinator()
 
     init() {
         pendingPushDeviceToken = UserDefaults.standard.string(forKey: Keys.pushDeviceToken)
@@ -156,55 +165,76 @@ final class SessionStore {
         }
     }
 
-    func loginDev(displayName: String, email: String?) async {
-        let trimmedName = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedName.isEmpty else {
-            authError = "Podaj nazwę użytkownika."
-            return
-        }
+    // MARK: - Sign in with Apple
 
+    /// Uruchamia natywny ekran Sign in with Apple. Po pomyślnym logowaniu wysyła
+    /// identityToken + rawNonce do backendu (`POST /auth/apple`), zapisuje sesję.
+    func signInWithApple() async {
         isSigningIn = true
         authError = nil
         defer { isSigningIn = false }
 
         do {
-            var request = URLRequest(url: baseURL.appendingPathComponent("auth/dev"))
-            request.httpMethod = "POST"
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            let body = DevLoginRequest(
-                displayName: trimmedName,
-                email: email?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == true
-                    ? nil
-                    : email?.trimmingCharacters(in: .whitespacesAndNewlines),
-                householdName: "Home"
-            )
-            request.httpBody = try JSONEncoder().encode(body)
-
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard let http = response as? HTTPURLResponse else {
-                throw RecipeDataError.serverError(message: "Brak odpowiedzi HTTP z serwera.")
-            }
-            guard (200...299).contains(http.statusCode) else {
-                let message = String(data: data, encoding: .utf8) ?? "Błąd logowania dev."
-                throw RecipeDataError.serverError(message: message)
-            }
-
-            let decoded = try JSONDecoder().decode(DevLoginResponse.self, from: data)
-            persistSession(decoded)
-            if let household = decoded.household {
-                bootstrapSession(userId: decoded.user.id, householdId: household.id, householdName: household.name)
-            } else {
-                currentUserId = decoded.user.id
-                currentHouseholdId = nil
-                currentHouseholdName = nil
-            }
-            await registerPushDeviceIfPossible()
-            isAuthenticated = true
+            let appleResult = try await appleSignInCoordinator.start()
+            try await exchangeAppleCredential(appleResult)
+        } catch AppleSignInError.canceled {
+            // Użytkownik anulował — nie pokazuj błędu.
+            return
+        } catch let error as AppleSignInError {
+            authError = error.errorDescription
+            isAuthenticated = false
+            clearRuntimeStores()
         } catch {
             authError = UserFacingErrorMapper.message(from: error)
             isAuthenticated = false
             clearRuntimeStores()
         }
+    }
+
+    /// POST /auth/apple z identityToken, rawNonce oraz (tylko na pierwszym
+    /// logowaniu) imieniem i adresem email.
+    private func exchangeAppleCredential(_ credential: AppleSignInResult) async throws {
+        var request = URLRequest(url: baseURL.appendingPathComponent("auth/apple"))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let body = AppleSignInRequest(
+            identityToken: credential.identityToken,
+            rawNonce: credential.rawNonce,
+            givenName: credential.givenName,
+            familyName: credential.familyName,
+            email: credential.email
+        )
+        request.httpBody = try JSONEncoder().encode(body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw RecipeDataError.serverError(message: "Brak odpowiedzi HTTP z serwera.")
+        }
+        guard (200...299).contains(http.statusCode) else {
+            let message = Self.decodeErrorMessage(data: data) ?? "Błąd logowania Apple (HTTP \(http.statusCode))."
+            throw RecipeDataError.serverError(message: message)
+        }
+
+        let decoded = try JSONDecoder().decode(SessionResponse.self, from: data)
+        persistSession(decoded, appleUserIdentifier: credential.userIdentifier)
+        if let household = decoded.household {
+            bootstrapSession(userId: decoded.user.id, householdId: household.id, householdName: household.name)
+        } else {
+            currentUserId = decoded.user.id
+            currentHouseholdId = nil
+            currentHouseholdName = nil
+        }
+        await registerPushDeviceIfPossible()
+        isAuthenticated = true
+    }
+
+    private static func decodeErrorMessage(data: Data) -> String? {
+        struct ErrorResponse: Codable { let message: String? }
+        if let obj = try? JSONDecoder().decode(ErrorResponse.self, from: data), let msg = obj.message {
+            return msg
+        }
+        return String(data: data, encoding: .utf8)
     }
 
     func logout() {
@@ -224,6 +254,26 @@ final class SessionStore {
         UserDefaults.standard.set(normalized, forKey: Keys.pushDeviceToken)
         Task { [weak self] in
             await self?.registerPushDeviceIfPossible()
+        }
+    }
+
+    /// Na starcie aplikacji pytamy Apple o aktualny stan podpisanego wcześniej
+    /// użytkownika. Jeżeli user cofnął dostęp w Ustawieniach iOS → Apple ID,
+    /// wylogowujemy lokalną sesję.
+    func validateAppleCredentialStateIfNeeded() async {
+        guard
+            let userIdentifier = UserDefaults.standard.string(forKey: Keys.appleUserIdentifier),
+            !userIdentifier.isEmpty
+        else { return }
+
+        let state = await AppleSignInCoordinator.currentCredentialState(for: userIdentifier)
+        switch state {
+        case .revoked, .notFound:
+            logout()
+        case .authorized, .transferred:
+            break
+        @unknown default:
+            break
         }
     }
 
@@ -248,6 +298,7 @@ final class SessionStore {
         }
         Task { [weak self] in
             await self?.registerPushDeviceIfPossible()
+            await self?.validateAppleCredentialStateIfNeeded()
         }
         isAuthenticated = true
     }
@@ -599,10 +650,15 @@ final class SessionStore {
         }
     }
 
-    private func persistSession(_ response: DevLoginResponse) {
+    private func persistSession(_ response: SessionResponse, appleUserIdentifier: String? = nil) {
         // Tokeny auth trafiają do Keychain (szyfrowany, chroniony przez Secure Enclave)
         KeychainService.save(response.accessToken, forKey: Keys.accessToken)
         KeychainService.save(response.refreshToken, forKey: Keys.refreshToken)
+
+        if let appleUserIdentifier, !appleUserIdentifier.isEmpty {
+            KeychainService.save(appleUserIdentifier, forKey: Keys.appleUserIdentifier)
+            UserDefaults.standard.set(appleUserIdentifier, forKey: Keys.appleUserIdentifier)
+        }
 
         // Dane niechronione — UserDefaults wystarczy
         let defaults = UserDefaults.standard
@@ -632,10 +688,12 @@ final class SessionStore {
         // Usuń tokeny z Keychain
         KeychainService.delete(forKey: Keys.accessToken)
         KeychainService.delete(forKey: Keys.refreshToken)
+        KeychainService.delete(forKey: Keys.appleUserIdentifier)
 
         // Usuń dane sesji z UserDefaults
         let defaults = UserDefaults.standard
         defaults.removeObject(forKey: Keys.userId)
         defaults.removeObject(forKey: Keys.householdId)
+        defaults.removeObject(forKey: Keys.appleUserIdentifier)
     }
 }

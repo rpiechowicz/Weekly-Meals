@@ -3,7 +3,7 @@ import SwiftUI
 struct AuthView: View {
     let isLoading: Bool
     let errorMessage: String?
-    let onLoginTap: (_ displayName: String, _ email: String?) -> Void
+    let onSignInWithAppleTap: () -> Void
 
     var body: some View {
         ZStack {
@@ -17,12 +17,7 @@ struct AuthView: View {
                         AuthActionsView(
                             isLoading: isLoading,
                             errorMessage: errorMessage,
-                            onLoginUser1Tap: {
-                                onLoginTap("user1", "user1@example.com")
-                            },
-                            onLoginUser2Tap: {
-                                onLoginTap("user2", "user2@example.com")
-                            }
+                            onSignInWithAppleTap: onSignInWithAppleTap
                         )
                         AuthFooterView()
                     }
@@ -41,6 +36,6 @@ struct AuthView: View {
     AuthView(
         isLoading: false,
         errorMessage: nil,
-        onLoginTap: { _, _ in }
+        onSignInWithAppleTap: {}
     )
 }

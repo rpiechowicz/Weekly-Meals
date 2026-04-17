@@ -95,9 +95,9 @@ struct weekly_mealsApp: App {
                     AuthView(
                         isLoading: sessionStore.isSigningIn,
                         errorMessage: sessionStore.authError,
-                        onLoginTap: { displayName, email in
+                        onSignInWithAppleTap: {
                             Task {
-                                await sessionStore.loginDev(displayName: displayName, email: email)
+                                await sessionStore.signInWithApple()
                             }
                         }
                     )
