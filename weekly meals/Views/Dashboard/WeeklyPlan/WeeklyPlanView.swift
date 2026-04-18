@@ -72,6 +72,10 @@ struct WeeklyPlanView: View {
                     weekStart: datesViewModel.weekStartISO,
                     dates: datesViewModel.dates
                 )
+                let urls = MealSlot.allCases
+                    .flatMap { mealStore.savedPlan.entries(for: $0) }
+                    .compactMap(\.recipe.imageURL)
+                ImagePrefetcher.prefetch(urls)
             }
             .sheet(isPresented: $showEditor) {
                 WeeklyPlanEditorView()

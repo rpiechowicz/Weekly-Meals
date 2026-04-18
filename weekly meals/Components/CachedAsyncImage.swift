@@ -10,7 +10,7 @@ private final class SharedImageMemoryCache {
 
     private let cache: NSCache<NSURL, UIImage> = {
         let cache = NSCache<NSURL, UIImage>()
-        cache.countLimit = 256
+        cache.countLimit = 512
         cache.totalCostLimit = 128 * 1_024 * 1_024
         return cache
     }()
@@ -31,35 +31,79 @@ private final class SharedImageMemoryCache {
 private actor SharedImagePipeline {
     static let shared = SharedImagePipeline()
 
-    private var inFlightTasks: [URL: Task<UIImage, Error>] = [:]
+    // Dedykowana sesja z dużym, trwałym URLCache — przeżywa restart aplikacji,
+    // więc drugie uruchomienie trafia w dysk zamiast kolejnego pobrania z sieci.
+    private nonisolated let session: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.urlCache = URLCache(
+            memoryCapacity: 32 * 1_024 * 1_024,
+            diskCapacity: 256 * 1_024 * 1_024,
+            diskPath: "com.weeklymeals.imagecache.http"
+        )
+        config.requestCachePolicy = .returnCacheDataElseLoad
+        config.httpMaximumConnectionsPerHost = 8
+        config.timeoutIntervalForRequest = 30
+        config.waitsForConnectivity = true
+        return URLSession(configuration: config)
+    }()
+
+    private var inFlight: [URL: Task<UIImage, Error>] = [:]
 
     func image(for url: URL) async throws -> UIImage {
-        if let cachedImage = SharedImageMemoryCache.shared.image(for: url) {
-            return cachedImage
+        if let cached = SharedImageMemoryCache.shared.image(for: url) {
+            return cached
         }
 
-        if let inFlightTask = inFlightTasks[url] {
-            return try await inFlightTask.value
+        if let task = inFlight[url] {
+            return try await task.value
         }
 
-        let request = URLRequest(
-            url: url,
-            cachePolicy: .returnCacheDataElseLoad,
-            timeoutInterval: 60
-        )
+        let task = makeFetchTask(url: url)
+        inFlight[url] = task
+        defer { inFlight[url] = nil }
+        return try await task.value
+    }
 
-        let task = Task<UIImage, Error> {
-            let (data, _) = try await URLSession.shared.data(for: request)
-            guard let image = UIImage(data: data) else {
+    func prefetch(_ urls: [URL]) {
+        for url in urls {
+            guard SharedImageMemoryCache.shared.image(for: url) == nil,
+                  inFlight[url] == nil else { continue }
+            // Reuse ten sam tor co zwykły fetch — defer w image(for:) sprząta inFlight,
+            // więc nie ma ryzyka wyścigu z równoległym zapotrzebowaniem na ten sam URL.
+            Task { [weak self] in
+                _ = try? await self?.image(for: url)
+            }
+        }
+    }
+
+    private func makeFetchTask(url: URL) -> Task<UIImage, Error> {
+        let session = self.session
+        return Task.detached(priority: .userInitiated) {
+            let (data, _) = try await session.data(from: url)
+            guard let decoded = await Self.decode(data: data) else {
                 throw CachedAsyncImageError.invalidImageData
             }
-            SharedImageMemoryCache.shared.insert(image, for: url)
-            return image
+            SharedImageMemoryCache.shared.insert(decoded, for: url)
+            return decoded
         }
+    }
 
-        inFlightTasks[url] = task
-        defer { inFlightTasks[url] = nil }
-        return try await task.value
+    private static func decode(data: Data) async -> UIImage? {
+        guard let image = UIImage(data: data) else { return nil }
+        // byPreparingForDisplay dekoduje poza main threadem — bez tego pierwszy render
+        // obrazu blokuje scroll i wywołuje efekt „wyskakiwania”.
+        return await image.byPreparingForDisplay() ?? image
+    }
+}
+
+/// Warmuje cache obrazów dla przyszłych widoków — wołaj gdy znasz URL-e wcześniej
+/// niż pojawią się na ekranie (np. po załadowaniu listy przepisów / stronicowaniu).
+enum ImagePrefetcher {
+    static func prefetch(_ urls: [URL]) {
+        guard !urls.isEmpty else { return }
+        Task.detached(priority: .utility) {
+            await SharedImagePipeline.shared.prefetch(urls)
+        }
     }
 }
 

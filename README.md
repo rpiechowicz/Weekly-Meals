@@ -28,10 +28,16 @@ The app resolves `API_BASE_URL` in this order:
 2. Info.plist / build setting
 3. built-in production fallback
 
-Current project default points to the production backend URL in the Xcode project build settings.
+Checked-in defaults stay on production.
 
-For local backend development on a simulator or device, override `API_BASE_URL` in the shared Xcode scheme or in the launch environment instead of editing the checked-in project default.
-On a physical iPhone, use your Mac's LAN IP (for example `http://192.168.x.x:3000`) rather than `localhost`, which resolves to the phone itself.
+During `Debug` builds, a build phase rewrites the built app's `Info.plist` like this:
+
+- branch `master` or `main`: `https://api.weeklymeals.app`
+- any other local branch: `http://localhost:3000`
+
+`Release` builds always use `https://api.weeklymeals.app`.
+
+For local backend development on a physical iPhone, override `API_BASE_URL` in your local Xcode scheme or launch environment and use your Mac's LAN IP (for example `http://192.168.x.x:3000`) rather than `localhost`, which resolves to the phone itself.
 
 ## Runtime notes
 
