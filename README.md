@@ -50,11 +50,17 @@ For local backend development on a physical iPhone, override `API_BASE_URL` in y
 
 The current app build uses Sign in with Apple and posts the resulting token to `POST /auth/apple`.
 
-## CI
+## CI and TestFlight
 
-GitHub Actions workflow: [`ios-ci.yml`](./.github/workflows/ios-ci.yml)
+GitHub Actions workflows:
 
-The workflow resolves packages and builds the simulator target without code signing.
+- [`ios-ci.yml`](./.github/workflows/ios-ci.yml) validates the simulator build for pull requests and pushes to `main`
+- [`ios-testflight.yml`](./.github/workflows/ios-testflight.yml) archives a signed `Release` build and uploads it to TestFlight after every merge to `main`
+
+Release versioning policy:
+
+- `MARKETING_VERSION` is manual and should be bumped only when starting a new release line, for example `1.0` -> `1.1`
+- `CURRENT_PROJECT_VERSION` is injected by CI from `github.run_number`, so every TestFlight upload gets a newer build number automatically
 
 ## Related backend docs
 
