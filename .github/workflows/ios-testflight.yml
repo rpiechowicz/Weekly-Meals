@@ -123,8 +123,9 @@ jobs:
           xcrun altool \
             --upload-app \
             -f "${{ steps.exported-ipa.outputs.path }}" \
-            --api-key "${{ secrets.APP_STORE_CONNECT_KEY_ID }}" \
-            --api-issuer "${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}" \
+            -t ios \
+            --apiKey "${{ secrets.APP_STORE_CONNECT_KEY_ID }}" \
+            --apiIssuer "${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}" \
             --p8-file-path "${{ steps.appstore-key.outputs.path }}" \
             --output-format json \
             --verbose
