@@ -56,6 +56,22 @@ struct SettingsView: View {
         createHouseholdName.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    private var appVersionLabel: String {
+        let shortVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+        let buildNumber = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String
+
+        switch (shortVersion, buildNumber) {
+        case let (version?, build?) where !version.isEmpty && !build.isEmpty:
+            return "\(version) (\(build))"
+        case let (version?, _) where !version.isEmpty:
+            return version
+        case let (_, build?) where !build.isEmpty:
+            return "Build \(build)"
+        default:
+            return "Niedostępna"
+        }
+    }
+
     private static let householdNameMinLength = 2
     private static let householdNameMaxLength = 50
 
@@ -96,6 +112,7 @@ struct SettingsView: View {
 
                         profileCard
                         menuCard
+                        appVersionCard
                     }
                     .padding(.horizontal, 16)
                     .padding(.top, 8)
@@ -201,6 +218,31 @@ struct SettingsView: View {
             }
         }
         .dashboardLiquidCard(cornerRadius: 22, strokeOpacity: 0.16)
+    }
+
+    private var appVersionCard: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "info.circle")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 30, height: 30)
+                .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Wersja aplikacji")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.primary)
+
+                Text(appVersionLabel)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .dashboardLiquidCard(cornerRadius: 18, strokeOpacity: 0.12)
     }
 
     private func settingsRowButton(
