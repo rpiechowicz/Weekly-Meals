@@ -27,7 +27,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Resolve Swift packages
         run: xcodebuild -resolvePackageDependencies -project "$PROJECT_PATH"
@@ -41,31 +41,12 @@ jobs:
           printf '%s' "$APP_STORE_CONNECT_PRIVATE_KEY_BASE64" | openssl base64 -d -A > "$key_path"
           echo "path=$key_path" >> "$GITHUB_OUTPUT"
 
-      - name: Load App Store Connect key content
-        id: appstore-key-content
-        run: |
-          delimiter="APPSTORE_KEY_$(uuidgen)"
-          {
-            echo "content<<$delimiter"
-            cat "${{ steps.appstore-key.outputs.path }}"
-            printf '\n%s\n' "$delimiter"
-          } >> "$GITHUB_OUTPUT"
-
       - name: Import code-signing certificates
-        uses: apple-actions/import-codesign-certs@v6
+        uses: apple-actions/import-codesign-certs@v5.0.3
         with:
           p12-file-base64: ${{ secrets.IOS_DISTRIBUTION_P12_BASE64 }}
           p12-password: ${{ secrets.IOS_DISTRIBUTION_P12_PASSWORD }}
           keychain-password: ${{ secrets.KEYCHAIN_PASSWORD }}
-
-      - name: Download App Store provisioning profile
-        uses: apple-actions/download-provisioning-profiles@v4
-        with:
-          bundle-id: ${{ env.BUNDLE_ID }}
-          profile-type: IOS_APP_STORE
-          issuer-id: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-          api-key-id: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-          api-private-key: ${{ steps.appstore-key-content.outputs.content }}
 
       - name: Create export options
         run: |
@@ -131,16 +112,19 @@ jobs:
           echo "path=$ipa_path" >> "$GITHUB_OUTPUT"
 
       - name: Upload IPA artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: weekly-meals-testflight-ipa
           path: ${{ steps.exported-ipa.outputs.path }}
           if-no-files-found: error
 
       - name: Upload build to TestFlight
-        uses: apple-actions/upload-testflight-build@v4
-        with:
-          app-path: ${{ steps.exported-ipa.outputs.path }}
-          issuer-id: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-          api-key-id: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-          api-private-key: ${{ steps.appstore-key-content.outputs.content }}
+        run: |
+          xcrun altool \
+            --upload-app \
+            -f "${{ steps.exported-ipa.outputs.path }}" \
+            --api-key "${{ secrets.APP_STORE_CONNECT_KEY_ID }}" \
+            --api-issuer "${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}" \
+            --p8-file-path "${{ steps.appstore-key.outputs.path }}" \
+            --output-format json \
+            --verbose

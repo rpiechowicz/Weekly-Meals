@@ -54,8 +54,14 @@ The current app build uses Sign in with Apple and posts the resulting token to `
 
 GitHub Actions workflows:
 
-- [`ios-ci.yml`](./.github/workflows/ios-ci.yml) validates the simulator build for pull requests and pushes to `main`
+- [`ios-ci.yml`](./.github/workflows/ios-ci.yml) validates the simulator build for pull requests
 - [`ios-testflight.yml`](./.github/workflows/ios-testflight.yml) archives a signed `Release` build and uploads it to TestFlight after every merge to `main`
+
+Release pipeline policy:
+
+- pull requests run only CI, so feedback stays fast and there is no duplicate release work
+- merges to `main` run only the TestFlight release pipeline
+- the release pipeline exports an `.ipa`, uploads it as a workflow artifact, and then uploads the same package to TestFlight
 
 Release versioning policy:
 
