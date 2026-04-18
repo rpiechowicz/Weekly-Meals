@@ -39,11 +39,16 @@ jobs:
         run: |
           key_path="$RUNNER_TEMP/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8"
           printf '%s' "$APP_STORE_CONNECT_PRIVATE_KEY_BASE64" | openssl base64 -d -A > "$key_path"
+          echo "path=$key_path" >> "$GITHUB_OUTPUT"
+
+      - name: Load App Store Connect key content
+        id: appstore-key-content
+        run: |
+          delimiter="APPSTORE_KEY_$(uuidgen)"
           {
-            echo "path=$key_path"
-            echo "content<<EOF"
-            cat "$key_path"
-            echo "EOF"
+            echo "content<<$delimiter"
+            cat "${{ steps.appstore-key.outputs.path }}"
+            echo "$delimiter"
           } >> "$GITHUB_OUTPUT"
 
       - name: Import code-signing certificates
@@ -60,7 +65,7 @@ jobs:
           profile-type: IOS_APP_STORE
           issuer-id: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
           api-key-id: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-          api-private-key: ${{ steps.appstore-key.outputs.content }}
+          api-private-key: ${{ steps.appstore-key-content.outputs.content }}
 
       - name: Create export options
         run: |
@@ -138,4 +143,4 @@ jobs:
           app-path: ${{ steps.exported-ipa.outputs.path }}
           issuer-id: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
           api-key-id: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-          api-private-key: ${{ steps.appstore-key.outputs.content }}
+          api-private-key: ${{ steps.appstore-key-content.outputs.content }}
