@@ -48,7 +48,7 @@ jobs:
           {
             echo "content<<$delimiter"
             cat "${{ steps.appstore-key.outputs.path }}"
-            echo "$delimiter"
+            printf '\n%s\n' "$delimiter"
           } >> "$GITHUB_OUTPUT"
 
       - name: Import code-signing certificates
