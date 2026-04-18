@@ -28,10 +28,16 @@ The app resolves `API_BASE_URL` in this order:
 2. Info.plist / build setting
 3. built-in production fallback
 
-Current project default points to the production backend URL in the Xcode project build settings.
+Checked-in defaults stay on production.
 
-For local backend development on a simulator or device, override `API_BASE_URL` in the shared Xcode scheme or in the launch environment instead of editing the checked-in project default.
-On a physical iPhone, use your Mac's LAN IP (for example `http://192.168.x.x:3000`) rather than `localhost`, which resolves to the phone itself.
+During `Debug` builds, a build phase rewrites the built app's `Info.plist` like this:
+
+- branch `master` or `main`: `https://api.weeklymeals.app`
+- any other local branch: `http://localhost:3000`
+
+`Release` builds always use `https://api.weeklymeals.app`.
+
+For local backend development on a physical iPhone, override `API_BASE_URL` in your local Xcode scheme or launch environment and use your Mac's LAN IP (for example `http://192.168.x.x:3000`) rather than `localhost`, which resolves to the phone itself.
 
 ## Runtime notes
 
@@ -44,11 +50,17 @@ On a physical iPhone, use your Mac's LAN IP (for example `http://192.168.x.x:300
 
 The current app build uses Sign in with Apple and posts the resulting token to `POST /auth/apple`.
 
-## CI
+## CI and TestFlight
 
-GitHub Actions workflow: [`ios-ci.yml`](./.github/workflows/ios-ci.yml)
+GitHub Actions workflows:
 
-The workflow resolves packages and builds the simulator target without code signing.
+- [`ios-ci.yml`](./.github/workflows/ios-ci.yml) validates the simulator build for pull requests and pushes to `main`
+- [`ios-testflight.yml`](./.github/workflows/ios-testflight.yml) archives a signed `Release` build and uploads it to TestFlight after every merge to `main`
+
+Release versioning policy:
+
+- `MARKETING_VERSION` is manual and should be bumped only when starting a new release line, for example `1.0` -> `1.1`
+- `CURRENT_PROJECT_VERSION` is injected by CI from `github.run_number`, so every TestFlight upload gets a newer build number automatically
 
 ## Related backend docs
 

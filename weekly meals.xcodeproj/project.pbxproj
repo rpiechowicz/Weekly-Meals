@@ -33,6 +33,27 @@
 		};
 /* End PBXFrameworksBuildPhase section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		7D1A9B2C3D4E5F60718293A4 /* Configure API Base URL */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/.git/HEAD",
+				"$(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)",
+			);
+			name = "Configure API Base URL";
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/configure-api-base-url.stamp",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -eu\n\nPROD_URL=\"https://api.weeklymeals.app\"\nLOCAL_URL=\"http://localhost:3000\"\nBRANCH=\"${GIT_BRANCH:-${GITHUB_HEAD_REF:-${GITHUB_REF_NAME:-}}}\"\n\nif [ -z \"$BRANCH\" ] && [ -f \"$SRCROOT/.git/HEAD\" ]; then\n  HEAD_CONTENT=$(cat \"$SRCROOT/.git/HEAD\")\n  case \"$HEAD_CONTENT\" in\n    \"ref: refs/heads/\"*)\n      BRANCH=\"${HEAD_CONTENT#ref: refs/heads/}\"\n      ;;\n  esac\nfi\n\nAPI_BASE_URL=\"$PROD_URL\"\nif [ \"$CONFIGURATION\" = \"Debug\" ] && [ -n \"$BRANCH\" ] && [ \"$BRANCH\" != \"master\" ] && [ \"$BRANCH\" != \"main\" ]; then\n  API_BASE_URL=\"$LOCAL_URL\"\nfi\n\nPLIST_PATH=\"$TARGET_BUILD_DIR/$INFOPLIST_PATH\"\n/usr/libexec/PlistBuddy -c \"Delete :API_BASE_URL\" \"$PLIST_PATH\" 2>/dev/null || true\n/usr/libexec/PlistBuddy -c \"Add :API_BASE_URL string $API_BASE_URL\" \"$PLIST_PATH\"\necho \"Configured API_BASE_URL=$API_BASE_URL for configuration=$CONFIGURATION branch=${BRANCH:-unknown}\"\ntouch \"$SCRIPT_OUTPUT_FILE_0\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXGroup section */
 		010DDB6D2F3235DD007CBEBF = {
 			isa = PBXGroup;
@@ -60,6 +81,7 @@
 				010DDB722F3235DD007CBEBF /* Sources */,
 				010DDB732F3235DD007CBEBF /* Frameworks */,
 				010DDB742F3235DD007CBEBF /* Resources */,
+				7D1A9B2C3D4E5F60718293A4 /* Configure API Base URL */,
 			);
 			buildRules = (
 			);
@@ -264,6 +286,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 5R874L3LNP;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "weekly-meals-Info.plist";
@@ -309,6 +332,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 5R874L3LNP;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "weekly-meals-Info.plist";

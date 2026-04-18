@@ -157,6 +157,11 @@ struct RecipesView: View {
                 debouncedSearchText = searchText
                 await recipeCatalogStore.loadIfNeeded()
             }
+            .onChange(of: recipeCatalogStore.recipes.count) { _, _ in
+                // Warmuj cache obrazów dla wszystkich przepisów zaraz po każdej stronie —
+                // tak, żeby użytkownik nie widział „wyskakujących” okładek przy scrollu.
+                ImagePrefetcher.prefetch(recipeCatalogStore.recipes.compactMap(\.imageURL))
+            }
             .onChange(of: searchText) { _, newValue in
                 searchDebounceTask?.cancel()
                 searchDebounceTask = Task { @MainActor in

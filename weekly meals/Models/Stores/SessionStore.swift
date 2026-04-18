@@ -85,6 +85,23 @@ private struct BackendInvitationPreviewDTO: Codable {
     let expiresAt: String?
 }
 
+private struct BackendCurrentUserDTO: Codable {
+    struct MembershipDTO: Codable {
+        struct HouseholdDTO: Codable {
+            let id: String
+            let name: String
+        }
+
+        let householdId: String
+        let household: HouseholdDTO?
+    }
+
+    let id: String
+    let displayName: String
+    let email: String?
+    let memberships: [MembershipDTO]
+}
+
 struct InvitationPromptState: Identifiable {
     let id = UUID()
     let token: String
@@ -109,6 +126,12 @@ struct InvitationPromptState: Identifiable {
 @MainActor
 @Observable
 final class SessionStore {
+    private struct PersistedSessionSnapshot {
+        let userId: String
+        let householdId: String?
+        let householdName: String?
+    }
+
     private enum Keys {
         static let accessToken = "auth.accessToken"
         static let refreshToken = "auth.refreshToken"
@@ -258,8 +281,11 @@ final class SessionStore {
     }
 
     /// Na starcie aplikacji pytamy Apple o aktualny stan podpisanego wcześniej
-    /// użytkownika. Jeżeli user cofnął dostęp w Ustawieniach iOS → Apple ID,
-    /// wylogowujemy lokalną sesję.
+    /// użytkownika. Wylogowujemy się tylko przy jawnym `.revoked` (user cofnął
+    /// dostęp w Ustawieniach → Apple ID). `.notFound` bywa zwracane przejściowo,
+    /// szczególnie na iOS Simulatorze po restarcie procesu — lokalny logout w
+    /// tym przypadku kasowałby ważną sesję. Gdy token faktycznie wygaśnie,
+    /// backend zwróci 401 i wtedy zadziała refresh/logout.
     func validateAppleCredentialStateIfNeeded() async {
         guard
             let userIdentifier = UserDefaults.standard.string(forKey: Keys.appleUserIdentifier),
@@ -268,9 +294,9 @@ final class SessionStore {
 
         let state = await AppleSignInCoordinator.currentCredentialState(for: userIdentifier)
         switch state {
-        case .revoked, .notFound:
+        case .revoked:
             logout()
-        case .authorized, .transferred:
+        case .authorized, .transferred, .notFound:
             break
         @unknown default:
             break
@@ -278,25 +304,28 @@ final class SessionStore {
     }
 
     private func restoreSession() {
-        let defaults = UserDefaults.standard
-        guard
-            let userId = defaults.string(forKey: Keys.userId),
-            !userId.isEmpty
-        else {
+        let snapshot = restoredSessionSnapshot()
+        NSLog(
+            "[SessionStore] restoreSession userId=\(snapshot?.userId ?? "<nil>") householdId=\(snapshot?.householdId ?? "<nil>")"
+        )
+        guard let snapshot else {
+            NSLog("[SessionStore] restoreSession EARLY RETURN — userId missing")
             return
         }
 
-        currentUserId = userId
-        let householdId = defaults.string(forKey: Keys.householdId)
-        let householdName = defaults.string(forKey: Keys.householdName)
+        syncPersistedSessionSnapshot(snapshot)
+        currentUserId = snapshot.userId
+        let householdId = snapshot.householdId
+        let householdName = snapshot.householdName
         if let householdId, !householdId.isEmpty {
             bootstrapSession(
-                userId: userId,
+                userId: snapshot.userId,
                 householdId: householdId,
                 householdName: (householdName?.isEmpty == false ? householdName : nil)
             )
         }
         Task { [weak self] in
+            await self?.restoreHouseholdIfNeeded()
             await self?.registerPushDeviceIfPossible()
             await self?.validateAppleCredentialStateIfNeeded()
         }
@@ -650,18 +679,59 @@ final class SessionStore {
         }
     }
 
+    private func restoreHouseholdIfNeeded() async {
+        guard let userId = currentUserId, !userId.isEmpty else { return }
+        guard currentHouseholdId == nil || currentHouseholdId?.isEmpty == true else { return }
+
+        do {
+            let socketClient = SocketIORecipeSocketClient(baseURL: baseURL)
+            let envelope: WsEnvelope<BackendCurrentUserDTO> = try await socketClient.emitWithAck(
+                event: "users:me",
+                payload: ["userId": userId],
+                as: WsEnvelope<BackendCurrentUserDTO>.self
+            )
+
+            guard envelope.ok, let user = envelope.data else {
+                return
+            }
+
+            let defaults = UserDefaults.standard
+            defaults.set(user.displayName, forKey: Keys.displayName)
+            defaults.set(user.email ?? "", forKey: Keys.email)
+
+            guard let membership = user.memberships.first,
+                  let household = membership.household else {
+                return
+            }
+
+            persistHousehold(id: household.id, name: household.name)
+            bootstrapSession(userId: userId, householdId: household.id, householdName: household.name)
+        } catch {
+            NSLog("[SessionStore] restoreHouseholdIfNeeded FAILED error=\(error.localizedDescription)")
+        }
+    }
+
     private func persistSession(_ response: SessionResponse, appleUserIdentifier: String? = nil) {
+        NSLog("[SessionStore] persistSession START userId=\(response.user.id) household=\(response.household?.id ?? "nil")")
+
         // Tokeny auth trafiają do Keychain (szyfrowany, chroniony przez Secure Enclave)
-        KeychainService.save(response.accessToken, forKey: Keys.accessToken)
-        KeychainService.save(response.refreshToken, forKey: Keys.refreshToken)
+        let accessSaved = KeychainService.save(response.accessToken, forKey: Keys.accessToken)
+        let refreshSaved = KeychainService.save(response.refreshToken, forKey: Keys.refreshToken)
+        let userIdSaved = KeychainService.save(response.user.id, forKey: Keys.userId)
+        NSLog("[SessionStore] keychain saved accessToken=\(accessSaved) refreshToken=\(refreshSaved)")
+        NSLog("[SessionStore] keychain saved userId=\(userIdSaved)")
+
+        // Legacy cleanup: wcześniejsze wersje trzymały tokeny w UserDefaults.
+        // Usuwamy je, żeby nie mylić diagnostyki i nie wyciekały przy backupie.
+        let defaults = UserDefaults.standard
+        defaults.removeObject(forKey: Keys.accessToken)
+        defaults.removeObject(forKey: Keys.refreshToken)
 
         if let appleUserIdentifier, !appleUserIdentifier.isEmpty {
             KeychainService.save(appleUserIdentifier, forKey: Keys.appleUserIdentifier)
-            UserDefaults.standard.set(appleUserIdentifier, forKey: Keys.appleUserIdentifier)
+            defaults.set(appleUserIdentifier, forKey: Keys.appleUserIdentifier)
         }
 
-        // Dane niechronione — UserDefaults wystarczy
-        let defaults = UserDefaults.standard
         defaults.set(response.user.id, forKey: Keys.userId)
         defaults.set(response.user.displayName, forKey: Keys.displayName)
         defaults.set(response.user.email ?? "", forKey: Keys.email)
@@ -670,18 +740,26 @@ final class SessionStore {
         } else {
             clearPersistedHousehold()
         }
+
+        let writtenUserId = defaults.string(forKey: Keys.userId) ?? "<nil>"
+        let writtenHouseholdId = defaults.string(forKey: Keys.householdId) ?? "<nil>"
+        NSLog("[SessionStore] persistSession DONE readback userId=\(writtenUserId) householdId=\(writtenHouseholdId)")
     }
 
     private func persistHousehold(id: String, name: String) {
         let defaults = UserDefaults.standard
         defaults.set(id, forKey: Keys.householdId)
         defaults.set(name, forKey: Keys.householdName)
+        KeychainService.save(id, forKey: Keys.householdId)
+        KeychainService.save(name, forKey: Keys.householdName)
     }
 
     private func clearPersistedHousehold() {
         let defaults = UserDefaults.standard
         defaults.removeObject(forKey: Keys.householdId)
         defaults.removeObject(forKey: Keys.householdName)
+        KeychainService.delete(forKey: Keys.householdId)
+        KeychainService.delete(forKey: Keys.householdName)
     }
 
     private func clearPersistedSession() {
@@ -689,11 +767,76 @@ final class SessionStore {
         KeychainService.delete(forKey: Keys.accessToken)
         KeychainService.delete(forKey: Keys.refreshToken)
         KeychainService.delete(forKey: Keys.appleUserIdentifier)
+        KeychainService.delete(forKey: Keys.userId)
+        KeychainService.delete(forKey: Keys.householdId)
+        KeychainService.delete(forKey: Keys.householdName)
 
         // Usuń dane sesji z UserDefaults
         let defaults = UserDefaults.standard
         defaults.removeObject(forKey: Keys.userId)
         defaults.removeObject(forKey: Keys.householdId)
+        defaults.removeObject(forKey: Keys.householdName)
         defaults.removeObject(forKey: Keys.appleUserIdentifier)
+    }
+
+    private func restoredSessionSnapshot() -> PersistedSessionSnapshot? {
+        let userId = persistedValue(forKey: Keys.userId) ?? userIdFromAccessToken()
+        guard let userId else { return nil }
+
+        return PersistedSessionSnapshot(
+            userId: userId,
+            householdId: persistedValue(forKey: Keys.householdId),
+            householdName: persistedValue(forKey: Keys.householdName)
+        )
+    }
+
+    private func syncPersistedSessionSnapshot(_ snapshot: PersistedSessionSnapshot) {
+        let defaults = UserDefaults.standard
+        defaults.set(snapshot.userId, forKey: Keys.userId)
+        KeychainService.save(snapshot.userId, forKey: Keys.userId)
+
+        if let householdId = snapshot.householdId {
+            defaults.set(householdId, forKey: Keys.householdId)
+            KeychainService.save(householdId, forKey: Keys.householdId)
+        }
+        if let householdName = snapshot.householdName {
+            defaults.set(householdName, forKey: Keys.householdName)
+            KeychainService.save(householdName, forKey: Keys.householdName)
+        }
+    }
+
+    private func persistedValue(forKey key: String) -> String? {
+        normalizedValue(UserDefaults.standard.string(forKey: key))
+            ?? normalizedValue(KeychainService.get(forKey: key))
+    }
+
+    private func normalizedValue(_ value: String?) -> String? {
+        guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
+            return nil
+        }
+        return trimmed
+    }
+
+    private func userIdFromAccessToken() -> String? {
+        guard let token = currentAccessToken else { return nil }
+        let segments = token.split(separator: ".")
+        guard segments.count >= 2 else { return nil }
+
+        var payload = String(segments[1])
+            .replacingOccurrences(of: "-", with: "+")
+            .replacingOccurrences(of: "_", with: "/")
+        let remainder = payload.count % 4
+        if remainder != 0 {
+            payload.append(String(repeating: "=", count: 4 - remainder))
+        }
+
+        guard let data = Data(base64Encoded: payload),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let userId = normalizedValue(object["sub"] as? String) else {
+            return nil
+        }
+
+        NSLog("[SessionStore] restoreSession recovered userId from access token")
+        return userId
     }
 }
