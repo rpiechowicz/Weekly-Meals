@@ -79,21 +79,20 @@ struct RecipeMetricBadge: View {
 struct RecipeCategoryBadge: View {
     @Environment(\.colorScheme) private var colorScheme
 
-    let text: String
-    let tint: Color
+    let category: RecipesCategory
     var style: RecipeCategoryBadgeStyle = .subtle
 
     var body: some View {
         HStack(spacing: 6) {
-            Circle()
-                .fill(dotColor)
-                .frame(width: 7, height: 7)
+            Image(systemName: RecipesConstants.icon(for: category))
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(iconColor)
 
-            Text(text)
+            Text(RecipesConstants.displayName(for: category))
                 .lineLimit(1)
+                .foregroundStyle(labelColor)
         }
         .font(.system(size: 11, weight: .semibold))
-        .foregroundStyle(labelColor)
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .background(backgroundFill, in: Capsule())
@@ -104,14 +103,18 @@ struct RecipeCategoryBadge: View {
         .shadow(color: shadowColor, radius: colorScheme == .dark ? 8 : 5, x: 0, y: 2)
     }
 
+    private var tint: Color {
+        RecipesConstants.tint(for: category)
+    }
+
     private var backgroundFill: Color {
         switch style {
         case .subtle:
             if colorScheme == .dark {
-                return Color(red: 0.15, green: 0.17, blue: 0.21).opacity(0.74)
+                return DashboardPalette.tintFill(tint, scheme: colorScheme, dark: 0.2, light: 0.14)
             }
 
-            return DashboardPalette.surface(colorScheme, level: .primary).opacity(0.96)
+            return DashboardPalette.tintFill(tint, scheme: colorScheme, dark: 0.2, light: 0.14)
         case .overlayDark:
             return Color.black.opacity(colorScheme == .dark ? 0.38 : 0.48)
         }
@@ -129,18 +132,16 @@ struct RecipeCategoryBadge: View {
     private var labelColor: Color {
         switch style {
         case .subtle:
-            return colorScheme == .dark
-                ? Color.white.opacity(0.88)
-                : Color.black.opacity(0.66)
+            return tint.opacity(colorScheme == .dark ? 0.96 : 0.9)
         case .overlayDark:
             return Color.white.opacity(0.94)
         }
     }
 
-    private var dotColor: Color {
+    private var iconColor: Color {
         switch style {
         case .subtle:
-            return tint.opacity(colorScheme == .dark ? 0.92 : 0.82)
+            return tint.opacity(colorScheme == .dark ? 0.98 : 0.9)
         case .overlayDark:
             return tint.opacity(0.96)
         }
@@ -156,6 +157,100 @@ struct RecipeCategoryBadge: View {
     }
 }
 
+struct RecipeStatusCircle: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    let systemName: String
+    let tint: Color
+
+    var body: some View {
+        Image(systemName: systemName)
+            .font(.system(size: 13, weight: .bold))
+            .foregroundStyle(tint)
+            .frame(width: 30, height: 30)
+            .background(
+                DashboardPalette.surface(colorScheme, level: .secondary),
+                in: Circle()
+            )
+            .overlay(
+                Circle()
+                    .stroke(DashboardPalette.neutralBorder(colorScheme, opacity: 0.12), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.08), radius: 4, x: 0, y: 2)
+    }
+}
+
+struct RecipeFavoriteBadge: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    let isFavorite: Bool
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: isFavorite ? "heart.fill" : "heart")
+                .font(.system(size: 11, weight: .semibold))
+
+            Text(isFavorite ? "Ulubione" : "Do ulubionych")
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+        }
+        .font(.system(size: 12, weight: .semibold))
+        .foregroundStyle(labelColor)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(backgroundFill, in: Capsule())
+        .overlay(
+            Capsule()
+                .stroke(borderColor, lineWidth: 1)
+        )
+    }
+
+    private var backgroundFill: Color {
+        if isFavorite {
+            return DashboardPalette.tintFill(.pink, scheme: colorScheme, dark: 0.2, light: 0.14)
+        }
+
+        return DashboardPalette.surface(colorScheme, level: .secondary)
+    }
+
+    private var borderColor: Color {
+        if isFavorite {
+            return Color.pink.opacity(colorScheme == .dark ? 0.34 : 0.28)
+        }
+
+        return DashboardPalette.neutralBorder(colorScheme, opacity: 0.12)
+    }
+
+    private var labelColor: Color {
+        if isFavorite {
+            return .pink.opacity(colorScheme == .dark ? 0.95 : 0.88)
+        }
+
+        return colorScheme == .dark
+            ? Color.white.opacity(0.84)
+            : Color.black.opacity(0.72)
+    }
+}
+
+struct RecipeFavoriteButton: View {
+    let isFavorite: Bool
+    var action: (() -> Void)? = nil
+
+    var body: some View {
+        Group {
+            if let action {
+                Button(action: action) {
+                    RecipeFavoriteBadge(isFavorite: isFavorite)
+                }
+                .buttonStyle(.plain)
+            } else {
+                RecipeFavoriteBadge(isFavorite: isFavorite)
+            }
+        }
+        .accessibilityLabel(isFavorite ? "Ulubione" : "Dodaj do ulubionych")
+    }
+}
+
 #Preview {
     VStack(spacing: 12) {
         RecipeInfoBadge(icon: "clock", text: "30 min")
@@ -165,8 +260,11 @@ struct RecipeCategoryBadge: View {
         RecipeInfoBadge(icon: "star.fill", text: "trudne", color: .red)
         RecipeMetricBadge(icon: "clock", text: "30 min")
         RecipeMetricBadge(icon: "flame.fill", text: "380 kcal")
-        RecipeCategoryBadge(text: "Kolacje", tint: .purple)
-        RecipeCategoryBadge(text: "Kolacje", tint: .purple, style: .overlayDark)
+        RecipeCategoryBadge(category: .dinner)
+        RecipeCategoryBadge(category: .dinner, style: .overlayDark)
+        RecipeStatusCircle(systemName: "heart.fill", tint: .pink)
+        RecipeFavoriteBadge(isFavorite: true)
+        RecipeFavoriteBadge(isFavorite: false)
     }
     .padding()
 }
