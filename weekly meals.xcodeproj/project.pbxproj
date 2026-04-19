@@ -50,7 +50,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -eu\n\nPROD_URL=\"https://api.weeklymeals.app\"\nLOCAL_URL=\"http://localhost:3000\"\nBRANCH=\"${GIT_BRANCH:-${GITHUB_HEAD_REF:-${GITHUB_REF_NAME:-}}}\"\n\nif [ -z \"$BRANCH\" ] && [ -f \"$SRCROOT/.git/HEAD\" ]; then\n  HEAD_CONTENT=$(cat \"$SRCROOT/.git/HEAD\")\n  case \"$HEAD_CONTENT\" in\n    \"ref: refs/heads/\"*)\n      BRANCH=\"${HEAD_CONTENT#ref: refs/heads/}\"\n      ;;\n  esac\nfi\n\nAPI_BASE_URL=\"$PROD_URL\"\nif [ \"$CONFIGURATION\" = \"Debug\" ] && [ -n \"$BRANCH\" ] && [ \"$BRANCH\" != \"master\" ] && [ \"$BRANCH\" != \"main\" ]; then\n  API_BASE_URL=\"$LOCAL_URL\"\nfi\n\nPLIST_PATH=\"$TARGET_BUILD_DIR/$INFOPLIST_PATH\"\n/usr/libexec/PlistBuddy -c \"Delete :API_BASE_URL\" \"$PLIST_PATH\" 2>/dev/null || true\n/usr/libexec/PlistBuddy -c \"Add :API_BASE_URL string $API_BASE_URL\" \"$PLIST_PATH\"\necho \"Configured API_BASE_URL=$API_BASE_URL for configuration=$CONFIGURATION branch=${BRANCH:-unknown}\"\ntouch \"$SCRIPT_OUTPUT_FILE_0\"\n";
+			shellScript = "set -eu\n\nPROD_URL=\"https://weakly-meals-backend-production.up.railway.app\"\nLOCAL_URL=\"http://localhost:3000\"\nBRANCH=\"${GIT_BRANCH:-${GITHUB_HEAD_REF:-${GITHUB_REF_NAME:-}}}\"\n\nif [ -z \"$BRANCH\" ] && [ -f \"$SRCROOT/.git/HEAD\" ]; then\n  HEAD_CONTENT=$(cat \"$SRCROOT/.git/HEAD\")\n  case \"$HEAD_CONTENT\" in\n    \"ref: refs/heads/\"*)\n      BRANCH=\"${HEAD_CONTENT#ref: refs/heads/}\"\n      ;;\n  esac\nfi\n\nAPI_BASE_URL=\"$PROD_URL\"\nif [ \"$CONFIGURATION\" = \"Debug\" ] && [ -n \"$BRANCH\" ] && [ \"$BRANCH\" != \"master\" ] && [ \"$BRANCH\" != \"main\" ]; then\n  API_BASE_URL=\"$LOCAL_URL\"\nfi\n\nPLIST_PATH=\"$TARGET_BUILD_DIR/$INFOPLIST_PATH\"\n/usr/libexec/PlistBuddy -c \"Delete :API_BASE_URL\" \"$PLIST_PATH\" 2>/dev/null || true\n/usr/libexec/PlistBuddy -c \"Add :API_BASE_URL string $API_BASE_URL\" \"$PLIST_PATH\"\necho \"Configured API_BASE_URL=$API_BASE_URL for configuration=$CONFIGURATION branch=${BRANCH:-unknown}\"\ntouch \"$SCRIPT_OUTPUT_FILE_0\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -290,7 +290,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "weekly-meals-Info.plist";
-				INFOPLIST_KEY_API_BASE_URL = "https://api.weeklymeals.app";
+				INFOPLIST_KEY_API_BASE_URL = "https://weakly-meals-backend-production.up.railway.app";
 				INFOPLIST_KEY_CFBundleDisplayName = "Weekly Meals";
 				INFOPLIST_KEY_CFBundleURLTypes_0_CFBundleURLName = weeklymeals;
 				INFOPLIST_KEY_CFBundleURLTypes_0_CFBundleURLSchemes_0 = weeklymeals;
@@ -336,7 +336,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "weekly-meals-Info.plist";
-				INFOPLIST_KEY_API_BASE_URL = "https://api.weeklymeals.app";
+				INFOPLIST_KEY_API_BASE_URL = "https://weakly-meals-backend-production.up.railway.app";
 				INFOPLIST_KEY_CFBundleDisplayName = "Weekly Meals";
 				INFOPLIST_KEY_CFBundleURLTypes_0_CFBundleURLName = weeklymeals;
 				INFOPLIST_KEY_CFBundleURLTypes_0_CFBundleURLSchemes_0 = weeklymeals;

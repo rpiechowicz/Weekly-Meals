@@ -541,6 +541,9 @@ private struct WeeklyPlanEditorView: View {
                 debouncedSearchText = searchText
                 await recipeCatalogStore.loadIfNeeded()
             }
+            .onChange(of: recipeCatalogStore.recipes.count) { _, _ in
+                ImagePrefetcher.prefetch(recipeCatalogStore.recipes.compactMap(\.imageURL))
+            }
             .task(id: datesViewModel.weekStartISO) {
                 await mealStore.loadSavedPlanFromBackend(weekStart: datesViewModel.weekStartISO)
                 await mealStore.loadWeekPlanFromBackend(

@@ -24,7 +24,7 @@ enum AppEnvironment {
            let url = URL(string: plistRaw) {
             return url
         }
-        return URL(string: "https://api.weeklymeals.app")!
+        return URL(string: "https://weakly-meals-backend-production.up.railway.app")!
     }()
 }
 

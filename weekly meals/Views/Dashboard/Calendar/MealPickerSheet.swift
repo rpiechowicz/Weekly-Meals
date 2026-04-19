@@ -144,6 +144,9 @@ struct MealPickerSheet: View {
         }
         .searchable(text: $searchText, prompt: "Szukaj przepisów")
         .presentationDetents([.large])
+        .task {
+            ImagePrefetcher.prefetch(uniqueRecipes.compactMap(\.imageURL))
+        }
     }
 
     private var pickerHeader: some View {
