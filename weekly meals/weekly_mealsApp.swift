@@ -66,45 +66,100 @@ struct weekly_mealsApp: App {
     @AppStorage("settings.theme") private var themeRawValue: String = AppTheme.system.rawValue
     @Environment(\.scenePhase) private var scenePhase
 
+    /// Klucz dla `.task(id:)` uruchamiającego smart startup loader.
+    /// Zmiana klucza (logowanie, restore, switch householdu) re-odpala warmup;
+    /// dla tego samego kontekstu Swift nie powtarza taska.
+    private var startupTaskID: String {
+        let auth = sessionStore.isAuthenticated ? "1" : "0"
+        let household = sessionStore.currentHouseholdId ?? ""
+        return "\(auth)|\(household)"
+    }
+
+    /// Stabilny identyfikator aktualnie widocznego ekranu. Sterowany przez niego
+    /// jest crossfade między Auth / Loader / Dashboard / NoHousehold.
+    private enum RootScreen: Equatable {
+        case auth
+        case loader
+        case dashboard
+        case noHousehold
+    }
+
+    private var currentRootScreen: RootScreen {
+        if !sessionStore.isAuthenticated {
+            return .auth
+        }
+        if sessionStore.isRestoringSession, sessionStore.currentHouseholdId == nil {
+            return .loader
+        }
+        if let householdId = sessionStore.currentHouseholdId, !householdId.isEmpty {
+            return sessionStore.startupPhase == .ready ? .dashboard : .loader
+        }
+        return .noHousehold
+    }
+
+    @ViewBuilder
+    private func rootScreen(_ screen: RootScreen) -> some View {
+        switch screen {
+        case .auth:
+            AuthView(
+                isLoading: sessionStore.isSigningIn,
+                errorMessage: sessionStore.authError,
+                onSignInWithAppleTap: {
+                    Task {
+                        await sessionStore.signInWithApple()
+                    }
+                }
+            )
+        case .loader:
+            StartupLoaderView()
+        case .dashboard:
+            if let mealStore = sessionStore.weeklyMealStore,
+               let recipeCatalogStore = sessionStore.recipeCatalogStore,
+               let shoppingListStore = sessionStore.shoppingListStore {
+                DashboardView()
+                    .environment(\.weeklyMealStore, mealStore)
+                    .environment(\.datesViewModel, sessionStore.datesViewModel)
+                    .environment(\.recipeCatalogStore, recipeCatalogStore)
+                    .environment(\.shoppingListStore, shoppingListStore)
+            } else {
+                // Stores nie powinny być nil gdy startupPhase == .ready,
+                // ale na wszelki wypadek pokażemy loader niż pusty ekran.
+                StartupLoaderView()
+            }
+        case .noHousehold:
+            NoHouseholdView(
+                isLoading: sessionStore.isSigningIn,
+                errorMessage: sessionStore.authError,
+                onCreate: { name in
+                    Task {
+                        await sessionStore.createHousehold(name: name)
+                    }
+                },
+                onLogout: {
+                    sessionStore.logout()
+                }
+            )
+        }
+    }
+
     var body: some Scene {
         WindowGroup {
-            Group {
-                if sessionStore.isAuthenticated,
-                   let mealStore = sessionStore.weeklyMealStore,
-                   let recipeCatalogStore = sessionStore.recipeCatalogStore,
-                   let shoppingListStore = sessionStore.shoppingListStore {
-                    DashboardView()
-                        .environment(\.weeklyMealStore, mealStore)
-                        .environment(\.datesViewModel, sessionStore.datesViewModel)
-                        .environment(\.recipeCatalogStore, recipeCatalogStore)
-                        .environment(\.shoppingListStore, shoppingListStore)
-                } else if sessionStore.isAuthenticated {
-                    NoHouseholdView(
-                        isLoading: sessionStore.isSigningIn,
-                        errorMessage: sessionStore.authError,
-                        onCreate: { name in
-                            Task {
-                                await sessionStore.createHousehold(name: name)
-                            }
-                        },
-                        onLogout: {
-                            sessionStore.logout()
-                        }
+            ZStack {
+                rootScreen(currentRootScreen)
+                    .id(currentRootScreen)
+                    .transition(
+                        .asymmetric(
+                            insertion: .opacity.combined(with: .scale(scale: 1.015)),
+                            removal: .opacity.combined(with: .scale(scale: 0.985))
+                        )
                     )
-                } else {
-                    AuthView(
-                        isLoading: sessionStore.isSigningIn,
-                        errorMessage: sessionStore.authError,
-                        onSignInWithAppleTap: {
-                            Task {
-                                await sessionStore.signInWithApple()
-                            }
-                        }
-                    )
-                }
             }
+            .animation(.easeInOut(duration: 0.45), value: currentRootScreen)
             .environment(\.sessionStore, sessionStore)
             .preferredColorScheme((AppTheme(rawValue: themeRawValue) ?? .system).colorScheme)
+            .task(id: startupTaskID) {
+                await sessionStore.runStartupIfNeeded()
+            }
             .onAppear {
                 appDelegate.sessionStore = sessionStore
             }

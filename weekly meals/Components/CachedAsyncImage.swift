@@ -205,6 +205,20 @@ enum ImagePrefetcher {
             await SharedImagePipeline.shared.prefetch(urls)
         }
     }
+
+    /// Jak `prefetch`, ale czeka aż pierwsza partia miniaturek zostanie zdekodowana
+    /// i będzie w cache pamięciowym. Używane przez smart startup loader, żeby
+    /// lista przepisów nie „wyskakiwała” okładkami zaraz po wejściu.
+    static func prefetchAwaiting(_ urls: [URL]) async {
+        guard !urls.isEmpty else { return }
+        await withTaskGroup(of: Void.self) { group in
+            for url in urls {
+                group.addTask(priority: .userInitiated) {
+                    _ = try? await SharedImagePipeline.shared.image(for: url)
+                }
+            }
+        }
+    }
 }
 
 struct CachedAsyncImage<Content: View>: View {

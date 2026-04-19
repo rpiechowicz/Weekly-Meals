@@ -123,6 +123,45 @@ struct InvitationPromptState: Identifiable {
     }
 }
 
+/// Kontrolowane fazy startu po logowaniu / restore sesji.
+/// UI gatuje przejście do dashboardu na `.ready`, żeby użytkownik nie zobaczył
+/// niedoładowanych ekranów z placeholderami.
+enum StartupPhase: Equatable {
+    case idle
+    case warmingUp
+    case ready
+}
+
+/// Snapshot domownika trzymany w SessionStore (preload pod Settings / Household).
+struct HouseholdMemberSnapshot: Identifiable, Hashable, Codable {
+    let id: String
+    let displayName: String
+    let email: String?
+    let avatarUrl: String?
+    let role: String
+}
+
+private struct BackendHouseholdMemberDTO: Decodable {
+    struct UserDTO: Decodable {
+        let id: String
+        let displayName: String
+        let email: String?
+        let avatarUrl: String?
+    }
+
+    let id: String
+    let userId: String
+    let householdId: String
+    let role: String
+    let user: UserDTO
+}
+
+private struct HouseholdMembersCachePayload: Codable {
+    let householdId: String
+    let members: [HouseholdMemberSnapshot]
+    let savedAt: Date
+}
+
 @MainActor
 @Observable
 final class SessionStore {
@@ -165,6 +204,22 @@ final class SessionStore {
     var invitationPrompt: InvitationPromptState?
     var householdRealtimeVersion: Int = 0
 
+    /// Bieżąca faza smart startup loadera.
+    /// - `.idle` → brak sesji / brak gospodarstwa (Auth / NoHousehold)
+    /// - `.warmingUp` → przygotowujemy dane przed wejściem do dashboardu
+    /// - `.ready` → dashboard może się pokazać
+    var startupPhase: StartupPhase = .idle
+    /// `true` gdy trwa restore sesji i musimy dociągnąć household z backendu
+    /// (persisted userId bez persisted householdId). UI trzyma wtedy loader
+    /// zamiast mignięcia NoHouseholdView.
+    var isRestoringSession: Bool = false
+
+    /// Członkowie aktualnego gospodarstwa. Prealoaduje się w startupie i z cache,
+    /// żeby Settings / Household sheet otwierało się z gotowymi danymi.
+    var householdMembers: [HouseholdMemberSnapshot] = []
+    var isLoadingHouseholdMembers: Bool = false
+    private(set) var didLoadHouseholdMembers: Bool = false
+
     var weeklyMealStore: WeeklyMealStore?
     var recipeCatalogStore: RecipeCatalogStore?
     var shoppingListStore: ShoppingListStore?
@@ -172,6 +227,14 @@ final class SessionStore {
     private var realtimeSocket: RecipeSocketClient?
     private var pendingPushDeviceToken: String?
     private let appleSignInCoordinator = AppleSignInCoordinator()
+    private var startupTask: Task<Void, Never>?
+    private var householdMembersTask: Task<Void, Never>?
+    private let householdMembersCacheMaxAge: TimeInterval = 60 * 60 * 24 // 24 h
+    private let startupTimeoutSeconds: Double = 6
+    private let startupImagePrefetchCount: Int = 12
+    /// Loader nie znika szybciej niż po tym czasie — nawet przy cieplutkim starcie
+    /// (wszystko z cache). Bez tego loader tylko mignął, co wyglądało jak przeskok.
+    private let startupMinimumDisplaySeconds: Double = 1.2
 
     init() {
         pendingPushDeviceToken = UserDefaults.standard.string(forKey: Keys.pushDeviceToken)
@@ -262,12 +325,15 @@ final class SessionStore {
 
     func logout() {
         clearPersistedSession()
+        clearHouseholdMembersCache()
         clearRuntimeStores()
         isAuthenticated = false
         authError = nil
         currentUserId = nil
         currentHouseholdId = nil
         currentHouseholdName = nil
+        startupPhase = .idle
+        isRestoringSession = false
     }
 
     func updatePushDeviceToken(_ token: String) {
@@ -323,19 +389,38 @@ final class SessionStore {
                 householdId: householdId,
                 householdName: (householdName?.isEmpty == false ? householdName : nil)
             )
+            // Podnosimy skopiowany z dysku snapshot domowników od razu — jeśli jest świeży,
+            // sheet Gospodarstwo otworzy się bez pustego stanu nawet przy cold starcie.
+            loadHouseholdMembersFromCacheIfFresh(for: householdId)
+        } else {
+            // Brak persisted householdu — musimy zapytać backend o membership.
+            // Dopóki to nie zakończy się, trzymamy loader zamiast mignięcia NoHouseholdView.
+            isRestoringSession = true
         }
         Task { [weak self] in
             await self?.restoreHouseholdIfNeeded()
             await self?.registerPushDeviceIfPossible()
             await self?.validateAppleCredentialStateIfNeeded()
+            await MainActor.run { [weak self] in
+                self?.isRestoringSession = false
+            }
         }
         isAuthenticated = true
     }
 
     private func bootstrapSession(userId: String, householdId: String, householdName: String? = nil) {
+        let householdChanged = currentHouseholdId != householdId
         currentUserId = userId
         currentHouseholdId = householdId
         currentHouseholdName = householdName
+        // Nowy rebootstrap (logowanie / switch household) — startup musi przejść ponownie.
+        startupPhase = .idle
+        if householdChanged {
+            householdMembers = []
+            didLoadHouseholdMembers = false
+            householdMembersTask?.cancel()
+            householdMembersTask = nil
+        }
         let datesViewModel = DatesViewModel()
         self.datesViewModel = datesViewModel
         let socketClient = SocketIORecipeSocketClient(baseURL: baseURL)
@@ -385,6 +470,13 @@ final class SessionStore {
         recipeCatalogStore = nil
         shoppingListStore = nil
         datesViewModel = DatesViewModel()
+        startupTask?.cancel()
+        startupTask = nil
+        householdMembersTask?.cancel()
+        householdMembersTask = nil
+        householdMembers = []
+        isLoadingHouseholdMembers = false
+        didLoadHouseholdMembers = false
     }
 
     private func observeHouseholdRealtime() {
@@ -401,6 +493,9 @@ final class SessionStore {
                 guard let currentHouseholdId = self.currentHouseholdId, !currentHouseholdId.isEmpty else { return }
                 guard event.householdId == currentHouseholdId else { return }
                 self.householdRealtimeVersion &+= 1
+                // Pull świeżej listy do store'a — widoki czytają ją bezpośrednio
+                // (bez refetchowania sheetu ponownie).
+                await self.refreshHouseholdMembers(force: true)
             }
         }
     }
@@ -815,6 +910,172 @@ final class SessionStore {
             return nil
         }
         return trimmed
+    }
+
+    // MARK: - Smart startup loader
+
+    /// Jedno wejście dla warmupu po logowaniu / restore sesji.
+    /// Idempotent — dla ciepłego startu i tak szybko wchodzi w `.ready`
+    /// (cache przepisów, cache dysku obrazów, snapshot domowników).
+    @MainActor
+    func runStartupIfNeeded(force: Bool = false) async {
+        guard isAuthenticated else {
+            startupPhase = .idle
+            return
+        }
+        guard let householdId = currentHouseholdId, !householdId.isEmpty else {
+            // Brak householdu → UI pokazuje loader (jeśli restoreSession trwa)
+            // lub NoHouseholdView. Warmup nie ma co przygotowywać.
+            startupPhase = .idle
+            return
+        }
+        if !force, startupPhase == .ready { return }
+
+        startupTask?.cancel()
+        let minimumDisplay = startupMinimumDisplaySeconds
+        let task = Task { @MainActor [weak self] in
+            guard let self else { return }
+            self.startupPhase = .warmingUp
+            let startedAt = Date()
+            await self.runStartupWithTimeout()
+            // Minimum display — jeśli warmup poszedł z cache w <2 s, dotrzymujemy
+            // loaderowi 2 s, żeby przejście Auth/Loader/Dashboard było płynne a nie migotało.
+            let elapsed = Date().timeIntervalSince(startedAt)
+            if elapsed < minimumDisplay {
+                let remaining = minimumDisplay - elapsed
+                try? await Task.sleep(nanoseconds: UInt64(remaining * 1_000_000_000))
+            }
+            // Nawet jeśli któryś krok się nie udał (offline / timeout),
+            // wchodzimy w .ready — dashboard ma własne skeletony / cache.
+            self.startupPhase = .ready
+        }
+        startupTask = task
+        await task.value
+    }
+
+    private func runStartupWithTimeout() async {
+        let timeoutSeconds = startupTimeoutSeconds
+        await withTaskGroup(of: Void.self) { group in
+            group.addTask { [weak self] in
+                await self?.prepareStartupData()
+            }
+            group.addTask {
+                try? await Task.sleep(nanoseconds: UInt64(timeoutSeconds * 1_000_000_000))
+            }
+            _ = await group.next()
+            group.cancelAll()
+        }
+    }
+
+    private func prepareStartupData() async {
+        // Krytyczne pod pierwsze wejście — odpalamy równolegle.
+        // Każdy krok jest bezpieczny wobec braku sieci (korzysta z cache /
+        // ustawia errorMessage w storze zamiast rzucać).
+        async let recipesReady: Void = prepareRecipesAndThumbnails()
+        async let householdReady: Void = prepareHouseholdMembersSnapshot()
+        _ = await (recipesReady, householdReady)
+    }
+
+    private func prepareRecipesAndThumbnails() async {
+        guard let catalog = recipeCatalogStore else { return }
+        await catalog.loadIfNeeded()
+        let urls = Array(catalog.recipes.prefix(startupImagePrefetchCount).compactMap(\.imageURL))
+        await ImagePrefetcher.prefetchAwaiting(urls)
+    }
+
+    private func prepareHouseholdMembersSnapshot() async {
+        // Jeśli mamy świeży snapshot z cache albo już pobrany po realtime,
+        // nie robimy drugiego round-tripa na starcie.
+        if didLoadHouseholdMembers, !householdMembers.isEmpty {
+            return
+        }
+        await refreshHouseholdMembers(force: false)
+    }
+
+    // MARK: - Household members snapshot
+
+    @MainActor
+    func refreshHouseholdMembers(force: Bool = false) async {
+        guard let userId = currentUserId, !userId.isEmpty,
+              let householdId = currentHouseholdId, !householdId.isEmpty else {
+            householdMembers = []
+            didLoadHouseholdMembers = false
+            return
+        }
+        if !force, isLoadingHouseholdMembers { return }
+        if !force, didLoadHouseholdMembers, !householdMembers.isEmpty { return }
+
+        householdMembersTask?.cancel()
+        let task = Task { @MainActor [weak self] in
+            guard let self else { return }
+            self.isLoadingHouseholdMembers = true
+            defer { self.isLoadingHouseholdMembers = false }
+            do {
+                let socketClient = SocketIORecipeSocketClient(baseURL: self.baseURL)
+                let envelope: WsEnvelope<[BackendHouseholdMemberDTO]> = try await socketClient.emitWithAck(
+                    event: "households:listMembers",
+                    payload: [
+                        "userId": userId,
+                        "householdId": householdId
+                    ],
+                    as: WsEnvelope<[BackendHouseholdMemberDTO]>.self
+                )
+
+                guard envelope.ok, let data = envelope.data else {
+                    if !self.didLoadHouseholdMembers {
+                        self.authError = envelope.error
+                    }
+                    return
+                }
+
+                let snapshots = data.map {
+                    HouseholdMemberSnapshot(
+                        id: $0.user.id,
+                        displayName: $0.user.displayName,
+                        email: $0.user.email,
+                        avatarUrl: $0.user.avatarUrl,
+                        role: $0.role
+                    )
+                }
+                self.householdMembers = snapshots
+                self.didLoadHouseholdMembers = true
+                self.saveHouseholdMembersCache(householdId: householdId, members: snapshots)
+            } catch is CancellationError {
+                return
+            } catch {
+                // Offline / błąd sieci — zostawiamy to, co już mamy (cache / poprzedni pull).
+                if !self.didLoadHouseholdMembers, self.householdMembers.isEmpty {
+                    self.authError = UserFacingErrorMapper.message(from: error)
+                }
+            }
+        }
+        householdMembersTask = task
+        await task.value
+    }
+
+    private var householdMembersCacheURL: URL {
+        FileManager.default
+            .urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("household_members_cache_v1.json")
+    }
+
+    private func loadHouseholdMembersFromCacheIfFresh(for householdId: String) {
+        guard let data = try? Data(contentsOf: householdMembersCacheURL) else { return }
+        guard let payload = try? JSONDecoder().decode(HouseholdMembersCachePayload.self, from: data) else { return }
+        guard payload.householdId == householdId else { return }
+        guard Date().timeIntervalSince(payload.savedAt) <= householdMembersCacheMaxAge else { return }
+        householdMembers = payload.members
+        didLoadHouseholdMembers = !payload.members.isEmpty
+    }
+
+    private func saveHouseholdMembersCache(householdId: String, members: [HouseholdMemberSnapshot]) {
+        let payload = HouseholdMembersCachePayload(householdId: householdId, members: members, savedAt: Date())
+        guard let data = try? JSONEncoder().encode(payload) else { return }
+        try? data.write(to: householdMembersCacheURL, options: .atomic)
+    }
+
+    private func clearHouseholdMembersCache() {
+        try? FileManager.default.removeItem(at: householdMembersCacheURL)
     }
 
     private func userIdFromAccessToken() -> String? {

@@ -1,28 +1,5 @@
 import SwiftUI
 
-private struct HouseholdMember: Identifiable, Hashable {
-    let id: String
-    let displayName: String
-    let email: String?
-    let avatarUrl: String?
-    let role: String
-}
-
-private struct BackendHouseholdMemberDTO: Decodable {
-    struct UserDTO: Decodable {
-        let id: String
-        let displayName: String
-        let email: String?
-        let avatarUrl: String?
-    }
-
-    let id: String
-    let userId: String
-    let householdId: String
-    let role: String
-    let user: UserDTO
-}
-
 struct SettingsView: View {
     @Environment(\.sessionStore) private var sessionStore
     @Environment(\.colorScheme) private var colorScheme
@@ -41,12 +18,8 @@ struct SettingsView: View {
     @State private var householdNameError: String? = nil
     @State private var showLogoutAlert = false
     @State private var showLeaveHouseholdAlert = false
-    @State private var householdMembers: [HouseholdMember] = []
-    @State private var isLoadingMembers = false
     @State private var invitationLink: URL?
     @State private var isCreatingInvitation = false
-
-    private let apiBaseURL = AppEnvironment.apiBaseURL
 
     private var hasHousehold: Bool {
         !persistedHouseholdName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -89,6 +62,14 @@ struct SettingsView: View {
 
     private var canSubmitCreateHousehold: Bool {
         householdNameValidationError == nil && !trimmedCreateHouseholdName.isEmpty
+    }
+
+    private var householdMembers: [HouseholdMemberSnapshot] {
+        sessionStore.householdMembers
+    }
+
+    private var isLoadingMembers: Bool {
+        sessionStore.isLoadingHouseholdMembers && householdMembers.isEmpty
     }
 
     private var canCreateInvitations: Bool {
@@ -146,6 +127,11 @@ struct SettingsView: View {
                 guard sessionStore.householdRealtimeVersion > 0 else { return }
                 await handleHouseholdRealtimeUpdate()
             }
+            .task {
+                // Wejście w ustawienia — dociągnij świeży snapshot jeśli brak.
+                // Przy ciepłym starcie cache z SessionStore startupu wystarczy.
+                await preloadHouseholdContextIfNeeded(force: false)
+            }
         }
     }
 
@@ -197,8 +183,11 @@ struct SettingsView: View {
                 accent: hasHousehold ? .teal : .blue
             ) {
                 if hasHousehold {
-                    Task { await preloadHouseholdContextIfNeeded() }
+                    // Sheet otwiera się z danymi, które już są w sessionStore.
+                    // Dopychamy w tle świeży pull (nie blokuje UI; jeśli snapshot
+                    // z cache jest aktualny, to działa jak no-op).
                     showHouseholdSheet = true
+                    Task { await preloadHouseholdContextIfNeeded(force: false) }
                 } else {
                     createHouseholdName = ""
                     showCreateHouseholdSheet = true
@@ -421,11 +410,6 @@ struct SettingsView: View {
             }
             .navigationTitle("Gospodarstwo")
             .navigationBarTitleDisplayMode(.inline)
-            .task(id: showHouseholdSheet) {
-                if showHouseholdSheet {
-                    await preloadHouseholdContextIfNeeded()
-                }
-            }
             .alert("Opuścić gospodarstwo?", isPresented: $showLeaveHouseholdAlert) {
                 Button("Anuluj", role: .cancel) {}
                 Button("Opuść", role: .destructive) {
@@ -715,14 +699,11 @@ struct SettingsView: View {
     @MainActor
     private func preloadHouseholdContextIfNeeded(force: Bool = false) async {
         guard hasHousehold else {
-            householdMembers = []
             invitationLink = nil
             return
         }
 
-        if force || householdMembers.isEmpty {
-            await loadHouseholdMembers()
-        }
+        await sessionStore.refreshHouseholdMembers(force: force)
 
         guard canCreateInvitations else {
             invitationLink = nil
@@ -736,13 +717,12 @@ struct SettingsView: View {
 
     @MainActor
     private func handleHouseholdRealtimeUpdate() async {
+        // SessionStore sam odświeża members po realtime event. Tu tylko
+        // synchronizujemy invitation link, jeśli zmiana roli jej wymaga.
         guard hasHousehold else {
-            householdMembers = []
             invitationLink = nil
             return
         }
-
-        await loadHouseholdMembers()
 
         guard canCreateInvitations else {
             invitationLink = nil
@@ -814,53 +794,7 @@ struct SettingsView: View {
         }
     }
 
-    private func loadHouseholdMembers() async {
-        guard let userId = sessionStore.currentUserId, !userId.isEmpty,
-              let householdId = sessionStore.currentHouseholdId, !householdId.isEmpty else {
-            householdMembers = []
-            return
-        }
-
-        isLoadingMembers = true
-        defer { isLoadingMembers = false }
-
-        do {
-            let socketClient = SocketIORecipeSocketClient(baseURL: apiBaseURL)
-            let envelope: WsEnvelope<[BackendHouseholdMemberDTO]> = try await socketClient.emitWithAck(
-                event: "households:listMembers",
-                payload: [
-                    "userId": userId,
-                    "householdId": householdId
-                ],
-                as: WsEnvelope<[BackendHouseholdMemberDTO]>.self
-            )
-
-            guard envelope.ok, let data = envelope.data else {
-                throw RecipeDataError.serverError(message: envelope.error ?? "Nie udało się pobrać członków gospodarstwa.")
-            }
-
-            householdMembers = data.map {
-                HouseholdMember(
-                    id: $0.user.id,
-                    displayName: $0.user.displayName,
-                    email: $0.user.email,
-                    avatarUrl: $0.user.avatarUrl,
-                    role: $0.role
-                )
-            }
-
-            if !canCreateInvitations {
-                sessionStore.authError = nil
-            }
-        } catch is CancellationError {
-            return
-        } catch {
-            sessionStore.authError = UserFacingErrorMapper.message(from: error)
-            householdMembers = []
-        }
-    }
-
-    private func memberRow(_ member: HouseholdMember) -> some View {
+    private func memberRow(_ member: HouseholdMemberSnapshot) -> some View {
         HStack(spacing: 12) {
             memberAvatar(for: member)
 
@@ -901,7 +835,7 @@ struct SettingsView: View {
     }
 
     @ViewBuilder
-    private func memberAvatar(for member: HouseholdMember) -> some View {
+    private func memberAvatar(for member: HouseholdMemberSnapshot) -> some View {
         if let avatarUrl = member.avatarUrl, let url = URL(string: avatarUrl) {
             CachedAsyncImage(url: url) { phase in
                 switch phase {
