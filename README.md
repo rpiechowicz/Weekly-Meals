@@ -32,10 +32,10 @@ Checked-in defaults stay on production.
 
 During `Debug` builds, a build phase rewrites the built app's `Info.plist` like this:
 
-- branch `master` or `main`: `https://api.weeklymeals.app`
+- branch `master` or `main`: `https://weakly-meals-backend-production.up.railway.app`
 - any other local branch: `http://localhost:3000`
 
-`Release` builds always use `https://api.weeklymeals.app`.
+`Release` builds always use `https://weakly-meals-backend-production.up.railway.app`.
 
 For local backend development on a physical iPhone, override `API_BASE_URL` in your local Xcode scheme or launch environment and use your Mac's LAN IP (for example `http://192.168.x.x:3000`) rather than `localhost`, which resolves to the phone itself.
 

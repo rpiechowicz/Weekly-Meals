@@ -1,5 +1,7 @@
 import SwiftUI
 import UIKit
+import ImageIO
+import CryptoKit
 
 private enum CachedAsyncImageError: Error {
     case invalidImageData
@@ -28,24 +30,99 @@ private final class SharedImageMemoryCache {
     }
 }
 
+// Trwały cache zakodowanych bajtów (JPEG/PNG z serwera) na dysku, niezależny od
+// nagłówków Cache-Control backendu — dzięki temu drugie uruchomienie aplikacji
+// serwuje okładki z dysku zamiast sieci, bez „wyskakiwania” obrazów.
+private final class SharedImageDiskCache {
+    static let shared = SharedImageDiskCache()
+
+    private let directory: URL
+    private let fileManager = FileManager.default
+    private let ioQueue = DispatchQueue(label: "com.weeklymeals.imagecache.disk", qos: .utility)
+    private let maxDiskBytes: Int = 300 * 1_024 * 1_024
+    private let maxAge: TimeInterval = 60 * 60 * 24 * 30
+
+    private init() {
+        let base = fileManager.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+        directory = base.appendingPathComponent("com.weeklymeals.imagecache.v2", isDirectory: true)
+        try? fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        ioQueue.async { [weak self] in self?.pruneIfNeeded() }
+    }
+
+    func data(for url: URL) -> Data? {
+        let path = filePath(for: url)
+        guard let data = try? Data(contentsOf: path, options: .mappedIfSafe) else { return nil }
+        ioQueue.async { [weak self] in
+            try? self?.fileManager.setAttributes([.modificationDate: Date()], ofItemAtPath: path.path)
+        }
+        return data
+    }
+
+    func insert(_ data: Data, for url: URL) {
+        let path = filePath(for: url)
+        ioQueue.async { [weak self] in
+            try? data.write(to: path, options: .atomic)
+            self?.pruneIfNeeded()
+        }
+    }
+
+    private func filePath(for url: URL) -> URL {
+        let digest = SHA256.hash(data: Data(url.absoluteString.utf8))
+        let name = digest.map { String(format: "%02x", $0) }.joined()
+        return directory.appendingPathComponent(name)
+    }
+
+    private func pruneIfNeeded() {
+        let keys: [URLResourceKey] = [.contentModificationDateKey, .fileSizeKey]
+        guard let contents = try? fileManager.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: keys
+        ) else { return }
+
+        let now = Date()
+        var entries: [(url: URL, date: Date, size: Int)] = []
+        var total = 0
+
+        for file in contents {
+            let values = try? file.resourceValues(forKeys: Set(keys))
+            let date = values?.contentModificationDate ?? now
+            let size = values?.fileSize ?? 0
+            if now.timeIntervalSince(date) > maxAge {
+                try? fileManager.removeItem(at: file)
+                continue
+            }
+            total += size
+            entries.append((file, date, size))
+        }
+
+        guard total > maxDiskBytes else { return }
+        for entry in entries.sorted(by: { $0.date < $1.date }) {
+            try? fileManager.removeItem(at: entry.url)
+            total -= entry.size
+            if total <= maxDiskBytes { break }
+        }
+    }
+}
+
 private actor SharedImagePipeline {
     static let shared = SharedImagePipeline()
 
-    // Dedykowana sesja z dużym, trwałym URLCache — przeżywa restart aplikacji,
-    // więc drugie uruchomienie trafia w dysk zamiast kolejnego pobrania z sieci.
+    // Mały memory-only URLCache — trwałość HTTP zastąpiliśmy własnym dyskiem
+    // (SharedImageDiskCache), który nie zależy od Cache-Control z backendu.
     private nonisolated let session: URLSession = {
         let config = URLSessionConfiguration.default
-        config.urlCache = URLCache(
-            memoryCapacity: 32 * 1_024 * 1_024,
-            diskCapacity: 256 * 1_024 * 1_024,
-            diskPath: "com.weeklymeals.imagecache.http"
-        )
-        config.requestCachePolicy = .returnCacheDataElseLoad
+        config.urlCache = URLCache(memoryCapacity: 8 * 1_024 * 1_024, diskCapacity: 0, diskPath: nil)
+        config.requestCachePolicy = .useProtocolCachePolicy
         config.httpMaximumConnectionsPerHost = 8
         config.timeoutIntervalForRequest = 30
         config.waitsForConnectivity = true
         return URLSession(configuration: config)
     }()
+
+    // Maks. krawędź thumbnailu (px). 1200 pokrywa zarówno kafelki w siatce, jak
+    // i pełnoekranowy header szczegółów na iPhone'ach — i pozwala uniknąć
+    // dekodowania 3–5 MP bitmap tylko po to, żeby SwiftUI je pomniejszył.
+    private static let maxThumbnailPixelSize: CGFloat = 1200
 
     private var inFlight: [URL: Task<UIImage, Error>] = [:]
 
@@ -79,17 +156,40 @@ private actor SharedImagePipeline {
     private func makeFetchTask(url: URL) -> Task<UIImage, Error> {
         let session = self.session
         return Task.detached(priority: .userInitiated) {
+            if let data = SharedImageDiskCache.shared.data(for: url),
+               let decoded = await Self.decode(data: data) {
+                SharedImageMemoryCache.shared.insert(decoded, for: url)
+                return decoded
+            }
+
             let (data, _) = try await session.data(from: url)
             guard let decoded = await Self.decode(data: data) else {
                 throw CachedAsyncImageError.invalidImageData
             }
             SharedImageMemoryCache.shared.insert(decoded, for: url)
+            SharedImageDiskCache.shared.insert(data, for: url)
             return decoded
         }
     }
 
     private static func decode(data: Data) async -> UIImage? {
-        guard let image = UIImage(data: data) else { return nil }
+        let image: UIImage? = {
+            guard let source = CGImageSourceCreateWithData(data as CFData, nil) else {
+                return UIImage(data: data)
+            }
+            let options: [CFString: Any] = [
+                kCGImageSourceCreateThumbnailFromImageAlways: true,
+                kCGImageSourceShouldCacheImmediately: true,
+                kCGImageSourceCreateThumbnailWithTransform: true,
+                kCGImageSourceThumbnailMaxPixelSize: maxThumbnailPixelSize
+            ]
+            guard let cg = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
+                return UIImage(data: data)
+            }
+            return UIImage(cgImage: cg)
+        }()
+
+        guard let image else { return nil }
         // byPreparingForDisplay dekoduje poza main threadem — bez tego pierwszy render
         // obrazu blokuje scroll i wywołuje efekt „wyskakiwania”.
         return await image.byPreparingForDisplay() ?? image
@@ -121,6 +221,11 @@ struct CachedAsyncImage<Content: View>: View {
 
     var body: some View {
         content(phase)
+            // Reset synchroniczny przy zmianie URL (LazyVGrid podmienia content w recyklowanej komórce):
+            // bez tego widać na klatkę starą okładkę z poprzedniego recipe.
+            .onChange(of: url, initial: false) { _, newURL in
+                phase = Self.initialPhase(for: newURL)
+            }
             .task(id: url) {
                 await loadImage()
             }
@@ -132,9 +237,7 @@ struct CachedAsyncImage<Content: View>: View {
             return
         }
 
-        let cachedPhase = Self.initialPhase(for: url)
-        phase = cachedPhase
-        if case .success = cachedPhase {
+        if case .success = phase {
             return
         }
 
