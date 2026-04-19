@@ -29,6 +29,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Select Xcode 26
+        run: |
+          # Prefer Xcode 26.x for iOS 26 SDK (required for Liquid Glass tab bar)
+          xcode26=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          if [ -n "$xcode26" ]; then
+            echo "Using $xcode26"
+            sudo xcode-select -s "$xcode26/Contents/Developer"
+          else
+            echo "Xcode 26 not found, using default: $(xcode-select -p)"
+          fi
+          xcodebuild -version
+          xcodebuild -showsdks | grep iphoneos
+
       - name: Resolve Swift packages
         run: xcodebuild -resolvePackageDependencies -project "$PROJECT_PATH"
 
@@ -83,6 +96,7 @@ jobs:
             -scheme "$SCHEME" \
             -configuration Release \
             -destination "generic/platform=iOS" \
+            -sdk iphoneos \
             -archivePath "$ARCHIVE_PATH" \
             -allowProvisioningUpdates \
             -authenticationKeyPath "${{ steps.appstore-key.outputs.path }}" \
