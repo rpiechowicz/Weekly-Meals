@@ -17,8 +17,33 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Select Xcode 26
+        run: |
+          # Keep CI aligned with the project's iOS 26 deployment target.
+          xcode26=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          if [ -n "$xcode26" ]; then
+            echo "Using $xcode26"
+            sudo xcode-select -s "$xcode26/Contents/Developer"
+          else
+            echo "Xcode 26 not found, using default: $(xcode-select -p)"
+          fi
+          xcodebuild -version
+          xcodebuild -showsdks | grep iphonesimulator
+
       - name: Resolve Swift packages
         run: xcodebuild -resolvePackageDependencies -project "weekly meals.xcodeproj"
 
       - name: Build app
-        run: xcodebuild -project "weekly meals.xcodeproj" -scheme "weekly meals" -destination "generic/platform=iOS Simulator" build CODE_SIGNING_ALLOWED=NO
+        run: |
+          # Avoid universal simulator binaries on arm64 runners.
+          # Xcode 26.3 on GitHub Actions fails while lipo-ing preview dylibs for x86_64 + arm64.
+          xcodebuild \
+            -project "weekly meals.xcodeproj" \
+            -scheme "weekly meals" \
+            -destination "generic/platform=iOS Simulator" \
+            -sdk iphonesimulator \
+            -arch arm64 \
+            build \
+            CODE_SIGNING_ALLOWED=NO \
+            ONLY_ACTIVE_ARCH=YES \
+            EXCLUDED_ARCHS=x86_64
