@@ -19,6 +19,7 @@ private struct SessionResponse: Codable {
         let id: String
         let displayName: String
         let email: String?
+        let avatarUrl: String?
         let provider: String?
     }
 
@@ -99,6 +100,7 @@ private struct BackendCurrentUserDTO: Codable {
     let id: String
     let displayName: String
     let email: String?
+    let avatarUrl: String?
     let memberships: [MembershipDTO]
 }
 
@@ -179,6 +181,7 @@ final class SessionStore {
         static let householdId = "auth.householdId"
         static let displayName = "settings.user.displayName"
         static let email = "settings.user.email"
+        static let avatarUrl = "settings.user.avatarUrl"
         static let householdName = "settings.household.name"
         static let pushDeviceToken = "notifications.pushDeviceToken"
     }
@@ -793,6 +796,11 @@ final class SessionStore {
             let defaults = UserDefaults.standard
             defaults.set(user.displayName, forKey: Keys.displayName)
             defaults.set(user.email ?? "", forKey: Keys.email)
+            if let avatarUrl = user.avatarUrl, !avatarUrl.isEmpty {
+                defaults.set(avatarUrl, forKey: Keys.avatarUrl)
+            } else {
+                defaults.removeObject(forKey: Keys.avatarUrl)
+            }
 
             guard let membership = user.memberships.first,
                   let household = membership.household else {
@@ -830,6 +838,14 @@ final class SessionStore {
         defaults.set(response.user.id, forKey: Keys.userId)
         defaults.set(response.user.displayName, forKey: Keys.displayName)
         defaults.set(response.user.email ?? "", forKey: Keys.email)
+        // Apple Sign in doesn't provide a profile photo; avatarUrl is typically
+        // nil for Apple users and surfaces initials-based fallback in the UI.
+        // For Google / other providers it persists the real URL.
+        if let avatarUrl = response.user.avatarUrl, !avatarUrl.isEmpty {
+            defaults.set(avatarUrl, forKey: Keys.avatarUrl)
+        } else {
+            defaults.removeObject(forKey: Keys.avatarUrl)
+        }
         if let household = response.household {
             persistHousehold(id: household.id, name: household.name)
         } else {
@@ -872,6 +888,7 @@ final class SessionStore {
         defaults.removeObject(forKey: Keys.householdId)
         defaults.removeObject(forKey: Keys.householdName)
         defaults.removeObject(forKey: Keys.appleUserIdentifier)
+        defaults.removeObject(forKey: Keys.avatarUrl)
     }
 
     private func restoredSessionSnapshot() -> PersistedSessionSnapshot? {

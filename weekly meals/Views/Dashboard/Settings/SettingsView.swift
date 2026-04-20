@@ -9,6 +9,7 @@ struct SettingsView: View {
     @AppStorage("settings.notifications.shoppingReminders") private var shoppingRemindersEnabled: Bool = true
     @AppStorage("settings.user.displayName") private var userDisplayName: String = "user1"
     @AppStorage("settings.user.email") private var userEmail: String = "user1@example.com"
+    @AppStorage("settings.user.avatarUrl") private var userAvatarUrl: String = ""
     @AppStorage("settings.household.name") private var persistedHouseholdName: String = ""
 
     @State private var showCreateHouseholdSheet = false
@@ -136,28 +137,27 @@ struct SettingsView: View {
     }
 
     private var profileCard: some View {
-        HStack(spacing: 12) {
-            Circle()
-                .fill(Color.blue.opacity(colorScheme == .dark ? 0.18 : 0.12))
-                .frame(width: 42, height: 42)
-                .overlay(
-                    Image(systemName: "person.fill")
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(.blue)
-                )
+        HStack(spacing: 14) {
+            ProfileAvatar(
+                avatarUrl: trimmedUserAvatarUrl,
+                displayName: userDisplayName,
+                size: 52
+            )
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(userDisplayName)
-                    .font(.footnote.weight(.semibold))
+                    .font(.callout.weight(.semibold))
                     .foregroundStyle(.primary)
+                    .lineLimit(1)
 
-                Text(userEmail)
+                Text(userEmailLabel)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+                    .truncationMode(.middle)
             }
 
-            Spacer(minLength: 0)
+            Spacer(minLength: 8)
 
             DashboardActionButton(
                 title: nil,
@@ -170,8 +170,18 @@ struct SettingsView: View {
             .accessibilityLabel("Wyloguj")
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 12)
+        .padding(.vertical, 14)
         .dashboardLiquidCard(cornerRadius: 18, strokeOpacity: 0.14)
+    }
+
+    private var trimmedUserAvatarUrl: String? {
+        let trimmed = userAvatarUrl.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private var userEmailLabel: String {
+        let trimmed = userEmail.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "Brak e-maila" : trimmed
     }
 
     private var menuCard: some View {
@@ -796,12 +806,17 @@ struct SettingsView: View {
 
     private func memberRow(_ member: HouseholdMemberSnapshot) -> some View {
         HStack(spacing: 12) {
-            memberAvatar(for: member)
+            ProfileAvatar(
+                avatarUrl: member.avatarUrl,
+                displayName: member.displayName,
+                size: 40
+            )
 
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
                     Text(member.displayName)
                         .font(.footnote.weight(.semibold))
+                        .lineLimit(1)
 
                     if member.id == sessionStore.currentUserId {
                         Text("Ty")
@@ -815,6 +830,8 @@ struct SettingsView: View {
                 Text(member.email ?? "Brak e-maila")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
             }
 
             Spacer(minLength: 0)
@@ -834,43 +851,6 @@ struct SettingsView: View {
         )
     }
 
-    @ViewBuilder
-    private func memberAvatar(for member: HouseholdMemberSnapshot) -> some View {
-        if let avatarUrl = member.avatarUrl, let url = URL(string: avatarUrl) {
-            CachedAsyncImage(url: url) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .scaledToFill()
-                case .empty, .failure:
-                    Circle().fill(Color.gray.opacity(0.22))
-                @unknown default:
-                    Circle().fill(Color.gray.opacity(0.22))
-                }
-            }
-            .frame(width: 34, height: 34)
-            .clipShape(Circle())
-        } else {
-            Circle()
-                .fill(Color.blue.opacity(0.18))
-                .frame(width: 34, height: 34)
-                .overlay(
-                    Text(initials(for: member.displayName))
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(.blue)
-                )
-        }
-    }
-
-    private func initials(for name: String) -> String {
-        let parts = name
-            .split(separator: " ")
-            .prefix(2)
-            .map { String($0.prefix(1)).uppercased() }
-        return parts.joined()
-    }
-
     private func createInvitationLink() async {
         guard hasHousehold else {
             invitationLink = nil
@@ -888,6 +868,92 @@ struct SettingsView: View {
             sessionStore.authError = UserFacingErrorMapper.message(from: error)
             invitationLink = nil
         }
+    }
+}
+
+/// Shared profile avatar used by the Settings current-user card and the
+/// Household member rows. Renders the remote photo when `avatarUrl` is present
+/// (e.g. Google users). Falls back to a tinted circle with up-to-two
+/// initials derived from the display name — Apple Sign in doesn't expose a
+/// profile photo, so Apple users always hit this branch.
+struct ProfileAvatar: View {
+    let avatarUrl: String?
+    let displayName: String
+    let size: CGFloat
+
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        ZStack {
+            if let url = resolvedURL {
+                CachedAsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    case .empty, .failure:
+                        initialsFallback
+                    @unknown default:
+                        initialsFallback
+                    }
+                }
+            } else {
+                initialsFallback
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(Circle())
+        .overlay(
+            Circle()
+                .stroke(DashboardPalette.neutralBorder(colorScheme, opacity: colorScheme == .dark ? 0.12 : 0.14), lineWidth: 1)
+        )
+        .accessibilityElement()
+        .accessibilityLabel(Text(displayName))
+    }
+
+    private var resolvedURL: URL? {
+        guard let avatarUrl, !avatarUrl.isEmpty else { return nil }
+        return URL(string: avatarUrl)
+    }
+
+    private var initialsFallback: some View {
+        LinearGradient(
+            colors: colorScheme == .dark
+                ? [Color.blue.opacity(0.38), Color.indigo.opacity(0.34)]
+                : [Color.blue.opacity(0.22), Color.indigo.opacity(0.18)],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+        .overlay(
+            Text(Self.initials(for: displayName))
+                .font(.system(size: size * 0.38, weight: .semibold, design: .rounded))
+                .foregroundStyle(colorScheme == .dark ? Color.white : Color.blue)
+                .monospacedDigit()
+        )
+    }
+
+    static func initials(for name: String) -> String {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "?" }
+
+        let tokens = trimmed
+            .split(whereSeparator: { $0.isWhitespace || $0 == "-" || $0 == "." || $0 == "_" })
+            .filter { $0.contains(where: { $0.isLetter || $0.isNumber }) }
+
+        let letters = tokens.prefix(2).compactMap { token -> String? in
+            guard let first = token.first else { return nil }
+            return String(first).uppercased()
+        }
+
+        if let joined = letters.isEmpty ? nil : letters.joined(), !joined.isEmpty {
+            return joined
+        }
+
+        if let first = trimmed.first {
+            return String(first).uppercased()
+        }
+        return "?"
     }
 }
 
