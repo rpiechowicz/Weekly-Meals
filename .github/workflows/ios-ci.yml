@@ -34,4 +34,16 @@ jobs:
         run: xcodebuild -resolvePackageDependencies -project "weekly meals.xcodeproj"
 
       - name: Build app
-        run: xcodebuild -project "weekly meals.xcodeproj" -scheme "weekly meals" -destination "generic/platform=iOS Simulator" build CODE_SIGNING_ALLOWED=NO
+        run: |
+          # Avoid universal simulator binaries on arm64 runners.
+          # Xcode 26.3 on GitHub Actions fails while lipo-ing preview dylibs for x86_64 + arm64.
+          xcodebuild \
+            -project "weekly meals.xcodeproj" \
+            -scheme "weekly meals" \
+            -destination "generic/platform=iOS Simulator" \
+            -sdk iphonesimulator \
+            -arch arm64 \
+            build \
+            CODE_SIGNING_ALLOWED=NO \
+            ONLY_ACTIVE_ARCH=YES \
+            EXCLUDED_ARCHS=x86_64
