@@ -5,6 +5,11 @@ enum RecipeCategoryBadgeStyle {
     case overlayDark
 }
 
+enum RecipeBadgeSize {
+    case regular
+    case compact
+}
+
 struct RecipeInfoBadge: View {
     let icon: String
     let text: String
@@ -81,20 +86,21 @@ struct RecipeCategoryBadge: View {
 
     let category: RecipesCategory
     var style: RecipeCategoryBadgeStyle = .subtle
+    var size: RecipeBadgeSize = .regular
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: horizontalSpacing) {
             Image(systemName: RecipesConstants.icon(for: category))
-                .font(.system(size: 11, weight: .semibold))
+                .font(.system(size: iconFontSize, weight: .semibold))
                 .foregroundStyle(iconColor)
 
             Text(RecipesConstants.displayName(for: category))
                 .lineLimit(1)
                 .foregroundStyle(labelColor)
         }
-        .font(.system(size: 11, weight: .semibold))
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
+        .font(.system(size: labelFontSize, weight: .semibold))
+        .padding(.horizontal, horizontalPadding)
+        .padding(.vertical, verticalPadding)
         .background(backgroundFill, in: Capsule())
         .overlay(
             Capsule()
@@ -105,6 +111,26 @@ struct RecipeCategoryBadge: View {
 
     private var tint: Color {
         RecipesConstants.tint(for: category)
+    }
+
+    private var iconFontSize: CGFloat {
+        size == .compact ? 10 : 11
+    }
+
+    private var labelFontSize: CGFloat {
+        size == .compact ? 10 : 11
+    }
+
+    private var horizontalSpacing: CGFloat {
+        size == .compact ? 5 : 6
+    }
+
+    private var horizontalPadding: CGFloat {
+        size == .compact ? 9 : 10
+    }
+
+    private var verticalPadding: CGFloat {
+        size == .compact ? 5 : 6
     }
 
     private var backgroundFill: Color {
