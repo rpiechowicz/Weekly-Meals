@@ -12,6 +12,8 @@ struct WeeklyPlanView: View {
     @State private var pastDayMessage: String?
     @State private var didLoadDraft = false
     @State private var saveTask: Task<Void, Never>?
+    @State private var showAssigner = false
+    @State private var activeSlot: MealSlot = .breakfast
 
     private static let weekRangeFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -56,27 +58,41 @@ struct WeeklyPlanView: View {
 
     var body: some View {
         NavigationStack {
-            ZStack(alignment: .bottom) {
-                DashboardSheetBackground(theme: .plan)
-                    .ignoresSafeArea()
+            GeometryReader { proxy in
+                ZStack {
+                    DashboardSheetBackground(theme: .plan)
+                        .ignoresSafeArea()
 
-                ScrollView {
-                    VStack(spacing: 16) {
-                        headerCard
-
+                    ScrollView {
                         VStack(spacing: 14) {
-                            ForEach(MealSlot.allCases) { slot in
-                                slotCard(slot)
-                            }
+                            heroHeader
+
+                            slotPills
+
+                            slotContent(cardWidth: cardWidth(for: proxy.size.width))
+                                .id(activeSlot)
+                                .transition(.opacity)
                         }
+                        .padding(.horizontal, 14)
+                        .padding(.top, 6)
+                        .padding(.bottom, 28)
+                        .animation(.easeInOut(duration: 0.22), value: activeSlot)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
-                    .padding(.bottom, 24)
                 }
             }
             .navigationTitle("Plan tygodnia")
             .toolbar {
+                if totalCount > 0 {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button {
+                            showAssigner = true
+                        } label: {
+                            Image(systemName: "calendar.badge.plus")
+                                .font(.body.weight(.semibold))
+                        }
+                        .accessibilityLabel("Przypisz do dni")
+                    }
+                }
                 if mealStore.hasSavedPlan {
                     ToolbarItem(placement: .topBarTrailing) {
                         Menu {
@@ -111,6 +127,13 @@ struct WeeklyPlanView: View {
                 if !isDirty {
                     draft.loadFromSaved(mealStore.savedPlan)
                 }
+            }
+            .sheet(isPresented: $showAssigner) {
+                DayAssignerSheet(
+                    weekDates: datesViewModel.dates,
+                    weekStartISO: datesViewModel.weekStartISO
+                )
+                .dashboardLiquidSheet()
             }
             .sheet(item: $activePickerSlot) { slot in
                 RecipePickerSheet(
@@ -152,199 +175,229 @@ struct WeeklyPlanView: View {
         }
     }
 
-    // MARK: - Header
+    // MARK: - Hero header
 
-    private var headerCard: some View {
-        HStack(alignment: .center, spacing: 12) {
+    private var heroHeader: some View {
+        HStack(alignment: .center, spacing: 14) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("TYDZIEŃ")
-                    .font(.caption2.weight(.semibold))
+                    .font(.caption2.weight(.bold))
                     .tracking(0.9)
                     .foregroundStyle(.secondary)
 
                 Text(weekRangeText)
-                    .font(.title2.weight(.bold))
+                    .font(.title3.weight(.bold))
                     .fontDesign(.rounded)
                     .foregroundStyle(.primary)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.85)
+                    .minimumScaleFactor(0.8)
+
+                Text(statusCaption)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(status.color)
+            }
+
+            Spacer(minLength: 10)
+
+            progressRing
+        }
+        .padding(16)
+        .dashboardLiquidCard(cornerRadius: 22, strokeOpacity: 0.18)
+    }
+
+    private var statusCaption: String {
+        switch status {
+        case .empty: return "Zacznij planować tydzień"
+        case .draft: return "W trakcie planowania"
+        case .complete: return "Plan kompletny"
+        }
+    }
+
+    private var progressRing: some View {
+        let progress = Self.maxTotal > 0 ? CGFloat(totalCount) / CGFloat(Self.maxTotal) : 0
+        return ZStack {
+            Circle()
+                .stroke(status.color.opacity(colorScheme == .dark ? 0.22 : 0.16), lineWidth: 4)
+            Circle()
+                .trim(from: 0, to: progress)
+                .stroke(status.color.opacity(0.9), style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+                .animation(.easeInOut(duration: 0.25), value: progress)
+            VStack(spacing: 0) {
+                Text("\(totalCount)")
+                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(.primary)
+                Text("/ \(Self.maxTotal)")
+                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(width: 64, height: 64)
+    }
+
+    // MARK: - Slot pills (selector + summary)
+
+    private var slotPills: some View {
+        HStack(spacing: 8) {
+            ForEach(MealSlot.allCases) { slot in
+                slotPill(slot)
+            }
+        }
+    }
+
+    private func slotPill(_ slot: MealSlot) -> some View {
+        let count = draft.count(for: slot)
+        let maxPerSlot = MealPlanViewModel.maxPerSlot
+        let isActive = activeSlot == slot
+        let isFull = count >= maxPerSlot
+
+        return Button {
+            withAnimation(.easeInOut(duration: 0.22)) { activeSlot = slot }
+        } label: {
+            VStack(spacing: 6) {
+                HStack(spacing: 6) {
+                    Image(systemName: slot.icon)
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(slot.accentColor)
+                    Text(slot.title)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(isActive ? .primary : .secondary)
+                }
+
+                HStack(alignment: .firstTextBaseline, spacing: 2) {
+                    Text("\(count)")
+                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(.primary)
+                    Text("/\(maxPerSlot)")
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                    if isFull {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(Color.green.opacity(0.85))
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(
+                        isActive
+                            ? DashboardPalette.tintFill(slot.accentColor, scheme: colorScheme, dark: 0.22, light: 0.16)
+                            : DashboardPalette.surface(colorScheme, level: .secondary)
+                    )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(
+                        isActive
+                            ? slot.accentColor.opacity(colorScheme == .dark ? 0.55 : 0.4)
+                            : DashboardPalette.neutralBorder(colorScheme, opacity: 0.14),
+                        lineWidth: isActive ? 1.6 : 1
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Slot content
+
+    private func slotContent(cardWidth: CGFloat) -> some View {
+        let slot = activeSlot
+        let recipes = draft.uniqueRecipes(for: slot)
+        let count = draft.count(for: slot)
+        let maxPerSlot = MealPlanViewModel.maxPerSlot
+
+        return VStack(alignment: .leading, spacing: 12) {
+            slotHeaderRow(slot: slot, count: count, max: maxPerSlot)
+
+            if recipes.isEmpty {
+                emptySlotState(slot: slot)
+            } else {
+                LazyVGrid(
+                    columns: [
+                        GridItem(.flexible(), spacing: 10),
+                        GridItem(.flexible(), spacing: 10)
+                    ],
+                    spacing: 10
+                ) {
+                    ForEach(recipes) { recipe in
+                        planGridCard(recipe: recipe, slot: slot, width: cardWidth)
+                    }
+                }
+            }
+        }
+    }
+
+    private func cardWidth(for totalWidth: CGFloat) -> CGFloat {
+        let horizontalPadding: CGFloat = 28
+        let spacing: CGFloat = 10
+        return max(140, floor((totalWidth - horizontalPadding - spacing) / 2))
+    }
+
+    private func slotHeaderRow(slot: MealSlot, count: Int, max: Int) -> some View {
+        HStack(alignment: .center, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(slot.title)
+                    .font(.title3.weight(.bold))
+                    .fontDesign(.rounded)
+                    .foregroundStyle(.primary)
+
+                Text(count == 0 ? "Brak pozycji" : "\(count) z \(max) wybranych")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Spacer(minLength: 8)
 
-            statusPill
+            addButton(slot: slot, atLimit: count >= max)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-        .dashboardLiquidCard(cornerRadius: 20, strokeOpacity: 0.18)
-    }
-
-    private var statusPill: some View {
-        HStack(spacing: 6) {
-            Circle()
-                .fill(status.color)
-                .frame(width: 7, height: 7)
-
-            Text("\(totalCount)")
-                .font(.system(size: 15, weight: .bold, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(.primary)
-
-            Text("/ \(Self.maxTotal)")
-                .font(.system(size: 12, weight: .semibold, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(.secondary)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 7)
-        .background(
-            DashboardPalette.tintFill(status.color, scheme: colorScheme, dark: 0.18, light: 0.14),
-            in: Capsule()
-        )
-        .overlay(
-            Capsule()
-                .stroke(status.color.opacity(colorScheme == .dark ? 0.3 : 0.22), lineWidth: 1)
-        )
-    }
-
-    // MARK: - Slot cards
-
-    @ViewBuilder
-    private func slotCard(_ slot: MealSlot) -> some View {
-        let recipes = draft.uniqueRecipes(for: slot)
-        let count = draft.count(for: slot)
-        let max = MealPlanViewModel.maxPerSlot
-
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .center, spacing: 12) {
-                slotIcon(slot)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(slot.title)
-                        .font(.headline.weight(.bold))
-                        .fontDesign(.rounded)
-                        .foregroundStyle(.primary)
-
-                    Text(slotSubtitle(count: count, max: max))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer(minLength: 8)
-
-                addButton(slot: slot, atLimit: count >= max)
-            }
-
-            slotProgressBar(slot: slot, count: count, max: max)
-                .frame(height: 4)
-
-            if recipes.isEmpty {
-                emptyRow(slot: slot)
-            } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(alignment: .top, spacing: 10) {
-                        ForEach(recipes) { recipe in
-                            planCarouselCard(recipe: recipe, slot: slot)
-                        }
-                    }
-                    .padding(.vertical, 2)
-                }
-            }
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(slot.accentColor.opacity(colorScheme == .dark ? 0.08 : 0.045))
-        )
-        .dashboardLiquidCard(cornerRadius: 22, strokeOpacity: 0.16)
-    }
-
-    private func slotIcon(_ slot: MealSlot) -> some View {
-        Image(systemName: slot.icon)
-            .font(.system(size: 15, weight: .bold))
-            .foregroundStyle(slot.accentColor.opacity(colorScheme == .dark ? 0.96 : 0.85))
-            .frame(width: 36, height: 36)
-            .background(
-                DashboardPalette.tintFill(slot.accentColor, scheme: colorScheme, dark: 0.2, light: 0.16),
-                in: RoundedRectangle(cornerRadius: 12, style: .continuous)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(slot.accentColor.opacity(colorScheme == .dark ? 0.28 : 0.2), lineWidth: 1)
-            )
-    }
-
-    private func slotSubtitle(count: Int, max: Int) -> String {
-        count == 0 ? "Nic jeszcze nie wybrano" : "\(count) \(pluralizePozycje(count))"
-    }
-
-    private func pluralizePozycje(_ n: Int) -> String {
-        if n == 1 { return "pozycja" }
-        let mod10 = n % 10
-        let mod100 = n % 100
-        if (2...4).contains(mod10) && !(12...14).contains(mod100) { return "pozycje" }
-        return "pozycji"
+        .padding(.top, 4)
     }
 
     private func addButton(slot: MealSlot, atLimit: Bool) -> some View {
         Button {
             activePickerSlot = slot
         } label: {
-            Image(systemName: atLimit ? "checkmark" : "plus")
-                .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(.white)
-                .frame(width: 34, height: 34)
-                .background(
-                    LinearGradient(
-                        colors: [
-                            slot.accentColor.opacity(colorScheme == .dark ? 0.95 : 0.88),
-                            slot.secondaryAccentColor.opacity(colorScheme == .dark ? 0.82 : 0.72)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    in: Circle()
-                )
-                .overlay(
-                    Circle()
-                        .stroke(Color.white.opacity(colorScheme == .dark ? 0.16 : 0.22), lineWidth: 1)
-                )
-                .shadow(color: slot.accentColor.opacity(colorScheme == .dark ? 0.32 : 0.2), radius: 8, x: 0, y: 4)
+            HStack(spacing: 6) {
+                Image(systemName: atLimit ? "square.and.pencil" : "plus")
+                    .font(.system(size: 13, weight: .bold))
+                Text(atLimit ? "Zmień" : "Dodaj")
+                    .font(.footnote.weight(.bold))
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 14)
+            .frame(height: 34)
+            .background(
+                LinearGradient(
+                    colors: [
+                        slot.accentColor.opacity(colorScheme == .dark ? 0.95 : 0.88),
+                        slot.secondaryAccentColor.opacity(colorScheme == .dark ? 0.82 : 0.72)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                in: Capsule()
+            )
+            .overlay(
+                Capsule()
+                    .stroke(Color.white.opacity(colorScheme == .dark ? 0.16 : 0.22), lineWidth: 1)
+            )
+            .shadow(color: slot.accentColor.opacity(colorScheme == .dark ? 0.3 : 0.2), radius: 8, x: 0, y: 4)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(atLimit ? "Edytuj \(slot.title.lowercased())" : "Dodaj \(slot.title.lowercased())")
+        .accessibilityLabel(atLimit ? "Zmień wybór: \(slot.title.lowercased())" : "Dodaj \(slot.title.lowercased())")
     }
 
-    private func slotProgressBar(slot: MealSlot, count: Int, max: Int) -> some View {
-        GeometryReader { geo in
-            let w = geo.size.width
-            let progress = CGFloat(count) / CGFloat(max)
-            let pw = count == 0 ? 0 : Swift.max(w * progress, 8)
-            ZStack(alignment: .leading) {
-                Capsule()
-                    .fill(DashboardPalette.surface(colorScheme, level: .tertiary))
-                if count > 0 {
-                    Capsule()
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    slot.accentColor.opacity(colorScheme == .dark ? 0.92 : 0.82),
-                                    slot.secondaryAccentColor.opacity(colorScheme == .dark ? 0.78 : 0.64)
-                                ],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .frame(width: pw)
-                }
-            }
-        }
-    }
+    // MARK: - Grid card
 
-    private func planCarouselCard(recipe: Recipe, slot: MealSlot) -> some View {
+    private func planGridCard(recipe: Recipe, slot: MealSlot, width: CGFloat) -> some View {
         let count = draft.recipeCount(recipe)
-        let cardWidth: CGFloat = 148
         return Menu {
             Button {
                 incrementRecipe(recipe, slot: slot)
@@ -366,78 +419,87 @@ struct WeeklyPlanView: View {
             ZStack(alignment: .topLeading) {
                 RecipeCarouselCard(
                     recipe: recipe,
-                    width: cardWidth,
+                    width: width,
                     selectionCount: 0,
-                    showsHeart: false,
-                    showsMetrics: false
+                    showsHeart: false
                 )
 
-                HStack(spacing: 4) {
-                    Text("×\(count)")
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .monospacedDigit()
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 8, weight: .bold))
-                }
-                .foregroundStyle(.white)
-                .padding(.horizontal, 9)
-                .padding(.vertical, 5)
-                .background(
-                    Capsule()
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    slot.accentColor.opacity(colorScheme == .dark ? 0.95 : 0.88),
-                                    slot.secondaryAccentColor.opacity(colorScheme == .dark ? 0.82 : 0.74)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                )
-                .overlay(
-                    Capsule()
-                        .stroke(Color.white.opacity(0.22), lineWidth: 1)
-                )
-                .shadow(color: .black.opacity(0.22), radius: 4, x: 0, y: 2)
-                .padding(.top, 9)
-                .padding(.leading, 9)
+                countBadge(slot: slot, count: count)
+                    .padding(10)
             }
         }
         .buttonStyle(.plain)
     }
 
-    private func emptyRow(slot: MealSlot) -> some View {
+    private func countBadge(slot: MealSlot, count: Int) -> some View {
+        HStack(spacing: 4) {
+            Text("×\(count)")
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .monospacedDigit()
+            Image(systemName: "chevron.down")
+                .font(.system(size: 8, weight: .bold))
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, 9)
+        .padding(.vertical, 5)
+        .background(
+            Capsule()
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            slot.accentColor.opacity(colorScheme == .dark ? 0.95 : 0.88),
+                            slot.secondaryAccentColor.opacity(colorScheme == .dark ? 0.82 : 0.74)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+        )
+        .overlay(
+            Capsule()
+                .stroke(Color.white.opacity(0.22), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.22), radius: 4, x: 0, y: 2)
+    }
+
+    // MARK: - Empty state
+
+    private func emptySlotState(slot: MealSlot) -> some View {
         Button {
             activePickerSlot = slot
         } label: {
-            HStack(spacing: 10) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(slot.accentColor.opacity(colorScheme == .dark ? 0.9 : 0.75))
+            VStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(DashboardPalette.tintFill(slot.accentColor, scheme: colorScheme, dark: 0.22, light: 0.16))
+                        .frame(width: 68, height: 68)
+                    Image(systemName: slot.icon)
+                        .font(.system(size: 26, weight: .bold))
+                        .foregroundStyle(slot.accentColor)
+                }
 
-                Text("Dodaj \(slot.title.lowercased())")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(.primary)
-
-                Spacer(minLength: 0)
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(.secondary)
+                VStack(spacing: 3) {
+                    Text("Brak \(slot.title.lowercased())")
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(.primary)
+                    Text("Stuknij, żeby wybrać pierwszy przepis")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 28)
+            .padding(.horizontal, 16)
             .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(DashboardPalette.surface(colorScheme, level: .tertiary))
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(DashboardPalette.surface(colorScheme, level: .secondary))
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
                     .strokeBorder(
-                        slot.accentColor.opacity(colorScheme == .dark ? 0.3 : 0.2),
-                        style: StrokeStyle(lineWidth: 1, dash: [5, 4])
+                        slot.accentColor.opacity(colorScheme == .dark ? 0.32 : 0.22),
+                        style: StrokeStyle(lineWidth: 1.2, dash: [5, 4])
                     )
             )
         }
