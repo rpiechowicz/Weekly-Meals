@@ -46,13 +46,7 @@ struct RecipeDetailView: View {
     }
 
     private var categoryTint: Color {
-        switch recipe.category {
-        case .breakfast: return .orange
-        case .lunch: return .blue
-        case .dinner: return .purple
-        case .favourite: return .pink
-        case .all: return .teal
-        }
+        RecipesConstants.tint(for: recipe.category)
     }
 
     private func ingredientDisplayName(_ name: String) -> String {
@@ -88,187 +82,198 @@ struct RecipeDetailView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    // Image Header
-                    ZStack {
-                        if let imageURL = recipe.imageURL {
-                            CachedAsyncImage(url: imageURL) { phase in
-                                switch phase {
-                                case .success(let image):
-                                    image
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fill)
-                                case .empty, .failure:
-                                    placeholderHeader
-                                @unknown default:
-                                    placeholderHeader
-                                }
-                            }
-                            .frame(height: 275)
-                            .clipped()
-                        } else {
-                            placeholderHeader
-                                .frame(height: 275)
-                        }
-                        
-                        // Gradient overlay for better text readability
-                        LinearGradient(
-                            colors: [.clear, .black.opacity(0.6)],
-                            startPoint: .center,
-                            endPoint: .bottom
-                        )
-                    }
-                    .ignoresSafeArea(edges: .top)
-                    .overlay(alignment: .topTrailing) {
-                        Button {
-                            onToggleFavorite?()
-                        } label: {
-                            Image(systemName: recipe.favourite ? "heart.fill" : "heart")
-                                .font(.caption.weight(.bold))
-                                .foregroundStyle(recipe.favourite ? .pink : Color.white.opacity(0.94))
-                                .frame(width: 38, height: 38)
-                                .background(
-                                    DashboardPalette.surface(colorScheme, level: .secondary),
-                                    in: Circle()
-                                )
-                                .overlay(
-                                    Circle()
-                                        .stroke(DashboardPalette.neutralBorder(colorScheme, opacity: 0.12), lineWidth: 1)
-                                )
-                        }
-                        .buttonStyle(.plain)
-                        .padding(16)
-                    }
-                    .overlay(alignment: .topLeading) {
-                        RecipeCategoryBadge(
-                            text: RecipesConstants.displayName(for: recipe.category),
-                            tint: categoryTint,
-                            style: .overlayDark
-                        )
-                        .padding(16)
-                    }
-                    
-                    VStack(alignment: .leading, spacing: 16) {
-                        // Title
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(recipe.name)
-                                .font(.title)
-                                .fontWeight(.bold)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        
-                        // Description
-                        Text(recipe.description)
-                            .font(.body)
-                            .foregroundStyle(.secondary)
-                        
-                        // Quick Info
-                        HStack(spacing: 10) {
-                            RecipeInfoBadge(icon: "clock", text: "\(recipe.prepTimeMinutes) min")
-                            RecipeInfoBadge(icon: "person.2", text: "\(recipe.servings) porcje")
-                            RecipeInfoBadge(icon: difficultyIcon, text: recipe.difficulty.rawValue, color: difficultyColor)
-                        }
-                        
-                        Divider()
-                        
-                        // Nutrition Info
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Wartości odżywcze")
-                                .font(.headline)
-                            
-                            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                                NutritionCard(title: "Kalorie", value: formatNutritionValue(recipe.nutritionPerServing.kcal, maximumFractionDigits: 0), unit: "kcal", icon: "flame.fill", color: .orange)
-                                NutritionCard(title: "Białko", value: formatNutritionValue(recipe.nutritionPerServing.protein), unit: "g", icon: "bolt.fill", color: .blue)
-                                NutritionCard(title: "Węglowodany", value: formatNutritionValue(recipe.nutritionPerServing.carbs), unit: "g", icon: "leaf.fill", color: .green)
-                                NutritionCard(title: "Tłuszcze", value: formatNutritionValue(recipe.nutritionPerServing.fat), unit: "g", icon: "drop.fill", color: .pink)
-                                NutritionCard(title: "Błonnik", value: formatNutritionValue(recipe.nutritionPerServing.fiber), unit: "g", icon: "heart.fill", color: .pink)
-                                NutritionCard(title: "Sól", value: formatNutritionValue(recipe.nutritionPerServing.salt), unit: "g", icon: "sparkles", color: .cyan)
-                            }
-                            .padding(1) // Spacer for border visibility
-                        }
-                        
-                        Divider()
-                        
-                        // Preparation Steps
+                    heroSection
+
+                    VStack(alignment: .leading, spacing: 24) {
+                        nutritionSection
+
                         if !recipe.preparationSteps.isEmpty {
-                            VStack(alignment: .leading, spacing: 12) {
-                                Text("Sposób przygotowania")
-                                    .font(.headline)
-                                
-                                VStack(spacing: 0) {
-                                    ForEach(recipe.preparationSteps.sorted(by: { $0.stepNumber < $1.stepNumber })) { step in
-                                        HStack(alignment: .top, spacing: 16) {
-                                            // Step number badge - soft style
-                                            ZStack {
-                                                RoundedRectangle(cornerRadius: 15, style: .continuous)
-                                                    .fill(Color.accentColor.opacity(0.15))
-                                                    .frame(width: 32, height: 32)
-                                                
-                                                Text("\(step.stepNumber)")
-                                                    .font(.subheadline)
-                                                    .fontWeight(.semibold)
-                                                    .foregroundStyle(Color.accentColor)
-                                            }
-                                            
-                                            // Instruction text
-                                            Text(step.instruction)
-                                                .font(.subheadline)
-                                                .foregroundStyle(.primary)
-                                                .fixedSize(horizontal: false, vertical: true)
-                                            
-                                            Spacer(minLength: 0)
-                                        }
-                                        .padding(.vertical, 14)
-                                        
-                                        if step.stepNumber < recipe.preparationSteps.count {
-                                            Divider()
-                                        }
-                                    }
-                                }
-                                .padding(.horizontal, 16)
-                                .myBackground()
-                                .myBorderOverlay()
-                            }
-                            
-                            Divider()
+                            preparationSection
                         }
-                        
-                        // Ingredients
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Składniki")
-                                .font(.headline)
-                            
-                            VStack(spacing: 0) {
-                                ForEach(Array(recipe.ingredients.enumerated()), id: \.element.id) { index, ingredient in
-                                    HStack(alignment: .center, spacing: 12) {
-                                        // Ingredient name
-                                        Text(ingredientDisplayName(ingredient.name))
-                                            .font(.subheadline)
-                                            .foregroundStyle(.primary)
-                                        
-                                        Spacer(minLength: 8)
-                                        
-                                        // Amount
-                                        Text("\(formatIngredientAmount(ingredient.amount)) \(ingredient.unit.rawValue)")
-                                            .font(.subheadline)
-                                            .fontWeight(.medium)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                    .padding(.vertical, 14)
-                                    
-                                    if index < recipe.ingredients.count - 1 {
-                                        Divider()
-                                    }
-                                }
-                            }
-                            .padding(.horizontal, 16)
-                            .myBackground()
-                            .myBorderOverlay()
-                        }
+
+                        ingredientsSection
                     }
-                    .padding(.horizontal)
+                    .padding(.horizontal, 16)
                     .padding(.bottom, 32)
                 }
             }
+        }
+    }
+
+    private var heroSection: some View {
+        VStack(spacing: -34) {
+            heroImage
+
+            summaryCard
+                .padding(.horizontal, 16)
+                .zIndex(1)
+        }
+    }
+
+    private var heroImage: some View {
+        Group {
+            if let imageURL = recipe.imageURL {
+                CachedAsyncImage(url: imageURL) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    case .empty, .failure:
+                        placeholderHeader
+                    @unknown default:
+                        placeholderHeader
+                    }
+                }
+            } else {
+                placeholderHeader
+            }
+        }
+        .frame(height: 286)
+        .clipped()
+        .overlay(
+            LinearGradient(
+                colors: [
+                    .clear,
+                    Color.black.opacity(colorScheme == .dark ? 0.24 : 0.08)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        )
+        .ignoresSafeArea(edges: .top)
+    }
+
+    private var summaryCard: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(alignment: .center, spacing: 12) {
+                RecipeCategoryBadge(category: recipe.category)
+
+                Spacer(minLength: 8)
+
+                favoriteControl
+            }
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text(recipe.name)
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Text(recipe.description)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    RecipeInfoBadge(icon: "clock", text: "\(recipe.prepTimeMinutes) min")
+                    RecipeInfoBadge(icon: "person.2", text: "\(recipe.servings) porcje")
+                    RecipeInfoBadge(icon: difficultyIcon, text: recipe.difficulty.rawValue, color: difficultyColor)
+                }
+                .padding(.vertical, 1)
+            }
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .dashboardLiquidCard(cornerRadius: 28, strokeOpacity: 0.18)
+    }
+
+    @ViewBuilder
+    private var favoriteControl: some View {
+        if let onToggleFavorite {
+            RecipeFavoriteButton(isFavorite: recipe.favourite, action: onToggleFavorite)
+        } else if recipe.favourite {
+            RecipeFavoriteButton(isFavorite: true)
+        }
+    }
+
+    private var nutritionSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Wartości odżywcze")
+                .font(.headline)
+
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                NutritionCard(title: "Kalorie", value: formatNutritionValue(recipe.nutritionPerServing.kcal, maximumFractionDigits: 0), unit: "kcal", icon: "flame.fill", color: .orange)
+                NutritionCard(title: "Białko", value: formatNutritionValue(recipe.nutritionPerServing.protein), unit: "g", icon: "bolt.fill", color: .blue)
+                NutritionCard(title: "Węglowodany", value: formatNutritionValue(recipe.nutritionPerServing.carbs), unit: "g", icon: "leaf.fill", color: .green)
+                NutritionCard(title: "Tłuszcze", value: formatNutritionValue(recipe.nutritionPerServing.fat), unit: "g", icon: "drop.fill", color: .pink)
+                NutritionCard(title: "Błonnik", value: formatNutritionValue(recipe.nutritionPerServing.fiber), unit: "g", icon: "heart.fill", color: .pink)
+                NutritionCard(title: "Sól", value: formatNutritionValue(recipe.nutritionPerServing.salt), unit: "g", icon: "sparkles", color: .cyan)
+            }
+            .padding(1)
+        }
+    }
+
+    private var preparationSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Sposób przygotowania")
+                .font(.headline)
+
+            VStack(spacing: 0) {
+                ForEach(recipe.preparationSteps.sorted(by: { $0.stepNumber < $1.stepNumber })) { step in
+                    HStack(alignment: .top, spacing: 16) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 15, style: .continuous)
+                                .fill(categoryTint.opacity(colorScheme == .dark ? 0.22 : 0.15))
+                                .frame(width: 32, height: 32)
+
+                            Text("\(step.stepNumber)")
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                                .foregroundStyle(categoryTint)
+                        }
+
+                        Text(step.instruction)
+                            .font(.subheadline)
+                            .foregroundStyle(.primary)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.vertical, 14)
+
+                    if step.stepNumber < recipe.preparationSteps.count {
+                        Divider()
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+            .myBackground()
+            .myBorderOverlay()
+        }
+    }
+
+    private var ingredientsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Składniki")
+                .font(.headline)
+
+            VStack(spacing: 0) {
+                ForEach(Array(recipe.ingredients.enumerated()), id: \.element.id) { index, ingredient in
+                    HStack(alignment: .center, spacing: 12) {
+                        Text(ingredientDisplayName(ingredient.name))
+                            .font(.subheadline)
+                            .foregroundStyle(.primary)
+
+                        Spacer(minLength: 8)
+
+                        Text("\(formatIngredientAmount(ingredient.amount)) \(ingredient.unit.rawValue)")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 14)
+
+                    if index < recipe.ingredients.count - 1 {
+                        Divider()
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+            .myBackground()
+            .myBorderOverlay()
         }
     }
 }
