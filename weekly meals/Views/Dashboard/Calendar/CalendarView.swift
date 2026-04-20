@@ -6,20 +6,17 @@ struct CalendarView: View {
     @Environment(\.recipeCatalogStore) private var recipeCatalogStore
     @Environment(\.colorScheme) private var colorScheme
 
-    @State private var slotToPick: MealSlot? = nil
-    @State private var detailRecipe: Recipe? = nil
+    @State private var detailRecipe: Recipe?
+    @State private var showAssigner = false
 
-    private static let weekRangeFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "pl_PL")
-        formatter.dateFormat = "d MMM"
-        return formatter
-    }()
-
-    // MARK: - Computed
+    // MARK: - Derived
 
     private var isDayEditable: Bool {
         datesViewModel.isEditable(datesViewModel.selectedDate)
+    }
+
+    private var hasAssignableDay: Bool {
+        datesViewModel.dates.contains { datesViewModel.isEditable($0) }
     }
 
     private var dayNutrition: DayNutrition {
@@ -32,40 +29,8 @@ struct CalendarView: View {
         )
     }
 
-    private var weekRangeText: String {
-        guard let first = datesViewModel.dates.first,
-              let last = datesViewModel.dates.last else {
-            return "Bieżący tydzień"
-        }
-        return "\(Self.weekRangeFormatter.string(from: first)) - \(Self.weekRangeFormatter.string(from: last))"
-    }
-
     private func recipe(for slot: MealSlot) -> Recipe? {
         mealStore.recipe(for: datesViewModel.selectedDate, slot: slot)
-    }
-
-    private func availableCounts(for slot: MealSlot, includeCurrentFor date: Date? = nil) -> [UUID: Int] {
-        var counts: [UUID: Int] = [:]
-        for recipe in mealStore.savedPlan.availableRecipes(for: slot) {
-            counts[recipe.id, default: 0] += 1
-        }
-        if let date,
-           let current = mealStore.recipe(for: date, slot: slot) {
-            counts[current.id, default: 0] += 1
-        }
-        return counts
-    }
-
-    private func totalCounts(for slot: MealSlot) -> [UUID: Int] {
-        var counts: [UUID: Int] = [:]
-        for entry in mealStore.savedPlan.entries(for: slot) {
-            counts[entry.recipe.id, default: 0] += 1
-        }
-        return counts
-    }
-
-    private func pickerRecipes(for slot: MealSlot) -> [Recipe] {
-        mealStore.savedPlan.entries(for: slot).map(\.recipe)
     }
 
     // MARK: - Body
@@ -73,61 +38,52 @@ struct CalendarView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                CalendarLiquidBackground()
+                DashboardSheetBackground(theme: .indigo)
                     .ignoresSafeArea()
 
-                @Bindable var bindableDates = datesViewModel
-                List {
-                    DatesView(datesViewModal: bindableDates)
-                        .dashboardLiquidCard(cornerRadius: 24, strokeOpacity: 0.22)
-                        .padding(.horizontal, 16)
-                        .listRowSeparator(.hidden)
-                        .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
-                        .listRowBackground(Color.clear)
+                ScrollView {
+                    VStack(spacing: 16) {
+                        @Bindable var bindableDates = datesViewModel
+                        DatesView(datesViewModal: bindableDates)
+                            .dashboardLiquidCard(cornerRadius: 24, strokeOpacity: 0.2)
 
-                    if let errorMessage = mealStore.errorMessage, !errorMessage.isEmpty {
-                        Text(errorMessage)
-                            .font(.caption)
-                            .foregroundStyle(.red)
-                            .padding(.horizontal, 20)
-                            .padding(.top, 8)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .listRowSeparator(.hidden)
-                            .listRowInsets(EdgeInsets())
-                            .listRowBackground(Color.clear)
-                    }
+                        if let errorMessage = mealStore.errorMessage, !errorMessage.isEmpty {
+                            Text(errorMessage)
+                                .font(.footnote)
+                                .foregroundStyle(.red)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 10)
+                                .dashboardLiquidCard(cornerRadius: 16, strokeOpacity: 0.2)
+                        }
 
-                    dayHeader
-                        .listRowSeparator(.hidden)
-                        .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
-                        .listRowBackground(Color.clear)
+                        dayHeaderCard
 
-                    ForEach(MealSlot.allCases) { slot in
-                        MealCardView(slot: slot, recipe: recipe(for: slot), isEditable: isDayEditable)
-                            .contentShape(Rectangle())
-                            .onTapGesture { handleTap(slot) }
-                            .swipeActions(edge: .leading) {
-                                if recipe(for: slot) != nil && isDayEditable {
-                                    Button("Edytuj") { slotToPick = slot }
-                                        .tint(slot.accentColor)
-                                }
+                        VStack(spacing: 14) {
+                            ForEach(MealSlot.allCases) { slot in
+                                slotCard(slot)
                             }
-                            .swipeActions(edge: .trailing) {
-                                if recipe(for: slot) != nil && isDayEditable {
-                                    Button("Usuń") { clearRecipe(for: slot) }
-                                        .tint(.red)
-                                }
-                            }
-                            .listRowSeparator(.hidden)
-                            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                            .listRowBackground(Color.clear)
+                        }
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                    .padding(.bottom, 24)
                 }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
-                .scrollBounceBehavior(.always)
             }
             .navigationTitle("Kalendarz")
+            .toolbar {
+                if hasAssignableDay {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button {
+                            showAssigner = true
+                        } label: {
+                            Image(systemName: "pencil.and.list.clipboard")
+                                .font(.body.weight(.semibold))
+                        }
+                        .accessibilityLabel("Przypisz posiłki")
+                    }
+                }
+            }
             .task(id: datesViewModel.weekStartISO) {
                 await mealStore.loadSavedPlanFromBackend(weekStart: datesViewModel.weekStartISO)
                 await mealStore.loadWeekPlanFromBackend(
@@ -135,40 +91,27 @@ struct CalendarView: View {
                     dates: datesViewModel.dates
                 )
             }
-            .sheet(item: $slotToPick) { slot in
-                MealPickerSheet(
-                    slot: slot,
-                    recipes: pickerRecipes(for: slot),
-                    recipeCounts: availableCounts(for: slot, includeCurrentFor: datesViewModel.selectedDate),
-                    totalRecipeCounts: totalCounts(for: slot)
-                ) { selected in
-                    // Zwolnij poprzedni przepis z tego slotu (jeśli był)
-                    let previous = recipe(for: slot)
-                    if let previous {
-                        mealStore.markAsAvailable(previous, slot: slot)
-                    }
-                    mealStore.markAsSelected(selected, slot: slot)
-                    Task {
-                        let success = await mealStore.upsertWeekSlot(
-                            recipe: selected,
-                            for: datesViewModel.selectedDate,
-                            slot: slot,
-                            weekStart: datesViewModel.weekStartISO
-                        )
-                        if !success {
-                            mealStore.markAsAvailable(selected, slot: slot)
-                            if let previous {
-                                mealStore.markAsSelected(previous, slot: slot)
-                            }
-                        }
-                    }
-                }
+            .sheet(isPresented: $showAssigner) {
+                DayAssignerSheet(
+                    weekDates: datesViewModel.dates,
+                    weekStartISO: datesViewModel.weekStartISO
+                )
                 .dashboardLiquidSheet()
             }
-            .sheet(item: $detailRecipe) { recipe in
+            .sheet(item: $detailRecipe) { selected in
                 NavigationStack {
-                    RecipeDetailView(recipe: recipe)
-                        .navigationBarTitleDisplayMode(.inline)
+                    RecipeDetailView(
+                        recipe: selected,
+                        onToggleFavorite: {
+                            Task { @MainActor in
+                                await recipeCatalogStore.toggleFavorite(recipeId: selected.id)
+                                detailRecipe = await recipeCatalogStore.loadRecipeDetail(recipeId: selected.id)
+                                    ?? recipeCatalogStore.recipes.first(where: { $0.id == selected.id })
+                                    ?? selected
+                            }
+                        }
+                    )
+                    .navigationBarTitleDisplayMode(.inline)
                 }
                 .presentationDetents([.large])
                 .dashboardLiquidSheet()
@@ -176,25 +119,37 @@ struct CalendarView: View {
         }
     }
 
-    // MARK: - Day Header
+    // MARK: - Day header (nutrition)
 
-    private var dayHeader: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 10) {
+    private var dayHeaderCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
                 Text(datesViewModel.formattedDate(datesViewModel.selectedDate))
-                    .font(.system(size: 18, weight: .semibold, design: .rounded))
-                    .fontWeight(.semibold)
+                    .font(.headline.weight(.bold))
+                    .fontDesign(.rounded)
+                    .foregroundStyle(.primary)
 
-                Spacer(minLength: 8)
+                if !isDayEditable {
+                    HStack(spacing: 4) {
+                        Image(systemName: "lock.fill")
+                            .font(.caption2.weight(.bold))
+                        Text("Tylko podgląd")
+                            .font(.caption2.weight(.semibold))
+                    }
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 5)
+                    .background(DashboardPalette.surface(colorScheme, level: .tertiary), in: Capsule())
+                }
+
+                Spacer(minLength: 0)
             }
-            .frame(minHeight: 30, alignment: .leading)
 
             nutritionPanel
         }
+        .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
         .dashboardLiquidCard(cornerRadius: 20, strokeOpacity: 0.18)
-        .padding(.horizontal, 16)
     }
 
     private var nutritionPanel: some View {
@@ -232,8 +187,7 @@ struct CalendarView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.caption2)
-                    .fontWeight(.semibold)
+                    .font(.caption2.weight(.semibold))
                     .foregroundStyle(.secondary)
 
                 HStack(alignment: .firstTextBaseline, spacing: 3) {
@@ -245,8 +199,7 @@ struct CalendarView: View {
                         .minimumScaleFactor(0.72)
 
                     Text(unit)
-                        .font(.caption2)
-                        .fontWeight(.medium)
+                        .font(.caption2.weight(.medium))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
@@ -267,67 +220,193 @@ struct CalendarView: View {
         )
     }
 
+    // MARK: - Slot card
+
+    @ViewBuilder
+    private func slotCard(_ slot: MealSlot) -> some View {
+        let assigned = recipe(for: slot)
+
+        VStack(alignment: .leading, spacing: 12) {
+            slotHeader(slot: slot, assigned: assigned)
+
+            if let assigned {
+                assignedContent(slot: slot, recipe: assigned)
+            } else {
+                emptyRow(slot: slot)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(slot.accentColor.opacity(colorScheme == .dark ? 0.08 : 0.045))
+        )
+        .dashboardLiquidCard(cornerRadius: 22, strokeOpacity: 0.16)
+    }
+
+    private func slotHeader(slot: MealSlot, assigned: Recipe?) -> some View {
+        HStack(alignment: .center, spacing: 12) {
+            slotIcon(slot)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(slot.title)
+                    .font(.headline.weight(.bold))
+                    .fontDesign(.rounded)
+                    .foregroundStyle(.primary)
+
+                Text(assigned == nil ? (isDayEditable ? "Do uzupełnienia" : "Brak") : "Zaplanowany")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 8)
+
+            timePill(slot)
+        }
+    }
+
+    private func slotIcon(_ slot: MealSlot) -> some View {
+        Image(systemName: slot.icon)
+            .font(.system(size: 15, weight: .bold))
+            .foregroundStyle(slot.accentColor.opacity(colorScheme == .dark ? 0.96 : 0.85))
+            .frame(width: 36, height: 36)
+            .background(
+                DashboardPalette.tintFill(slot.accentColor, scheme: colorScheme, dark: 0.2, light: 0.16),
+                in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(slot.accentColor.opacity(colorScheme == .dark ? 0.28 : 0.2), lineWidth: 1)
+            )
+    }
+
+    private func timePill(_ slot: MealSlot) -> some View {
+        Text(slot.time)
+            .font(.caption.weight(.semibold))
+            .monospacedDigit()
+            .foregroundStyle(slot.accentColor)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(
+                slot.accentColor.opacity(colorScheme == .dark ? 0.2 : 0.16),
+                in: Capsule()
+            )
+    }
+
+    private func assignedContent(slot: MealSlot, recipe: Recipe) -> some View {
+        Button {
+            openDetail(for: recipe)
+        } label: {
+            HStack(spacing: 12) {
+                ticketThumbnail(recipe: recipe, slot: slot)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(recipe.name)
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    HStack(spacing: 10) {
+                        ticketMeta(icon: "clock", text: "\(recipe.prepTimeMinutes) min")
+                        ticketMeta(icon: "flame.fill", text: "\(Int(recipe.nutritionPerServing.kcal)) kcal")
+                    }
+                }
+
+                Spacer(minLength: 6)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                DashboardPalette.surface(colorScheme, level: .secondary)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(slot.accentColor.opacity(colorScheme == .dark ? 0.22 : 0.16), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func ticketThumbnail(recipe: Recipe, slot: MealSlot) -> some View {
+        Group {
+            if let url = recipe.imageURL {
+                CachedAsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image.resizable().scaledToFill()
+                    case .empty, .failure:
+                        ticketThumbPlaceholder(slot: slot)
+                    @unknown default:
+                        ticketThumbPlaceholder(slot: slot)
+                    }
+                }
+            } else {
+                ticketThumbPlaceholder(slot: slot)
+            }
+        }
+        .frame(width: 60, height: 60)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private func ticketThumbPlaceholder(slot: MealSlot) -> some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(slot.accentColor.opacity(colorScheme == .dark ? 0.22 : 0.18))
+            Image(systemName: slot.icon)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(slot.accentColor)
+        }
+    }
+
+    private func ticketMeta(icon: String, text: String) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.system(size: 10, weight: .semibold))
+            Text(text)
+                .font(.caption2.weight(.semibold))
+                .monospacedDigit()
+        }
+        .foregroundStyle(.secondary)
+    }
+
+    private func emptyRow(slot: MealSlot) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: isDayEditable ? "circle.dashed" : "lock.fill")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(.secondary)
+
+            Text(isDayEditable ? "Brak przypisanego posiłku" : "Dzień nieedytowalny")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(DashboardPalette.surface(colorScheme, level: .tertiary))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(DashboardPalette.neutralBorder(colorScheme, opacity: 0.12), lineWidth: 1)
+        )
+    }
+
     // MARK: - Actions
 
-    private func handleTap(_ slot: MealSlot) {
-        if let recipe = recipe(for: slot) {
-            Task {
-                detailRecipe = await recipeCatalogStore.loadRecipeDetail(recipeId: recipe.id) ?? recipe
-            }
-        } else if isDayEditable {
-            slotToPick = slot
-        }
-    }
-
-    private func clearRecipe(for slot: MealSlot) {
-        let previous = recipe(for: slot)
-        if let previous {
-            mealStore.markAsAvailable(previous, slot: slot)
-        }
-        Task {
-            let success = await mealStore.removeWeekSlot(
-                for: datesViewModel.selectedDate,
-                slot: slot,
-                weekStart: datesViewModel.weekStartISO
-            )
-            if !success, let previous {
-                mealStore.markAsSelected(previous, slot: slot)
-            }
-        }
-    }
-}
-
-private struct CalendarLiquidBackground: View {
-    @Environment(\.colorScheme) private var colorScheme
-
-    var body: some View {
-        ZStack {
-            LinearGradient(
-                colors: [
-                    DashboardPalette.backgroundTop(for: colorScheme),
-                    DashboardPalette.backgroundBottom(for: colorScheme)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-
-            Circle()
-                .fill(Color.blue.opacity(colorScheme == .dark ? 0.22 : 0.12))
-                .frame(width: 260, height: 260)
-                .blur(radius: 95)
-                .offset(x: -120, y: -190)
-
-            Circle()
-                .fill(Color.purple.opacity(colorScheme == .dark ? 0.18 : 0.1))
-                .frame(width: 280, height: 280)
-                .blur(radius: 100)
-                .offset(x: 150, y: 240)
-
-            Circle()
-                .fill(Color.cyan.opacity(colorScheme == .dark ? 0.12 : 0.09))
-                .frame(width: 210, height: 210)
-                .blur(radius: 85)
-                .offset(x: 120, y: -240)
+    private func openDetail(for recipe: Recipe) {
+        Task { @MainActor in
+            detailRecipe = await recipeCatalogStore.loadRecipeDetail(recipeId: recipe.id) ?? recipe
         }
     }
 }

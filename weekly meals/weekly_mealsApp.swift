@@ -10,7 +10,7 @@ import SwiftUI
 import UserNotifications
 
 enum AppEnvironment {
-    /// Adres backendu. Kolejność priorytetów:
+    /// Adres backendu. Kolejność priorytetów:r
     /// 1. Zmienna środowiskowa API_BASE_URL (przydatna przy lokalnym debugowaniu)
     /// 2. Info.plist → klucz API_BASE_URL (domyślnie produkcja)
     /// 3. Bezpieczny fallback: produkcja
