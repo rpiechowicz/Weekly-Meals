@@ -11,6 +11,8 @@ enum RecipeBadgeSize {
 }
 
 struct RecipeInfoBadge: View {
+    @Environment(\.colorScheme) private var colorScheme
+
     let icon: String
     let text: String
     var color: Color = .secondary
@@ -24,10 +26,23 @@ struct RecipeInfoBadge: View {
                 .fontWeight(.medium)
         }
         .foregroundStyle(color)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        .myBackground()
-        .myBorderOverlay()
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(badgeFill, in: Capsule())
+        .overlay(
+            Capsule()
+                .stroke(borderColor, lineWidth: 1)
+        )
+    }
+
+    private var badgeFill: Color {
+        colorScheme == .dark
+            ? DashboardPalette.surface(colorScheme, level: .secondary)
+            : Color.white.opacity(0.9)
+    }
+
+    private var borderColor: Color {
+        DashboardPalette.neutralBorder(colorScheme, opacity: colorScheme == .dark ? 0.12 : 0.08)
     }
 }
 
@@ -176,7 +191,7 @@ struct RecipeCategoryBadge: View {
     private var shadowColor: Color {
         switch style {
         case .subtle:
-            return .black.opacity(colorScheme == .dark ? 0.18 : 0.08)
+            return colorScheme == .dark ? .black.opacity(0.18) : .clear
         case .overlayDark:
             return .black.opacity(colorScheme == .dark ? 0.24 : 0.16)
         }

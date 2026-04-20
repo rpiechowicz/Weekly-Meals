@@ -14,6 +14,7 @@ private struct RecipeMealSection: Identifiable {
 struct RecipesView: View {
     @Environment(\.recipeCatalogStore) private var recipeCatalogStore
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.colorScheme) private var colorScheme
 
     @State private var searchText = ""
     @State private var selectedRecipe: Recipe?
@@ -90,7 +91,9 @@ struct RecipesView: View {
     }
 
     private var featuredEyebrowColor: Color {
-        Color(red: 0.74, green: 0.94, blue: 0.50)
+        colorScheme == .dark
+            ? Color(red: 0.74, green: 0.94, blue: 0.50)
+            : Color(red: 0.36, green: 0.62, blue: 0.14)
     }
 
     var body: some View {
@@ -373,7 +376,7 @@ private struct RecipeFeaturedCard: View {
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                 .stroke(DashboardPalette.neutralBorder(colorScheme, opacity: 0.14), lineWidth: 1)
         )
-        .shadow(color: .black.opacity(colorScheme == .dark ? 0.2 : 0.12), radius: 14, x: 0, y: 10)
+        .shadow(color: colorScheme == .dark ? .black.opacity(0.2) : .clear, radius: 14, x: 0, y: 10)
     }
 
     private var topRow: some View {
@@ -465,11 +468,7 @@ private struct RecipeFeaturedCard: View {
             .font(.system(size: 14, weight: .bold))
             .foregroundStyle(recipe.favourite ? Color.pink : Color.white.opacity(0.96))
             .frame(width: 38, height: 38)
-            .background(Color.black.opacity(0.22), in: Circle())
-            .overlay(
-                Circle()
-                    .stroke(Color.white.opacity(0.2), lineWidth: 1)
-            )
+            .background(Color.black.opacity(colorScheme == .dark ? 0.34 : 0.3), in: Circle())
     }
 
 }
@@ -797,7 +796,7 @@ private struct RecipeCarouselCard: View {
                 .padding(.top, 10)
                 .padding(.trailing, 10)
         }
-        .shadow(color: .black.opacity(colorScheme == .dark ? 0.24 : 0.12), radius: 10, x: 0, y: 6)
+        .shadow(color: colorScheme == .dark ? .black.opacity(0.24) : .clear, radius: 10, x: 0, y: 6)
     }
 
     private var bottomContent: some View {
@@ -824,17 +823,11 @@ private struct RecipeCarouselCard: View {
     }
 
     private var heartBadge: some View {
-        ZStack {
-            Circle().fill(.ultraThinMaterial)
-            Circle().fill(Color.black.opacity(0.28))
-            Image(systemName: recipe.favourite ? "heart.fill" : "heart")
-                .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(recipe.favourite ? Color.pink : Color.white)
-        }
-        .frame(width: 28, height: 28)
-        .overlay(
-            Circle().stroke(Color.white.opacity(0.22), lineWidth: 0.8)
-        )
+        Image(systemName: recipe.favourite ? "heart.fill" : "heart")
+            .font(.system(size: 11, weight: .bold))
+            .foregroundStyle(recipe.favourite ? Color.pink : Color.white)
+            .frame(width: 28, height: 28)
+            .background(Color.black.opacity(colorScheme == .dark ? 0.38 : 0.34), in: Circle())
     }
 
     private var thumbnail: some View {
