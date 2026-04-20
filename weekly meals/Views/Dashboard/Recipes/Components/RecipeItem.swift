@@ -9,16 +9,15 @@ struct RecipeItemView: View {
     var availabilityBadgeColor: Color = .green
     @Environment(\.colorScheme) private var colorScheme
     private let cardCornerRadius: CGFloat = 18
-    private let cardHeight: CGFloat = 258
-    private let titleBlockHeight: CGFloat = 56
-    private let detailsBlockHeight: CGFloat = 82
+    private let imageHeight: CGFloat = 140
+    private let titleBlockHeight: CGFloat = 52
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            ZStack(alignment: .topLeading) {
+        VStack(alignment: .leading, spacing: 12) {
+            ZStack(alignment: .bottomTrailing) {
                 if let imageURL = recipe.imageURL {
                     Color(.secondarySystemFill)
-                        .frame(height: 140)
+                        .frame(height: imageHeight)
                         .overlay(
                             CachedAsyncImage(url: imageURL) { phase in
                                 switch phase {
@@ -44,75 +43,61 @@ struct RecipeItemView: View {
                     recipePlaceholder
                 }
 
-                HStack {
-                    Spacer()
-                    if isSelected {
-                        statusIconBadge(systemName: "checkmark.circle.fill", foreground: .green)
-                    } else if recipe.favourite {
-                        statusIconBadge(systemName: "heart.fill", foreground: .pink)
-                    }
-                }
-
                 if let availabilityBadgeText {
-                    VStack {
-                        Spacer()
-                        HStack {
-                            Spacer()
-                            Text(availabilityBadgeText)
-                                .font(.caption)
-                                .fontWeight(.bold)
-                                .monospacedDigit()
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 5)
-                                .background(availabilityBadgeColor, in: Capsule())
-                                .overlay(
-                                    Capsule()
-                                        .stroke(Color.white.opacity(0.28), lineWidth: 0.8)
-                                )
-                                .shadow(color: .black.opacity(0.25), radius: 3, x: 0, y: 1)
-                                .padding(8)
-                        }
-                    }
+                    Text(availabilityBadgeText)
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .monospacedDigit()
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(availabilityBadgeColor, in: Capsule())
+                        .overlay(
+                            Capsule()
+                                .stroke(Color.white.opacity(0.28), lineWidth: 0.8)
+                        )
+                        .shadow(color: .black.opacity(0.25), radius: 3, x: 0, y: 1)
+                        .padding(8)
                 } else if badgeCount > 1 {
-                    VStack {
-                        Spacer()
-                        HStack {
-                            Spacer()
-                            Text("\(badgeCount)")
-                                .font(.caption2)
-                                .fontWeight(.bold)
-                                .foregroundStyle(.white)
-                                .frame(width: 22, height: 22)
-                                .background(.blue, in: Circle())
-                                .padding(8)
-                        }
-                    }
+                    Text("\(badgeCount)")
+                        .font(.caption2)
+                        .fontWeight(.bold)
+                        .foregroundStyle(.white)
+                        .frame(width: 22, height: 22)
+                        .background(.blue, in: Circle())
+                        .padding(8)
                 }
+            }
+            .frame(height: imageHeight)
 
+            HStack(alignment: .center, spacing: 8) {
                 categoryPill
-            }
-            .frame(height: 140)
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(recipe.name)
-                    .font(.headline)
-                    .foregroundStyle(.primary)
-                    .lineLimit(2)
-                    .truncationMode(.tail)
-                    .frame(maxWidth: .infinity, minHeight: titleBlockHeight, maxHeight: titleBlockHeight, alignment: .topLeading)
+                Spacer(minLength: 8)
 
-                HStack(spacing: 6) {
-                    infoPill(icon: "clock", text: "\(recipe.prepTimeMinutes) min")
-                    infoPill(icon: "flame.fill", text: "\(Int(recipe.nutritionPerServing.kcal)) kcal")
+                if isSelected {
+                    statusIconBadge(systemName: "checkmark.circle.fill", foreground: .green)
+                } else if recipe.favourite {
+                    statusIconBadge(systemName: "heart.fill", foreground: .pink)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(maxWidth: .infinity, minHeight: detailsBlockHeight, maxHeight: detailsBlockHeight, alignment: .topLeading)
+            .frame(maxWidth: .infinity, minHeight: 30, maxHeight: 30, alignment: .leading)
+
+            Text(recipe.name)
+                .font(.headline)
+                .foregroundStyle(.primary)
+                .lineLimit(2)
+                .truncationMode(.tail)
+                .frame(maxWidth: .infinity, minHeight: titleBlockHeight, maxHeight: titleBlockHeight, alignment: .topLeading)
+
+            HStack(spacing: 6) {
+                infoPill(icon: "clock", text: "\(recipe.prepTimeMinutes) min")
+                infoPill(icon: "flame.fill", text: "\(Int(recipe.nutritionPerServing.kcal)) kcal")
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .topLeading)
-        .frame(height: cardHeight, alignment: .topLeading)
         .background(cardFill, in: RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous))
         .clipShape(RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous))
         .overlay(
@@ -129,7 +114,7 @@ struct RecipeItemView: View {
     private var recipePlaceholder: some View {
         RoundedRectangle(cornerRadius: 12, style: .continuous)
             .fill(Color(.secondarySystemFill))
-            .frame(height: 140)
+            .frame(height: imageHeight)
             .overlay(
                 Image(systemName: "fork.knife.circle")
                     .font(.system(size: 40))
@@ -138,31 +123,11 @@ struct RecipeItemView: View {
     }
 
     private var categoryPill: some View {
-        RecipeCategoryBadge(
-            text: recipe.category.rawValue,
-            tint: categoryTint,
-            style: .overlayDark
-        )
-            .padding(8)
+        RecipeCategoryBadge(category: recipe.category)
     }
 
     private func statusIconBadge(systemName: String, foreground: Color) -> some View {
-        let isCheckmark = systemName == "checkmark.circle.fill"
-
-        return Image(systemName: systemName)
-        .font(.system(size: isCheckmark ? 14 : 13, weight: .bold))
-        .foregroundStyle(foreground)
-        .frame(width: 30, height: 30)
-        .background(
-            DashboardPalette.surface(colorScheme, level: .secondary),
-            in: Circle()
-        )
-        .overlay(
-            Circle()
-                .stroke(DashboardPalette.neutralBorder(colorScheme, opacity: 0.12), lineWidth: 1)
-        )
-        .shadow(color: .black.opacity(0.08), radius: 4, x: 0, y: 2)
-        .padding(8)
+        RecipeStatusCircle(systemName: systemName, tint: foreground)
     }
 
     private func infoPill(icon: String, text: String) -> some View {
@@ -175,21 +140,6 @@ struct RecipeItemView: View {
         }
 
         return DashboardPalette.surface(colorScheme, level: .secondary)
-    }
-
-    private var categoryTint: Color {
-        switch recipe.category {
-        case .breakfast:
-            return .orange
-        case .lunch:
-            return .blue
-        case .dinner:
-            return .purple
-        case .favourite:
-            return .pink
-        case .all:
-            return .teal
-        }
     }
 }
 
