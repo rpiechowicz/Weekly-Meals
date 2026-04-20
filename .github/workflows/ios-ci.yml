@@ -17,6 +17,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Select Xcode 26
+        run: |
+          # Keep CI aligned with the project's iOS 26 deployment target.
+          xcode26=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          if [ -n "$xcode26" ]; then
+            echo "Using $xcode26"
+            sudo xcode-select -s "$xcode26/Contents/Developer"
+          else
+            echo "Xcode 26 not found, using default: $(xcode-select -p)"
+          fi
+          xcodebuild -version
+          xcodebuild -showsdks | grep iphonesimulator
+
       - name: Resolve Swift packages
         run: xcodebuild -resolvePackageDependencies -project "weekly meals.xcodeproj"
 
