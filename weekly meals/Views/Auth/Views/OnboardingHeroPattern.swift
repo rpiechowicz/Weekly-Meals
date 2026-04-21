@@ -133,11 +133,10 @@ struct OnboardingHeroPattern: View {
     }
 
     private var bottomFade: some View {
-        // Gradient 50% → 95% matching design — bez tego shadow między ostatnim
-        // rzędem kafli a tytułem znika.
+        // 1:1 wg designu: linear-gradient(to bottom, transparent 50%, bg 95%).
         LinearGradient(
             stops: [
-                .init(color: Color.wmCanvas(colorScheme).opacity(0), location: 0.5),
+                .init(color: Color.wmCanvas(colorScheme).opacity(0), location: 0.50),
                 .init(color: Color.wmCanvas(colorScheme),            location: 0.95)
             ],
             startPoint: .top,

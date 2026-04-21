@@ -29,6 +29,7 @@ struct AuthView: View {
                         errorMessage: errorMessage,
                         onSignInWithAppleTap: onSignInWithAppleTap
                     )
+                        .padding(.top, 20)
 
                     AuthFooterView()
                         .padding(.top, 14)
