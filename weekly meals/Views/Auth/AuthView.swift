@@ -6,36 +6,64 @@ struct AuthView: View {
     let onSignInWithAppleTap: () -> Void
 
     var body: some View {
-        ZStack {
+        // Layout zgodny z designem (B2 Cozy Kitchen): sztywny, bez scrolla.
+        // Hero 280pt sięga pod status bar (ignoresSafeArea w hero). Content
+        // zajmuje resztę i spacerem wypycha Apple+footer na dół — tak jak
+        // `marginBottom: auto` w designie.
+        ZStack(alignment: .top) {
             AuthBackgroundView()
 
-            GeometryReader { proxy in
-                ScrollView(.vertical, showsIndicators: false) {
-                    VStack(spacing: 20) {
-                        AuthHeaderView()
-                        AuthFeaturesView()
-                        AuthActionsView(
-                            isLoading: isLoading,
-                            errorMessage: errorMessage,
-                            onSignInWithAppleTap: onSignInWithAppleTap
-                        )
-                        AuthFooterView()
-                    }
-                    .frame(maxWidth: 560)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 24)
-                    .frame(maxWidth: .infinity)
-                    .frame(minHeight: proxy.size.height, alignment: .center)
+            VStack(spacing: 0) {
+                OnboardingHeroPattern()
+
+                VStack(alignment: .leading, spacing: 0) {
+                    AuthHeaderView()
+
+                    AuthFeaturesView()
+                        .padding(.top, 24)
+
+                    Spacer(minLength: 20)
+
+                    AuthActionsView(
+                        isLoading: isLoading,
+                        errorMessage: errorMessage,
+                        onSignInWithAppleTap: onSignInWithAppleTap
+                    )
+                        .padding(.top, 20)
+
+                    AuthFooterView()
+                        .padding(.top, 14)
                 }
+                .padding(.horizontal, 28)
+                .padding(.top, 8)
+                .padding(.bottom, 36)
+                .frame(maxWidth: 560)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
         }
     }
 }
 
-#Preview {
+#Preview("Dark") {
+    AuthView(isLoading: false, errorMessage: nil, onSignInWithAppleTap: {})
+        .preferredColorScheme(.dark)
+}
+
+#Preview("Light") {
+    AuthView(isLoading: false, errorMessage: nil, onSignInWithAppleTap: {})
+        .preferredColorScheme(.light)
+}
+
+#Preview("Loading") {
+    AuthView(isLoading: true, errorMessage: nil, onSignInWithAppleTap: {})
+        .preferredColorScheme(.dark)
+}
+
+#Preview("Error") {
     AuthView(
         isLoading: false,
-        errorMessage: nil,
+        errorMessage: "Nie udało się zalogować. Spróbuj ponownie.",
         onSignInWithAppleTap: {}
     )
+    .preferredColorScheme(.dark)
 }
