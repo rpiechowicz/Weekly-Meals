@@ -23,6 +23,8 @@ final class RecipeCatalogStore {
     private let cacheMaxAge: TimeInterval = 60 * 60 * 12 // 12 h
     private let maxFetchAttempts: Int = 3
     private var pendingRealtimeReloadTask: Task<Void, Never>?
+    private var pendingFavoriteTasks: [UUID: Task<Void, Never>] = [:]
+    private var pendingFavoriteOriginalState: [UUID: Bool] = [:]
 
     private var cacheURL: URL {
         FileManager.default
@@ -145,12 +147,34 @@ final class RecipeCatalogStore {
         let next = !previous
 
         recipes[index].favourite = next
-        do {
-            try await repository.setFavorite(recipeId: recipeId, isFavorite: next)
-            saveCache()
-        } catch {
-            recipes[index].favourite = previous
-            errorMessage = UserFacingErrorMapper.message(from: error)
+
+        if pendingFavoriteTasks[recipeId] == nil {
+            pendingFavoriteOriginalState[recipeId] = previous
+        }
+        pendingFavoriteTasks[recipeId]?.cancel()
+
+        pendingFavoriteTasks[recipeId] = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            guard let self, !Task.isCancelled else { return }
+
+            let originalState = self.pendingFavoriteOriginalState[recipeId] ?? previous
+            self.pendingFavoriteTasks[recipeId] = nil
+            self.pendingFavoriteOriginalState[recipeId] = nil
+
+            guard let finalIndex = self.recipes.firstIndex(where: { $0.id == recipeId }) else { return }
+            let finalState = self.recipes[finalIndex].favourite
+
+            if finalState == originalState { return }
+
+            do {
+                try await self.repository.setFavorite(recipeId: recipeId, isFavorite: finalState)
+                self.saveCache()
+            } catch {
+                if let rollbackIndex = self.recipes.firstIndex(where: { $0.id == recipeId }) {
+                    self.recipes[rollbackIndex].favourite = originalState
+                }
+                self.errorMessage = UserFacingErrorMapper.message(from: error)
+            }
         }
     }
 

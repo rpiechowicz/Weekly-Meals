@@ -530,6 +530,8 @@ final class ShoppingListStore {
     private var pendingArchiveWeekLabel: String?
     private var isReconcilingPendingChecks: Bool = false
     private var pendingResetProductKeys: Set<String> = []
+    private var pendingToggleTasks: [String: Task<Void, Never>] = [:]
+    private var pendingToggleOriginalState: [String: Bool] = [:]
     var isLoading: Bool = false
     var errorMessage: String?
 
@@ -629,6 +631,9 @@ final class ShoppingListStore {
         guard !uncheckedItems.isEmpty else { return }
 
         pendingResetProductKeys.removeAll()
+        for task in pendingToggleTasks.values { task.cancel() }
+        pendingToggleTasks.removeAll()
+        pendingToggleOriginalState.removeAll()
         let originalItems = items
         isBatchUpdating = true
         for index in items.indices {
@@ -652,17 +657,39 @@ final class ShoppingListStore {
               let weekStart else { return }
 
         pendingResetProductKeys.remove(item.productKey)
+        let productKey = item.productKey
         let previous = items[index].isChecked
         let next = !previous
         items[index].isChecked = next
         cacheCurrentState(for: weekStart)
 
-        do {
-            try await repository.setChecked(weekStart: weekStart, productKey: item.productKey, isChecked: next)
-        } catch {
-            items[index].isChecked = previous
-            cacheCurrentState(for: weekStart)
-            errorMessage = UserFacingErrorMapper.message(from: error)
+        if pendingToggleTasks[productKey] == nil {
+            pendingToggleOriginalState[productKey] = previous
+        }
+        pendingToggleTasks[productKey]?.cancel()
+
+        pendingToggleTasks[productKey] = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            guard let self, !Task.isCancelled else { return }
+
+            let originalState = self.pendingToggleOriginalState[productKey] ?? previous
+            self.pendingToggleTasks[productKey] = nil
+            self.pendingToggleOriginalState[productKey] = nil
+
+            guard let finalIndex = self.items.firstIndex(where: { $0.productKey == productKey }) else { return }
+            let finalState = self.items[finalIndex].isChecked
+
+            if finalState == originalState { return }
+
+            do {
+                try await self.repository.setChecked(weekStart: weekStart, productKey: productKey, isChecked: finalState)
+            } catch {
+                if let rollbackIndex = self.items.firstIndex(where: { $0.productKey == productKey }) {
+                    self.items[rollbackIndex].isChecked = originalState
+                    self.cacheCurrentState(for: weekStart)
+                }
+                self.errorMessage = UserFacingErrorMapper.message(from: error)
+            }
         }
     }
 
@@ -827,7 +854,24 @@ final class ShoppingListStore {
 
     private func apply(state: ShoppingListState, for weekStart: String) async {
         archivedLists = state.archives
-        items = state.items
+        let pendingKeys = Set(pendingToggleTasks.keys)
+        if pendingKeys.isEmpty {
+            items = state.items
+        } else {
+            // Zachowaj optymistyczne isChecked dla itemów z aktywnym debouncem —
+            // serwer jeszcze nie wie o tapnięciu, wiec nie nadpisujemy lokalnego stanu.
+            let localCheckedByKey = Dictionary(
+                uniqueKeysWithValues: items.map { ($0.productKey, $0.isChecked) }
+            )
+            items = state.items.map { serverItem in
+                guard pendingKeys.contains(serverItem.productKey),
+                      let localChecked = localCheckedByKey[serverItem.productKey]
+                else { return serverItem }
+                var merged = serverItem
+                merged.isChecked = localChecked
+                return merged
+            }
+        }
         await syncPendingItemCheckState(for: weekStart, currentItems: state.items)
         cacheCurrentState(for: weekStart)
     }
