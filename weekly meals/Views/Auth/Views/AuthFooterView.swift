@@ -1,32 +1,39 @@
 import SwiftUI
 
 struct AuthFooterView: View {
+    @Environment(\.colorScheme) private var colorScheme
     @State private var showPrivacyPolicy = false
     @State private var showTermsOfService = false
 
     var body: some View {
-        VStack(spacing: 10) {
-            Text("Kontynuując, akceptujesz Warunki korzystania i potwierdzasz, że zapoznałeś(-aś) się z Polityką prywatności.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 8)
+        // Kropka wkleja się w nazwę drugiego przycisku, żeby nie pływała
+        // samotnie po gapie HStack-a.
+        VStack(spacing: 6) {
+            Text("Kontynuując, akceptujesz")
+                .font(.system(size: 12))
+                .foregroundStyle(Color.wmMuted(colorScheme))
 
-            HStack(spacing: 16) {
-                Button("Polityka prywatności") {
-                    showPrivacyPolicy = true
-                }
-                .buttonStyle(.plain)
-                .font(.footnote)
+            HStack(spacing: 4) {
+                Button("Warunki") { showTermsOfService = true }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 12, weight: .medium))
+                    .underline()
+                    .foregroundStyle(Color.wmLabel(colorScheme))
 
-                Button("Warunki korzystania") {
-                    showTermsOfService = true
-                }
-                .buttonStyle(.plain)
-                .font(.footnote)
+                Text("oraz")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color.wmMuted(colorScheme))
+
+                Button("Politykę prywatności.") { showPrivacyPolicy = true }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 12, weight: .medium))
+                    .underline()
+                    .foregroundStyle(Color.wmLabel(colorScheme))
             }
-            .foregroundStyle(.secondary)
         }
+        .multilineTextAlignment(.center)
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 8)
         .sheet(isPresented: $showPrivacyPolicy) {
             LegalDocumentSheet(title: "Polityka prywatności") {
                 PrivacyPolicyContent()
@@ -47,6 +54,7 @@ private struct LegalDocumentSheet<Content: View>: View {
     @ViewBuilder let content: () -> Content
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         NavigationStack {
@@ -57,8 +65,12 @@ private struct LegalDocumentSheet<Content: View>: View {
                 .padding(20)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .scrollContentBackground(.hidden)
+            .background(Color.wmCanvas(colorScheme))
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Color.wmCanvas(colorScheme), for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Zamknij") { dismiss() }
@@ -115,7 +127,7 @@ private struct PrivacyPolicyContent: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Administratorem danych osobowych użytkowników Aplikacji jest Rafał Piechowicz („Administrator”).")
                     Text("Kontakt w sprawach dotyczących danych osobowych:")
-                    Text("e-mail: piechowicz.rafal98@gmail.com")
+                    Text("e-mail: rpiechowicz@icloud.com")
                         .fontWeight(.medium)
                 }
             }
@@ -179,13 +191,13 @@ private struct PrivacyPolicyContent: View {
                     Text("• ograniczenia przetwarzania (art. 18);")
                     Text("• przenoszenia danych (art. 20);")
                     Text("• sprzeciwu wobec przetwarzania opartego na prawnie uzasadnionym interesie (art. 21).")
-                    Text("W celu realizacji powyższych praw prosimy o kontakt pod adresem: piechowicz.rafal98@gmail.com.")
+                    Text("W celu realizacji powyższych praw prosimy o kontakt pod adresem: rpiechowicz@icloud.com.")
                     Text("Użytkownik ma również prawo wniesienia skargi do Prezesa Urzędu Ochrony Danych Osobowych (ul. Stawki 2, 00-193 Warszawa).")
                 }
             }
 
             LegalSection(number: 9, title: "Usunięcie konta") {
-                Text("Użytkownik może w każdej chwili zażądać usunięcia konta i powiązanych z nim danych osobowych, wysyłając wiadomość na adres piechowicz.rafal98@gmail.com z adresu e-mail powiązanego z kontem lub korzystając z funkcji usuwania konta w Aplikacji, jeżeli została udostępniona. Żądanie realizowane jest niezwłocznie, nie później niż w terminie 30 dni.")
+                Text("Użytkownik może w każdej chwili zażądać usunięcia konta i powiązanych z nim danych osobowych, wysyłając wiadomość na adres rpiechowicz@icloud.com z adresu e-mail powiązanego z kontem lub korzystając z funkcji usuwania konta w Aplikacji, jeżeli została udostępniona. Żądanie realizowane jest niezwłocznie, nie później niż w terminie 30 dni.")
             }
 
             LegalSection(number: 10, title: "Zautomatyzowane podejmowanie decyzji") {
@@ -200,7 +212,7 @@ private struct PrivacyPolicyContent: View {
                 Text("Administrator może zaktualizować niniejszą Politykę prywatności w związku ze zmianami prawa lub funkcjonalności Aplikacji. Istotne zmiany zostaną zakomunikowane w Aplikacji z odpowiednim wyprzedzeniem. Dalsze korzystanie z Aplikacji po wejściu w życie zmian oznacza zapoznanie się z nową wersją dokumentu.")
             }
 
-            Text("W razie pytań dotyczących przetwarzania danych prosimy o kontakt: piechowicz.rafal98@gmail.com.")
+            Text("W razie pytań dotyczących przetwarzania danych prosimy o kontakt: rpiechowicz@icloud.com.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .padding(.top, 8)
@@ -219,7 +231,7 @@ private struct TermsOfServiceContent: View {
 
             LegalSection(number: 1, title: "Postanowienia ogólne") {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Usługodawcą jest Rafał Piechowicz („Usługodawca”), kontakt: piechowicz.rafal98@gmail.com.")
+                    Text("Usługodawcą jest Rafał Piechowicz („Usługodawca”), kontakt: rpiechowicz@icloud.com.")
                     Text("Użytkownikiem jest osoba fizyczna korzystająca z Aplikacji. Warunkiem korzystania z pełnej funkcjonalności Aplikacji jest zalogowanie się za pomocą Sign in with Apple.")
                     Text("Korzystanie z Aplikacji jest równoznaczne z akceptacją Warunków.")
                 }
@@ -273,7 +285,7 @@ private struct TermsOfServiceContent: View {
 
             LegalSection(number: 8, title: "Reklamacje") {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Reklamacje dotyczące Aplikacji można składać na adres: piechowicz.rafal98@gmail.com.")
+                    Text("Reklamacje dotyczące Aplikacji można składać na adres: rpiechowicz@icloud.com.")
                     Text("Reklamacja powinna zawierać imię, adres e-mail, opis problemu oraz oczekiwany sposób rozpatrzenia.")
                     Text("Usługodawca rozpatruje reklamacje w terminie 14 dni od ich otrzymania, informując o wyniku drogą elektroniczną.")
                 }
@@ -287,7 +299,7 @@ private struct TermsOfServiceContent: View {
             }
 
             LegalSection(number: 10, title: "Odstąpienie od umowy") {
-                Text("Konsumentowi w rozumieniu art. 22(1) Kodeksu cywilnego przysługuje prawo odstąpienia od umowy o świadczenie usług drogą elektroniczną w terminie 14 dni od dnia jej zawarcia, bez podania przyczyny. Oświadczenie o odstąpieniu można złożyć w dowolnej formie, w szczególności drogą elektroniczną na adres piechowicz.rafal98@gmail.com. Prawo odstąpienia nie przysługuje, jeżeli świadczenie usługi zostało w pełni wykonane za wyraźną zgodą konsumenta, który został poinformowany o utracie tego prawa.")
+                Text("Konsumentowi w rozumieniu art. 22(1) Kodeksu cywilnego przysługuje prawo odstąpienia od umowy o świadczenie usług drogą elektroniczną w terminie 14 dni od dnia jej zawarcia, bez podania przyczyny. Oświadczenie o odstąpieniu można złożyć w dowolnej formie, w szczególności drogą elektroniczną na adres rpiechowicz@icloud.com. Prawo odstąpienia nie przysługuje, jeżeli świadczenie usługi zostało w pełni wykonane za wyraźną zgodą konsumenta, który został poinformowany o utracie tego prawa.")
             }
 
             LegalSection(number: 11, title: "Zmiany Warunków") {
@@ -303,7 +315,7 @@ private struct TermsOfServiceContent: View {
             }
 
             LegalSection(number: 13, title: "Kontakt") {
-                Text("Pytania dotyczące Warunków prosimy kierować na adres: piechowicz.rafal98@gmail.com.")
+                Text("Pytania dotyczące Warunków prosimy kierować na adres: rpiechowicz@icloud.com.")
             }
         }
     }
