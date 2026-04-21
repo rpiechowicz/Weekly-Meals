@@ -31,7 +31,31 @@ struct WeeklyPlanView: View {
     }
 
     private var totalCount: Int { draft.totalCount }
-    private static let maxTotal = MealPlanViewModel.maxTotal
+
+    /// Dni tygodnia, do których wciąż można przypisać posiłek (dziś + przyszłość).
+    private var editableDaysCount: Int {
+        datesViewModel.dates.filter { datesViewModel.isEditable($0) }.count
+    }
+
+    /// Ile posiłków danego slotu jest już przypisanych do dni z przeszłości
+    /// (zamrożone — liczą się do planu, ale nie można ich przenieść).
+    private func lockedAssignments(for slot: MealSlot) -> Int {
+        datesViewModel.dates
+            .filter { !datesViewModel.isEditable($0) }
+            .reduce(0) { acc, date in
+                acc + (mealStore.recipe(for: date, slot: slot) != nil ? 1 : 0)
+            }
+    }
+
+    /// Maksymalna liczba pozycji planu dla danego slotu = zamrożone w przeszłości + edytowalne dni.
+    /// Zabezpiecza przed planowaniem większej liczby posiłków niż da się przypisać.
+    private func maxPerSlot(_ slot: MealSlot) -> Int {
+        lockedAssignments(for: slot) + editableDaysCount
+    }
+
+    private var maxTotal: Int {
+        MealSlot.allCases.reduce(0) { $0 + maxPerSlot($1) }
+    }
 
     private enum PlanStatus {
         case empty, draft, complete
@@ -46,7 +70,7 @@ struct WeeklyPlanView: View {
 
     private var status: PlanStatus {
         if totalCount == 0 { return .empty }
-        if totalCount >= Self.maxTotal { return .complete }
+        if totalCount >= maxTotal { return .complete }
         return .draft
     }
 
@@ -124,7 +148,10 @@ struct WeeklyPlanView: View {
                 ImagePrefetcher.prefetch(urls)
             }
             .onChange(of: planSignature(mealStore.savedPlan)) { _, _ in
-                if !isDirty {
+                // Gdy nie ma lokalnego edytowania (saveTask == nil), zawsze
+                // synchronizuj draft z backendem — łapie zmiany zrobione przez
+                // innego użytkownika w gospodarstwie (realtime / foreground refresh).
+                if saveTask == nil {
                     draft.loadFromSaved(mealStore.savedPlan)
                 }
             }
@@ -139,6 +166,7 @@ struct WeeklyPlanView: View {
                 RecipePickerSheet(
                     slot: slot,
                     draft: draft,
+                    slotMax: maxPerSlot(slot),
                     pastDayCountForRecipe: { recipe in
                         pastDayAssignments(for: recipe, slot: slot)
                     },
@@ -214,7 +242,8 @@ struct WeeklyPlanView: View {
     }
 
     private var progressRing: some View {
-        let progress = Self.maxTotal > 0 ? CGFloat(totalCount) / CGFloat(Self.maxTotal) : 0
+        let total = maxTotal
+        let progress = total > 0 ? CGFloat(totalCount) / CGFloat(total) : 0
         return ZStack {
             Circle()
                 .stroke(status.color.opacity(colorScheme == .dark ? 0.22 : 0.16), lineWidth: 4)
@@ -228,7 +257,7 @@ struct WeeklyPlanView: View {
                     .font(.system(size: 17, weight: .bold, design: .rounded))
                     .monospacedDigit()
                     .foregroundStyle(.primary)
-                Text("/ \(Self.maxTotal)")
+                Text("/ \(total)")
                     .font(.system(size: 10, weight: .semibold, design: .rounded))
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
@@ -249,7 +278,7 @@ struct WeeklyPlanView: View {
 
     private func slotPill(_ slot: MealSlot) -> some View {
         let count = draft.count(for: slot)
-        let maxPerSlot = MealPlanViewModel.maxPerSlot
+        let maxPerSlot = maxPerSlot(slot)
         let isActive = activeSlot == slot
         let isFull = count >= maxPerSlot
 
@@ -311,10 +340,10 @@ struct WeeklyPlanView: View {
         let slot = activeSlot
         let recipes = draft.uniqueRecipes(for: slot)
         let count = draft.count(for: slot)
-        let maxPerSlot = MealPlanViewModel.maxPerSlot
+        let slotMax = maxPerSlot(slot)
 
         return VStack(alignment: .leading, spacing: 12) {
-            slotHeaderRow(slot: slot, count: count, max: maxPerSlot)
+            slotHeaderRow(slot: slot, count: count, max: slotMax)
 
             if recipes.isEmpty {
                 emptySlotState(slot: slot)
@@ -509,7 +538,7 @@ struct WeeklyPlanView: View {
     // MARK: - Actions
 
     private func incrementRecipe(_ recipe: Recipe, slot: MealSlot) {
-        guard draft.canAdd(to: slot) else { return }
+        guard draft.count(for: slot) < maxPerSlot(slot) else { return }
         withAnimation(.easeInOut(duration: 0.15)) {
             draft.incrementRecipe(recipe)
         }
@@ -560,6 +589,7 @@ struct WeeklyPlanView: View {
             try? await Task.sleep(nanoseconds: 350_000_000)
             guard !Task.isCancelled else { return }
             await persistCurrentDraft()
+            saveTask = nil
         }
     }
 
@@ -607,6 +637,7 @@ struct WeeklyPlanView: View {
 private struct RecipePickerSheet: View {
     let slot: MealSlot
     @Bindable var draft: MealPlanViewModel
+    let slotMax: Int
     let pastDayCountForRecipe: (Recipe) -> Int
     let onPastDayBlocked: (String) -> Void
 
@@ -663,7 +694,6 @@ private struct RecipePickerSheet: View {
     }
 
     private var slotCount: Int { draft.count(for: slot) }
-    private var slotMax: Int { MealPlanViewModel.maxPerSlot }
     private var slotFull: Bool { slotCount >= slotMax }
 
     var body: some View {
@@ -933,7 +963,7 @@ private struct RecipePickerSheet: View {
     // MARK: - Actions
 
     private func tryIncrement(_ recipe: Recipe) {
-        guard draft.canAdd(to: slot) else { return }
+        guard draft.count(for: slot) < slotMax else { return }
         withAnimation(.easeInOut(duration: 0.15)) {
             draft.incrementRecipe(recipe)
         }
