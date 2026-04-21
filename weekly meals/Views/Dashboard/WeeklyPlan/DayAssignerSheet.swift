@@ -227,7 +227,6 @@ struct DayAssignerSheet: View {
         let isToday = Calendar.current.isDateInToday(date)
         let hasPool = selectedPoolRecipeId != nil
         let isValidTarget = hasPool && editable && assigned == nil
-        let isSameAsSelected = assigned != nil && assigned?.id == selectedPoolRecipeId
         let middleTappable = editable && hasPool
 
         return HStack(spacing: 12) {
@@ -259,7 +258,6 @@ struct DayAssignerSheet: View {
         .background(
             rowBackground(
                 isValidTarget: isValidTarget,
-                isSameAsSelected: isSameAsSelected,
                 isToday: isToday
             )
         )
@@ -387,17 +385,15 @@ struct DayAssignerSheet: View {
 
     private func rowBackground(
         isValidTarget: Bool,
-        isSameAsSelected: Bool,
         isToday: Bool
     ) -> some View {
         let corner: CGFloat = 14
         let borderColor: Color = {
-            if isSameAsSelected { return Color.green.opacity(0.75) }
             if isValidTarget { return activePoolSlot.accentColor.opacity(0.9) }
             if isToday { return Color.blue.opacity(0.45) }
             return DashboardPalette.neutralBorder(colorScheme, opacity: 0.14)
         }()
-        let lineWidth: CGFloat = (isValidTarget || isSameAsSelected) ? 1.8 : 1
+        let lineWidth: CGFloat = isValidTarget ? 1.8 : 1
 
         return RoundedRectangle(cornerRadius: corner, style: .continuous)
             .fill(DashboardPalette.surface(colorScheme, level: .secondary))
