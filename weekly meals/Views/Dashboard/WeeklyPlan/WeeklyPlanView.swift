@@ -268,6 +268,16 @@ struct WeeklyPlanView: View {
         ZStack {
             Circle()
                 .stroke(DashboardPalette.surface(colorScheme, level: .tertiary), lineWidth: 4)
+            VStack(spacing: 0) {
+                Text("0")
+                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(.primary)
+                Text("/ 0")
+                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
         }
         .frame(width: 64, height: 64)
         .redacted(reason: .placeholder)
@@ -385,6 +395,9 @@ struct WeeklyPlanView: View {
         }
     }
 
+    /// Pill skeleton 1:1 z prawdziwym `slotPill`: ta sama wysokość (ikona + title
+    /// + liczby w tej samej typografii), różni się tylko redakcją liczb, żeby data
+    /// wpadła bez skoku layoutu.
     private func slotPillSkeleton(_ slot: MealSlot) -> some View {
         VStack(spacing: 6) {
             HStack(spacing: 6) {
@@ -396,10 +409,17 @@ struct WeeklyPlanView: View {
                     .foregroundStyle(.secondary)
             }
 
-            RoundedRectangle(cornerRadius: 4, style: .continuous)
-                .fill(DashboardPalette.surface(colorScheme, level: .tertiary))
-                .frame(width: 40, height: 14)
-                .redacted(reason: .placeholder)
+            HStack(alignment: .firstTextBaseline, spacing: 2) {
+                Text("0")
+                    .font(.system(size: 18, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(.primary)
+                Text("/0")
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
+            .redacted(reason: .placeholder)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
@@ -413,26 +433,32 @@ struct WeeklyPlanView: View {
         )
     }
 
+    /// Content skeleton 1:1 z `slotContent`: header row używa tej samej typografii
+    /// co realny widok (tytuł aktywnego slotu + placeholder podpisu + add button),
+    /// a grid trzyma dokładny kształt 2×2 prawdziwych kart.
     private func slotContentSkeleton(cardWidth: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        let slot = activeSlot
+        return VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .center, spacing: 10) {
-                VStack(alignment: .leading, spacing: 4) {
-                    RoundedRectangle(cornerRadius: 4, style: .continuous)
-                        .fill(DashboardPalette.surface(colorScheme, level: .tertiary))
-                        .frame(width: 120, height: 18)
-                    RoundedRectangle(cornerRadius: 4, style: .continuous)
-                        .fill(DashboardPalette.surface(colorScheme, level: .tertiary))
-                        .frame(width: 80, height: 10)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(slot.title)
+                        .font(.title3.weight(.bold))
+                        .fontDesign(.rounded)
+                        .foregroundStyle(.primary)
+
+                    Text("0 z 0 wybranych")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .redacted(reason: .placeholder)
                 }
 
                 Spacer(minLength: 8)
 
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(DashboardPalette.surface(colorScheme, level: .tertiary))
-                    .frame(width: 80, height: 34)
+                addButton(slot: slot, atLimit: false)
+                    .disabled(true)
+                    .opacity(0.6)
             }
             .padding(.top, 4)
-            .redacted(reason: .placeholder)
 
             LazyVGrid(
                 columns: [
@@ -449,23 +475,49 @@ struct WeeklyPlanView: View {
         .accessibilityLabel("Wczytuję plan posiłków")
     }
 
+    /// Szkielet kafelka 1:1 z `RecipeCarouselCard`: ten sam `width × height = width * 1.28`,
+    /// cornerRadius 22, tekst + metryki na dole w overlayu. Dzięki temu prawdziwa karta
+    /// wskakuje w to samo miejsce bez skoku layoutu.
     private func cardSkeleton(width: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(DashboardPalette.surface(colorScheme, level: .tertiary))
-                .frame(width: width, height: width * 0.9)
+        let height = width * 1.28
+        let surface = DashboardPalette.surface(colorScheme, level: .tertiary)
+        let inner = DashboardPalette.surface(colorScheme, level: .secondary)
 
-            VStack(alignment: .leading, spacing: 6) {
-                RoundedRectangle(cornerRadius: 4, style: .continuous)
-                    .fill(DashboardPalette.surface(colorScheme, level: .tertiary))
-                    .frame(width: width * 0.85, height: 12)
-                RoundedRectangle(cornerRadius: 4, style: .continuous)
-                    .fill(DashboardPalette.surface(colorScheme, level: .tertiary))
-                    .frame(width: width * 0.55, height: 10)
+        return ZStack(alignment: .bottomLeading) {
+            Rectangle()
+                .fill(surface)
+                .frame(width: width, height: height)
+
+            VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 4) {
+                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        .fill(inner)
+                        .frame(height: 12)
+                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        .fill(inner)
+                        .frame(maxWidth: width * 0.55, alignment: .leading)
+                        .frame(height: 12)
+                }
+
+                HStack(spacing: 8) {
+                    Capsule()
+                        .fill(inner)
+                        .frame(width: 58, height: 20)
+                    Capsule()
+                        .fill(inner)
+                        .frame(width: 68, height: 20)
+                }
             }
-            .padding(.horizontal, 4)
+            .padding(.horizontal, 14)
+            .padding(.bottom, 14)
+            .frame(width: width, alignment: .leading)
         }
-        .padding(.bottom, 10)
+        .frame(width: width, height: height)
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(DashboardPalette.neutralBorder(colorScheme, opacity: 0.14), lineWidth: 1)
+        )
         .redacted(reason: .placeholder)
     }
 
