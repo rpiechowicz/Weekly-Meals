@@ -36,8 +36,13 @@ struct RecipesView: View {
         return filtered
     }
 
+    /// Skeleton pokazuje się dopóki store nie oznaczy pierwszej próby ładowania
+    /// jako zakończonej (`didLoad`). Bazowanie tylko na `isLoading` powodowało
+    /// mignięcie empty state'u przy pierwszym wejściu: przed `.task` mamy
+    /// `isLoading=false` i `recipes.isEmpty`, więc poprzednie warunki
+    /// fallbackowały do „Brak przepisów".
     private var shouldShowSkeleton: Bool {
-        recipeCatalogStore.isLoading && recipeCatalogStore.recipes.isEmpty
+        !recipeCatalogStore.didLoad && recipeCatalogStore.errorMessage == nil
     }
 
     private var mealSections: [RecipeMealSection] {

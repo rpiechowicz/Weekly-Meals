@@ -535,6 +535,14 @@ final class ShoppingListStore {
     var isLoading: Bool = false
     var errorMessage: String?
 
+    /// Tygodnie, dla których zakończyliśmy pierwszą próbę ładowania (sukces albo
+    /// błąd). UI używa tego, żeby nie migać empty state'em przed pierwszym `load`.
+    private(set) var loadedWeekStarts: Set<String> = []
+
+    func hasLoadedWeek(_ weekStart: String) -> Bool {
+        loadedWeekStarts.contains(weekStart)
+    }
+
     private var cacheURL: URL {
         FileManager.default
             .urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -594,13 +602,18 @@ final class ShoppingListStore {
            let cachedState = cachedStateByWeek[weekStart],
            !invalidatedWeeks.contains(weekStart) {
             await apply(state: cachedState, for: weekStart)
+            loadedWeekStarts.insert(weekStart)
             return
         }
 
         guard !isLoading else { return }
 
         isLoading = true
-        defer { isLoading = false }
+        defer {
+            isLoading = false
+            // Oznacz "attempted" nawet po błędzie — inaczej UI utknie na skeletonie.
+            loadedWeekStarts.insert(weekStart)
+        }
         do {
             let state = try await repository.fetchShoppingListState(weekStart: weekStart)
             await apply(state: state, for: weekStart)
