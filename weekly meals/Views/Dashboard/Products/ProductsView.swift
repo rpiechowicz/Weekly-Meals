@@ -146,7 +146,9 @@ struct ProductsView: View {
                     .ignoresSafeArea()
 
                 Group {
-                    if shoppingListStore.isLoading && shoppingItems.isEmpty && readonlyItems.isEmpty {
+                    if !shoppingListStore.hasLoadedWeek(datesViewModel.weekStartISO)
+                        && shoppingItems.isEmpty
+                        && readonlyItems.isEmpty {
                         loadingState
                     } else if isCurrentWeekArchived {
                         archivedState
