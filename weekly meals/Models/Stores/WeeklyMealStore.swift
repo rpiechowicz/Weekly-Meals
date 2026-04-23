@@ -102,6 +102,17 @@ class WeeklyMealStore {
     private var pendingSavedPlanReloadTask: Task<Void, Never>?
     var errorMessage: String?
 
+    /// Tygodnie, dla których zakończyliśmy przynajmniej raz load z backendu.
+    /// Widoki używają do odróżnienia "ładuje się" (→ skeleton) od "pusty plan" (→ empty state).
+    private(set) var loadedWeekStarts: Set<String> = []
+    /// Licznik in-flight loadów tygodnia (week plan + saved plan liczą się niezależnie).
+    private var weekLoadingCount: Int = 0
+    var isLoadingWeek: Bool { weekLoadingCount > 0 }
+
+    func hasLoadedWeek(_ weekStart: String) -> Bool {
+        loadedWeekStarts.contains(weekStart)
+    }
+
     var hasSavedPlan: Bool { !savedPlan.isEmpty }
 
     // MARK: - Date formatting
@@ -186,6 +197,13 @@ class WeeklyMealStore {
         guard let weeklyPlanRepository else { return }
         observedWeekStart = weekStart
         observedWeekDates = dates
+        weekLoadingCount += 1
+        defer {
+            weekLoadingCount = max(0, weekLoadingCount - 1)
+            // Zawsze oznacz tydzień jako "attempted", nawet po błędzie, żeby UI mogło
+            // przejść ze skeletonu do empty state + error message zamiast utknąć na loaderze.
+            loadedWeekStarts.insert(weekStart)
+        }
         do {
             let slots = try await weeklyPlanRepository.fetchWeekPlan(weekStart: weekStart)
             clearWeek(dates: dates)
@@ -336,6 +354,8 @@ class WeeklyMealStore {
     func loadSavedPlanFromBackend(weekStart: String) async {
         guard let weeklyPlanRepository else { return }
         observedSavedPlanWeekStart = weekStart
+        weekLoadingCount += 1
+        defer { weekLoadingCount = max(0, weekLoadingCount - 1) }
         do {
             let dto = try await weeklyPlanRepository.fetchSavedPlan(weekStart: weekStart)
             let mapped = mapSavedPlan(dto: dto)
@@ -386,6 +406,8 @@ class WeeklyMealStore {
         observedSavedPlanWeekStart = nil
         lastWeekChangeVersionByWeek = [:]
         lastSavedPlanChangeVersionByWeek = [:]
+        loadedWeekStarts = []
+        weekLoadingCount = 0
         pendingWeekReloadTask?.cancel()
         pendingSavedPlanReloadTask?.cancel()
         pendingWeekReloadTask = nil

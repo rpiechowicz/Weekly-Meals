@@ -66,15 +66,26 @@ final class RecipeCatalogStore {
 
     func loadIfNeeded() async {
         guard !didLoad else { return }
-        if loadCacheIfFresh() {
-            didLoad = true
-            errorMessage = nil
+        if hydrateFromCacheIfFresh() {
             Task { @MainActor [weak self] in
                 await self?.reload()
             }
             return
         }
         await reload()
+    }
+
+    /// Synchronicznie hydratuje store z dyskowego cache (≤12 h) bez żadnego
+    /// requestu sieciowego. Zwraca `true`, jeśli cache był świeży i przepisy
+    /// zostały wczytane. SessionStore używa tego w `bootstrapSession` do
+    /// warm-start fast-pathu (od razu .ready, refresh w tle).
+    @discardableResult
+    func hydrateFromCacheIfFresh() -> Bool {
+        if didLoad, !recipes.isEmpty { return true }
+        guard loadCacheIfFresh() else { return false }
+        didLoad = true
+        errorMessage = nil
+        return true
     }
 
     func reload() async {

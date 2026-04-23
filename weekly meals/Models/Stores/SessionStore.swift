@@ -125,15 +125,6 @@ struct InvitationPromptState: Identifiable {
     }
 }
 
-/// Kontrolowane fazy startu po logowaniu / restore sesji.
-/// UI gatuje przejście do dashboardu na `.ready`, żeby użytkownik nie zobaczył
-/// niedoładowanych ekranów z placeholderami.
-enum StartupPhase: Equatable {
-    case idle
-    case warmingUp
-    case ready
-}
-
 /// Snapshot domownika trzymany w SessionStore (preload pod Settings / Household).
 struct HouseholdMemberSnapshot: Identifiable, Hashable, Codable {
     let id: String
@@ -207,11 +198,6 @@ final class SessionStore {
     var invitationPrompt: InvitationPromptState?
     var householdRealtimeVersion: Int = 0
 
-    /// Bieżąca faza smart startup loadera.
-    /// - `.idle` → brak sesji / brak gospodarstwa (Auth / NoHousehold)
-    /// - `.warmingUp` → przygotowujemy dane przed wejściem do dashboardu
-    /// - `.ready` → dashboard może się pokazać
-    var startupPhase: StartupPhase = .idle
     /// `true` gdy trwa restore sesji i musimy dociągnąć household z backendu
     /// (persisted userId bez persisted householdId). UI trzyma wtedy loader
     /// zamiast mignięcia NoHouseholdView.
@@ -233,11 +219,7 @@ final class SessionStore {
     private var startupTask: Task<Void, Never>?
     private var householdMembersTask: Task<Void, Never>?
     private let householdMembersCacheMaxAge: TimeInterval = 60 * 60 * 24 // 24 h
-    private let startupTimeoutSeconds: Double = 6
     private let startupImagePrefetchCount: Int = 12
-    /// Loader nie znika szybciej niż po tym czasie — nawet przy cieplutkim starcie
-    /// (wszystko z cache). Bez tego loader tylko mignął, co wyglądało jak przeskok.
-    private let startupMinimumDisplaySeconds: Double = 1.2
 
     init() {
         pendingPushDeviceToken = UserDefaults.standard.string(forKey: Keys.pushDeviceToken)
@@ -335,7 +317,6 @@ final class SessionStore {
         currentUserId = nil
         currentHouseholdId = nil
         currentHouseholdName = nil
-        startupPhase = .idle
         isRestoringSession = false
     }
 
@@ -416,8 +397,6 @@ final class SessionStore {
         currentUserId = userId
         currentHouseholdId = householdId
         currentHouseholdName = householdName
-        // Nowy rebootstrap (logowanie / switch household) — startup musi przejść ponownie.
-        startupPhase = .idle
         if householdChanged {
             householdMembers = []
             didLoadHouseholdMembers = false
@@ -459,6 +438,11 @@ final class SessionStore {
         )
         self.shoppingListStore = shoppingListStore
         observeHouseholdRealtime()
+
+        // Warm-start fast path: jeśli mamy świeży cache przepisów, hydratujemy
+        // store synchronicznie — RecipesView ominie skeleton i pokaże dane
+        // od razu. `runStartupIfNeeded` odświeży dane w tle.
+        _ = self.recipeCatalogStore?.hydrateFromCacheIfFresh()
 
         let initialWeekStart = datesViewModel.weekStartISO
         Task {
@@ -929,65 +913,33 @@ final class SessionStore {
         return trimmed
     }
 
-    // MARK: - Smart startup loader
+    // MARK: - Background warmup
 
-    /// Jedno wejście dla warmupu po logowaniu / restore sesji.
-    /// Idempotent — dla ciepłego startu i tak szybko wchodzi w `.ready`
-    /// (cache przepisów, cache dysku obrazów, snapshot domowników).
+    /// Progressive handoff: dashboard pokazuje się natychmiast, a tu w tle
+    /// wykonujemy nieblokujące czynności pomocnicze:
+    ///   - refresh katalogu przepisów (jeśli cache był hydratowany w bootstrapie),
+    ///   - prefetch thumbnaili pod kartuszel Polecane,
+    ///   - snapshot domowników pod Settings / Household sheet.
+    ///
+    /// Żaden z tych kroków nie gatuje UI — każda zakładka ma własny
+    /// skeleton i niezależnie dociąga swoje dane przez `.task`.
     @MainActor
     func runStartupIfNeeded(force: Bool = false) async {
-        guard isAuthenticated else {
-            startupPhase = .idle
-            return
-        }
-        guard let householdId = currentHouseholdId, !householdId.isEmpty else {
-            // Brak householdu → UI pokazuje loader (jeśli restoreSession trwa)
-            // lub NoHouseholdView. Warmup nie ma co przygotowywać.
-            startupPhase = .idle
-            return
-        }
-        if !force, startupPhase == .ready { return }
+        _ = force
+        guard isAuthenticated else { return }
+        guard let householdId = currentHouseholdId, !householdId.isEmpty else { return }
 
         startupTask?.cancel()
-        let minimumDisplay = startupMinimumDisplaySeconds
         let task = Task { @MainActor [weak self] in
             guard let self else { return }
-            self.startupPhase = .warmingUp
-            let startedAt = Date()
-            await self.runStartupWithTimeout()
-            // Minimum display — jeśli warmup poszedł z cache w <2 s, dotrzymujemy
-            // loaderowi 2 s, żeby przejście Auth/Loader/Dashboard było płynne a nie migotało.
-            let elapsed = Date().timeIntervalSince(startedAt)
-            if elapsed < minimumDisplay {
-                let remaining = minimumDisplay - elapsed
-                try? await Task.sleep(nanoseconds: UInt64(remaining * 1_000_000_000))
-            }
-            // Nawet jeśli któryś krok się nie udał (offline / timeout),
-            // wchodzimy w .ready — dashboard ma własne skeletony / cache.
-            self.startupPhase = .ready
+            await self.prepareStartupData()
         }
         startupTask = task
         await task.value
     }
 
-    private func runStartupWithTimeout() async {
-        let timeoutSeconds = startupTimeoutSeconds
-        await withTaskGroup(of: Void.self) { group in
-            group.addTask { [weak self] in
-                await self?.prepareStartupData()
-            }
-            group.addTask {
-                try? await Task.sleep(nanoseconds: UInt64(timeoutSeconds * 1_000_000_000))
-            }
-            _ = await group.next()
-            group.cancelAll()
-        }
-    }
-
     private func prepareStartupData() async {
-        // Krytyczne pod pierwsze wejście — odpalamy równolegle.
-        // Każdy krok jest bezpieczny wobec braku sieci (korzysta z cache /
-        // ustawia errorMessage w storze zamiast rzucać).
+        // Nieblokujące — lecimy równolegle, a każdy krok sam łapie błędy.
         async let recipesReady: Void = prepareRecipesAndThumbnails()
         async let householdReady: Void = prepareHouseholdMembersSnapshot()
         _ = await (recipesReady, householdReady)

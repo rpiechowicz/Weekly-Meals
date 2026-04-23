@@ -66,20 +66,25 @@ struct weekly_mealsApp: App {
     @AppStorage("settings.theme") private var themeRawValue: String = AppTheme.system.rawValue
     @Environment(\.scenePhase) private var scenePhase
 
-    /// Klucz dla `.task(id:)` uruchamiającego smart startup loader.
-    /// Zmiana klucza (logowanie, restore, switch householdu) re-odpala warmup;
-    /// dla tego samego kontekstu Swift nie powtarza taska.
+    /// Klucz dla `.task(id:)` uruchamiającego background warmup.
+    /// Zmiana klucza (logowanie, restore, switch householdu) re-odpala prefetch.
     private var startupTaskID: String {
         let auth = sessionStore.isAuthenticated ? "1" : "0"
         let household = sessionStore.currentHouseholdId ?? ""
         return "\(auth)|\(household)"
     }
 
-    /// Stabilny identyfikator aktualnie widocznego ekranu. Sterowany przez niego
-    /// jest crossfade między Auth / Loader / Dashboard / NoHousehold.
+    /// Root screeny sterowane wyłącznie stanem auth + household.
+    ///
+    /// Progressive handoff: dashboard pokazuje się od razu gdy mamy household —
+    /// nie czekamy na żaden globalny warmup. Każda zakładka sama renderuje
+    /// swój skeleton dopóki nie dociągnie danych (pattern jak Instagram /
+    /// Spotify / Gmail). Loader jest widoczny tylko w bardzo wąskim przypadku
+    /// restore sesji bez persisted householdu, kiedy jeszcze nie wiemy czy
+    /// trafimy w dashboard czy NoHousehold.
     private enum RootScreen: Equatable {
         case auth
-        case loader
+        case restore
         case dashboard
         case noHousehold
     }
@@ -89,10 +94,10 @@ struct weekly_mealsApp: App {
             return .auth
         }
         if sessionStore.isRestoringSession, sessionStore.currentHouseholdId == nil {
-            return .loader
+            return .restore
         }
         if let householdId = sessionStore.currentHouseholdId, !householdId.isEmpty {
-            return sessionStore.startupPhase == .ready ? .dashboard : .loader
+            return .dashboard
         }
         return .noHousehold
     }
@@ -110,7 +115,7 @@ struct weekly_mealsApp: App {
                     }
                 }
             )
-        case .loader:
+        case .restore:
             StartupLoaderView()
         case .dashboard:
             if let mealStore = sessionStore.weeklyMealStore,
@@ -122,9 +127,13 @@ struct weekly_mealsApp: App {
                     .environment(\.recipeCatalogStore, recipeCatalogStore)
                     .environment(\.shoppingListStore, shoppingListStore)
             } else {
-                // Stores nie powinny być nil gdy startupPhase == .ready,
-                // ale na wszelki wypadek pokażemy loader niż pusty ekran.
-                StartupLoaderView()
+                // Stores są tworzone synchronicznie w bootstrapSession zanim
+                // currentHouseholdId zostanie ustawione, więc ten fallback jest
+                // praktycznie nieosiągalny. Trzymamy go defensywnie — pusty
+                // background zamiast loadera, żeby jeśli się zdarzył, nie
+                // powodował mignięcia.
+                Color.clear
+                    .background(DashboardLiquidBackground().ignoresSafeArea())
             }
         case .noHousehold:
             NoHouseholdView(
