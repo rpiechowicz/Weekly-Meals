@@ -78,6 +78,10 @@ struct WeeklyPlanView: View {
         !sameAsSaved(draft, mealStore.savedPlan)
     }
 
+    private var hasLoadedWeek: Bool {
+        mealStore.hasLoadedWeek(datesViewModel.weekStartISO)
+    }
+
     // MARK: - Body
 
     var body: some View {
@@ -91,16 +95,27 @@ struct WeeklyPlanView: View {
                         VStack(spacing: 14) {
                             heroHeader
 
-                            slotPills
+                            if hasLoadedWeek {
+                                slotPills
+                            } else {
+                                slotPillsSkeleton
+                            }
 
-                            slotContent(cardWidth: cardWidth(for: proxy.size.width))
-                                .id(activeSlot)
-                                .transition(.opacity)
+                            Group {
+                                if hasLoadedWeek {
+                                    slotContent(cardWidth: cardWidth(for: proxy.size.width))
+                                        .id(activeSlot)
+                                } else {
+                                    slotContentSkeleton(cardWidth: cardWidth(for: proxy.size.width))
+                                }
+                            }
+                            .transition(.opacity)
                         }
                         .padding(.horizontal, 14)
                         .padding(.top, 6)
                         .padding(.bottom, 28)
                         .animation(.easeInOut(duration: 0.22), value: activeSlot)
+                        .animation(.easeInOut(duration: 0.22), value: hasLoadedWeek)
                     }
                 }
             }
@@ -220,17 +235,43 @@ struct WeeklyPlanView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
 
-                Text(statusCaption)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(status.color)
+                if hasLoadedWeek {
+                    Text(statusCaption)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(status.color)
+                        .transition(.opacity)
+                } else {
+                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        .fill(DashboardPalette.surface(colorScheme, level: .tertiary))
+                        .frame(width: 140, height: 10)
+                        .redacted(reason: .placeholder)
+                        .transition(.opacity)
+                }
             }
 
             Spacer(minLength: 10)
 
-            progressRing
+            if hasLoadedWeek {
+                progressRing
+                    .transition(.opacity)
+            } else {
+                progressRingSkeleton
+                    .transition(.opacity)
+            }
         }
         .padding(16)
         .dashboardLiquidCard(cornerRadius: 22, strokeOpacity: 0.18)
+        .animation(.easeInOut(duration: 0.22), value: hasLoadedWeek)
+    }
+
+    private var progressRingSkeleton: some View {
+        ZStack {
+            Circle()
+                .stroke(DashboardPalette.surface(colorScheme, level: .tertiary), lineWidth: 4)
+        }
+        .frame(width: 64, height: 64)
+        .redacted(reason: .placeholder)
+        .accessibilityLabel("Wczytuję plan")
     }
 
     private var statusCaption: String {
@@ -332,6 +373,100 @@ struct WeeklyPlanView: View {
             )
         }
         .buttonStyle(.plain)
+    }
+
+    // MARK: - Skeletons
+
+    private var slotPillsSkeleton: some View {
+        HStack(spacing: 8) {
+            ForEach(MealSlot.allCases) { slot in
+                slotPillSkeleton(slot)
+            }
+        }
+    }
+
+    private func slotPillSkeleton(_ slot: MealSlot) -> some View {
+        VStack(spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: slot.icon)
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(slot.accentColor.opacity(0.6))
+                Text(slot.title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+
+            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                .fill(DashboardPalette.surface(colorScheme, level: .tertiary))
+                .frame(width: 40, height: 14)
+                .redacted(reason: .placeholder)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(DashboardPalette.surface(colorScheme, level: .secondary))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(DashboardPalette.neutralBorder(colorScheme, opacity: 0.12), lineWidth: 1)
+        )
+    }
+
+    private func slotContentSkeleton(cardWidth: CGFloat) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .center, spacing: 10) {
+                VStack(alignment: .leading, spacing: 4) {
+                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        .fill(DashboardPalette.surface(colorScheme, level: .tertiary))
+                        .frame(width: 120, height: 18)
+                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        .fill(DashboardPalette.surface(colorScheme, level: .tertiary))
+                        .frame(width: 80, height: 10)
+                }
+
+                Spacer(minLength: 8)
+
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(DashboardPalette.surface(colorScheme, level: .tertiary))
+                    .frame(width: 80, height: 34)
+            }
+            .padding(.top, 4)
+            .redacted(reason: .placeholder)
+
+            LazyVGrid(
+                columns: [
+                    GridItem(.flexible(), spacing: 10),
+                    GridItem(.flexible(), spacing: 10)
+                ],
+                spacing: 10
+            ) {
+                ForEach(0..<4, id: \.self) { _ in
+                    cardSkeleton(width: cardWidth)
+                }
+            }
+        }
+        .accessibilityLabel("Wczytuję plan posiłków")
+    }
+
+    private func cardSkeleton(width: CGFloat) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(DashboardPalette.surface(colorScheme, level: .tertiary))
+                .frame(width: width, height: width * 0.9)
+
+            VStack(alignment: .leading, spacing: 6) {
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .fill(DashboardPalette.surface(colorScheme, level: .tertiary))
+                    .frame(width: width * 0.85, height: 12)
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .fill(DashboardPalette.surface(colorScheme, level: .tertiary))
+                    .frame(width: width * 0.55, height: 10)
+            }
+            .padding(.horizontal, 4)
+        }
+        .padding(.bottom, 10)
+        .redacted(reason: .placeholder)
     }
 
     // MARK: - Slot content

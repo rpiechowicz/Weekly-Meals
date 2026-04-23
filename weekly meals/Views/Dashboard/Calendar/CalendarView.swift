@@ -29,6 +29,10 @@ struct CalendarView: View {
         )
     }
 
+    private var hasLoadedWeek: Bool {
+        mealStore.hasLoadedWeek(datesViewModel.weekStartISO)
+    }
+
     private func recipe(for slot: MealSlot) -> Recipe? {
         mealStore.recipe(for: datesViewModel.selectedDate, slot: slot)
     }
@@ -59,11 +63,22 @@ struct CalendarView: View {
 
                         dayHeaderCard
 
-                        VStack(spacing: 14) {
-                            ForEach(MealSlot.allCases) { slot in
-                                slotCard(slot)
+                        Group {
+                            if hasLoadedWeek {
+                                VStack(spacing: 14) {
+                                    ForEach(MealSlot.allCases) { slot in
+                                        slotCard(slot)
+                                    }
+                                }
+                            } else {
+                                VStack(spacing: 14) {
+                                    ForEach(MealSlot.allCases) { slot in
+                                        slotCardSkeleton(slot)
+                                    }
+                                }
                             }
                         }
+                        .animation(.easeInOut(duration: 0.22), value: hasLoadedWeek)
                     }
                     .padding(.horizontal, 16)
                     .padding(.top, 8)
@@ -145,11 +160,18 @@ struct CalendarView: View {
                 Spacer(minLength: 0)
             }
 
-            nutritionPanel
+            if hasLoadedWeek {
+                nutritionPanel
+                    .transition(.opacity)
+            } else {
+                nutritionPanelSkeleton
+                    .transition(.opacity)
+            }
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .dashboardLiquidCard(cornerRadius: 20, strokeOpacity: 0.18)
+        .animation(.easeInOut(duration: 0.22), value: hasLoadedWeek)
     }
 
     private var nutritionPanel: some View {
@@ -218,6 +240,115 @@ struct CalendarView: View {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(DashboardPalette.neutralBorder(colorScheme, opacity: 0.08), lineWidth: 1)
         )
+    }
+
+    // MARK: - Skeletons
+
+    private var nutritionPanelSkeleton: some View {
+        LazyVGrid(
+            columns: [
+                GridItem(.flexible(), spacing: 8),
+                GridItem(.flexible(), spacing: 8)
+            ],
+            spacing: 8
+        ) {
+            ForEach(0..<4, id: \.self) { _ in
+                nutritionStatSkeletonRow
+            }
+        }
+        .redacted(reason: .placeholder)
+        .accessibilityLabel("Wczytuję wartości odżywcze")
+    }
+
+    private var nutritionStatSkeletonRow: some View {
+        HStack(spacing: 8) {
+            Circle()
+                .fill(DashboardPalette.surface(colorScheme, level: .tertiary))
+                .frame(width: 28, height: 28)
+
+            VStack(alignment: .leading, spacing: 4) {
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .fill(DashboardPalette.surface(colorScheme, level: .tertiary))
+                    .frame(width: 48, height: 8)
+
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .fill(DashboardPalette.surface(colorScheme, level: .tertiary))
+                    .frame(width: 64, height: 12)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 9)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(DashboardPalette.surface(colorScheme, level: .secondary))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(DashboardPalette.neutralBorder(colorScheme, opacity: 0.08), lineWidth: 1)
+        )
+    }
+
+    private func slotCardSkeleton(_ slot: MealSlot) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .center, spacing: 12) {
+                slotIcon(slot)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        .fill(DashboardPalette.surface(colorScheme, level: .tertiary))
+                        .frame(width: 110, height: 14)
+                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        .fill(DashboardPalette.surface(colorScheme, level: .tertiary))
+                        .frame(width: 72, height: 10)
+                }
+
+                Spacer(minLength: 8)
+
+                timePill(slot)
+            }
+
+            HStack(spacing: 12) {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(DashboardPalette.surface(colorScheme, level: .tertiary))
+                    .frame(width: 60, height: 60)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        .fill(DashboardPalette.surface(colorScheme, level: .tertiary))
+                        .frame(maxWidth: 180)
+                        .frame(height: 12)
+                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        .fill(DashboardPalette.surface(colorScheme, level: .tertiary))
+                        .frame(maxWidth: 120)
+                        .frame(height: 10)
+                }
+
+                Spacer(minLength: 6)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                DashboardPalette.surface(colorScheme, level: .secondary)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(slot.accentColor.opacity(colorScheme == .dark ? 0.18 : 0.12), lineWidth: 1)
+            )
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(slot.accentColor.opacity(colorScheme == .dark ? 0.06 : 0.035))
+        )
+        .dashboardLiquidCard(cornerRadius: 22, strokeOpacity: 0.14)
+        .redacted(reason: .placeholder)
+        .accessibilityLabel("Wczytuję posiłek")
     }
 
     // MARK: - Slot card
