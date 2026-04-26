@@ -57,4 +57,58 @@ extension Color {
     static func wmAccentTint(_ scheme: ColorScheme) -> Color {
         WMPalette.terracotta.opacity(scheme == .dark ? 0.16 : 0.12)
     }
+
+    static func wmRule(_ scheme: ColorScheme) -> Color {
+        scheme == .dark
+            ? WMPalette.labelDark.opacity(0.12)
+            : WMPalette.labelLight.opacity(0.12)
+    }
+
+    static func wmFaint(_ scheme: ColorScheme) -> Color {
+        scheme == .dark
+            ? WMPalette.labelDark.opacity(0.32)
+            : WMPalette.labelLight.opacity(0.32)
+    }
+
+    static func wmStrike(_ scheme: ColorScheme) -> Color {
+        scheme == .dark
+            ? WMPalette.labelDark.opacity(0.30)
+            : WMPalette.labelLight.opacity(0.30)
+    }
+
+    static func wmBarTrack(_ scheme: ColorScheme) -> Color {
+        scheme == .dark
+            ? WMPalette.labelDark.opacity(0.07)
+            : WMPalette.labelLight.opacity(0.07)
+    }
+
+    static func wmChipBg(_ scheme: ColorScheme) -> Color {
+        scheme == .dark
+            ? WMPalette.labelDark.opacity(0.08)
+            : WMPalette.labelLight.opacity(0.05)
+    }
+}
+
+// Page background — warm canvas with a soft terracotta glow at the top.
+// Used as the root of editorial screens (Kalendarz v2).
+struct WMPageBackground: View {
+    let scheme: ColorScheme
+
+    var body: some View {
+        let base = scheme == .dark
+            ? Color(red: 12 / 255, green: 8 / 255, blue: 6 / 255)        // #0C0806
+            : Color(red: 251 / 255, green: 245 / 255, blue: 234 / 255)   // #FBF5EA
+
+        let glow = WMPalette.terracotta.opacity(scheme == .dark ? 0.12 : 0.10)
+
+        return ZStack {
+            base
+            RadialGradient(
+                colors: [glow, .clear],
+                center: .top,
+                startRadius: 0,
+                endRadius: 360
+            )
+        }
+    }
 }

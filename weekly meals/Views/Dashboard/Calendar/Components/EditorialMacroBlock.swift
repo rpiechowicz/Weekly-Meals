@@ -1,0 +1,203 @@
+import SwiftUI
+
+// Editorial macro block. Big rolling KCAL counter on the left, three macro
+// stats on the right, three-segment progress bar underneath.
+//
+// Animations:
+// - kcal / protein / fat / carbs roll on appear and on day swap (CountingNumber)
+// - segmented progress bar fills from 0 → target % via withAnimation
+struct EditorialMacroBlock: View {
+    let kcal: Int
+    let protein: Int
+    let fat: Int
+    let carbs: Int
+    var target: Int = 2100
+    @Environment(\.colorScheme) private var scheme
+
+    private var pKcal: Int { protein * 4 }
+    private var fKcal: Int { fat * 9 }
+    private var cKcal: Int { carbs * 4 }
+    private var totalMacroKcal: Int { max(1, pKcal + fKcal + cKcal) }
+    private var pPct: CGFloat { CGFloat(pKcal) / CGFloat(totalMacroKcal) }
+    private var fPct: CGFloat { CGFloat(fKcal) / CGFloat(totalMacroKcal) }
+    private var cPct: CGFloat { CGFloat(cKcal) / CGFloat(totalMacroKcal) }
+    private var fillPct: CGFloat {
+        min(1, CGFloat(kcal) / CGFloat(max(target, 1)))
+    }
+
+    private var isEmpty: Bool { kcal == 0 }
+
+    var body: some View {
+        let label = Color.wmLabel(scheme)
+        let muted = Color.wmMuted(scheme)
+        let faint = Color.wmFaint(scheme)
+
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .bottom, spacing: 14) {
+                // Kcal block — `flex: '0 0 auto'` in design (takes its natural width).
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("KALORIE")
+                        .font(.system(size: 9, weight: .bold))
+                        .tracking(2)
+                        .foregroundStyle(muted)
+
+                    HStack(alignment: .lastTextBaseline, spacing: 4) {
+                        CountingNumber(target: kcal)
+                            .font(.system(size: 44, weight: .heavy))
+                            .tracking(-1.6)
+                            .foregroundStyle(isEmpty ? faint : label)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        Text(verbatim: "/ \(target)")
+                            .font(.system(size: 11, weight: .semibold))
+                            .tracking(0.3)
+                            .foregroundStyle(muted)
+                            .lineLimit(1)
+                            .fixedSize()
+                    }
+                }
+                .layoutPriority(1)
+
+                // Macros grid — `flex: 1` in design (takes remaining space).
+                MacroStatGrid(
+                    protein: protein,
+                    fat: fat,
+                    carbs: carbs,
+                    isEmpty: isEmpty
+                )
+                .frame(maxWidth: .infinity)
+                .padding(.bottom, 3)
+            }
+
+            // Segmented progress bar
+            GeometryReader { geo in
+                let w = geo.size.width
+                let filled = w * fillPct
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(Color.wmBarTrack(scheme))
+
+                    if !isEmpty {
+                        HStack(spacing: 0) {
+                            Rectangle().fill(WMPalette.indigo).frame(width: filled * pPct)
+                            Rectangle().fill(WMPalette.terracottaDeep).frame(width: filled * fPct)
+                            Rectangle().fill(WMPalette.sage).frame(width: filled * cPct)
+                        }
+                        .frame(width: filled, height: 4, alignment: .leading)
+                        .clipShape(Capsule())
+                    }
+                }
+                .frame(height: 4)
+            }
+            .frame(height: 4)
+            .padding(.top, 2)
+
+            HStack {
+                progressFootnote
+                    .font(.system(size: 9, weight: .semibold))
+                    .tracking(0.4)
+                    .foregroundStyle(muted)
+
+                Spacer()
+
+                remainingFootnote
+                    .font(.system(size: 9, weight: .semibold))
+                    .tracking(0.4)
+                    .foregroundStyle(muted)
+                    .monospacedDigit()
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private var progressFootnote: some View {
+        if isEmpty {
+            Text("BRAK ZAPLANOWANYCH POSIŁKÓW")
+        } else {
+            let pct = Int((CGFloat(kcal) / CGFloat(max(target, 1)) * 100).rounded())
+            HStack(spacing: 0) {
+                CountingNumber(target: pct)
+                Text("% DZIENNEGO CELU")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var remainingFootnote: some View {
+        if isEmpty {
+            Text("— KCAL")
+        } else {
+            let remaining = max(0, target - kcal)
+            HStack(spacing: 0) {
+                CountingNumber(target: remaining)
+                Text(" KCAL DO CELU")
+            }
+        }
+    }
+}
+
+private struct MacroStatGrid: View {
+    let protein: Int
+    let fat: Int
+    let carbs: Int
+    let isEmpty: Bool
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            MacroStat(label: "BIAŁKO",   value: protein, dot: WMPalette.indigo,         isEmpty: isEmpty)
+            MacroStat(label: "TŁUSZCZE", value: fat,     dot: WMPalette.terracottaDeep, isEmpty: isEmpty)
+            MacroStat(label: "WĘGLE",    value: carbs,   dot: WMPalette.sage,           isEmpty: isEmpty)
+        }
+    }
+}
+
+private struct MacroStat: View {
+    let label: String
+    let value: Int
+    let dot: Color
+    let isEmpty: Bool
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        let muted = Color.wmMuted(scheme)
+        let faint = Color.wmFaint(scheme)
+        let labelColor = Color.wmLabel(scheme)
+
+        VStack(alignment: .leading, spacing: 2) {
+            Rectangle()
+                .fill(Color.wmRule(scheme))
+                .frame(height: 1)
+                .padding(.bottom, 4)
+
+            HStack(spacing: 5) {
+                Circle()
+                    .fill(isEmpty ? faint : dot)
+                    .frame(width: 6, height: 6)
+
+                Text(label)
+                    .font(.system(size: 9, weight: .bold))
+                    .tracking(1.4)
+                    .foregroundStyle(muted)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+
+            HStack(alignment: .lastTextBaseline, spacing: 2) {
+                CountingNumber(target: value)
+                    .font(.system(size: 20, weight: .heavy))
+                    .tracking(-0.5)
+                    .foregroundStyle(isEmpty ? faint : labelColor)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+
+                Text("g")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(isEmpty ? faint : muted)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
