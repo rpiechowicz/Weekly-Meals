@@ -1,0 +1,52 @@
+import SwiftUI
+
+// Plain count-up: render the rounded current value as static `Text`. SwiftUI
+// interpolates the underlying Double via `Animatable.animatableData`, so the
+// view re-renders many times during the animation — digits tick up in place,
+// no sliding/rolling content transition.
+private struct AnimatableInt: View, Animatable {
+    var value: Double
+
+    var animatableData: Double {
+        get { value }
+        set { value = newValue }
+    }
+
+    var body: some View {
+        // `Text("\(n)")` resolves to LocalizedStringKey, which formats integers
+        // per locale — Polish adds a thin space as a thousands separator and
+        // SwiftUI happily breaks lines on it. Use verbatim to render "1110".
+        Text(verbatim: String(Int(value.rounded())))
+            .monospacedDigit()
+    }
+}
+
+// Counts from 0 → target on first appear. On subsequent target changes it
+// smoothly recounts from the current displayed value to the new target.
+struct CountingNumber: View {
+    let target: Int
+    var loadDuration: Double = 0.9
+    var changeDuration: Double = 0.45
+
+    @State private var displayed: Double = 0
+    @State private var didLoad = false
+
+    var body: some View {
+        AnimatableInt(value: displayed)
+            .onAppear {
+                guard !didLoad else { return }
+                didLoad = true
+                // Tiny delay so the screen frame mounts before the count begins.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                    withAnimation(.easeOut(duration: loadDuration)) {
+                        displayed = Double(target)
+                    }
+                }
+            }
+            .onChange(of: target) { _, newValue in
+                withAnimation(.easeOut(duration: changeDuration)) {
+                    displayed = Double(newValue)
+                }
+            }
+    }
+}

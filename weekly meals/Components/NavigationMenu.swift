@@ -33,7 +33,7 @@ struct NavigationMenu: View {
                 SettingsView()
             }
         }
-        .tint(.blue)
+        .tint(WMPalette.terracotta)
     }
 }
 
