@@ -315,8 +315,20 @@ private struct GlassBadge: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(.ultraThinMaterial, in: Capsule())
-        .overlay(Capsule().stroke(.white.opacity(0.12), lineWidth: 1))
+        // Design spec: `rgba(20,14,10,0.55)` + `backdropFilter: blur(14px)`.
+        // `.ultraThinMaterial` alone picks up cream tones from light food
+        // photos and the white badge text disappears against it. Layering
+        // an explicit dark-warm tint (#140E0A @ 55%) on top of the material
+        // keeps the frosted-blur backdrop while guaranteeing readable
+        // contrast on bright shots.
+        .background {
+            Capsule()
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    Capsule().fill(Color(red: 20 / 255, green: 14 / 255, blue: 10 / 255).opacity(0.55))
+                )
+        }
+        .overlay(Capsule().stroke(.white.opacity(0.18), lineWidth: 1))
     }
 }
 
@@ -380,7 +392,9 @@ private struct EmptyHero: View {
                     .padding(.bottom, 16)
                 }
             }
-            .frame(height: 220)
+            // Same 260pt height as the assigned card so the meal stack
+            // doesn't shift when slots flip between filled / empty.
+            .frame(height: 260)
             .accessibilityElement(children: .combine)
             .accessibilityLabel(isEditable ? "\(promptText). Stuknij, aby wybrać przepis." : "\(slot.title) — dzień nieedytowalny")
         }
