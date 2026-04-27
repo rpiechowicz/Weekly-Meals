@@ -62,14 +62,16 @@ struct CalendarView: View {
                 ScrollView {
                     @Bindable var bindableDates = datesViewModel
                     VStack(alignment: .leading, spacing: 0) {
-                        // Week bar — top spacing chosen so the bar sits ~78pt
-                        // from screen top on iPhone 17 Pro (safe-area top ≈ 59pt).
+                        // Week bar — design spec puts it at ~78pt from screen
+                        // top. The ScrollView ignores top safe area below
+                        // (extends from screen top through the nav-bar zone),
+                        // so we use the full 78pt as explicit padding here.
                         EditorialWeekBar(
                             datesViewModel: bindableDates,
                             plannedDates: plannedDates
                         )
                         .padding(.horizontal, 22)
-                        .padding(.top, 19)
+                        .padding(.top, 78)
 
                         // Rule below week bar — `margin: '14px 22px 18px'`.
                         Rectangle()
@@ -128,8 +130,30 @@ struct CalendarView: View {
                     }
                 }
                 .scrollIndicators(.hidden)
+                // Extend the scroll view up under the nav-bar zone so the
+                // editorial layout sits at design-spec position (~78pt from
+                // screen top) instead of being pushed down by the nav bar's
+                // ~44pt height. The transparent nav bar still sits on top
+                // and keeps SwiftUI's native blur-on-scroll behavior live.
+                .ignoresSafeArea(.container, edges: .top)
             }
-            .toolbar(.hidden, for: .navigationBar)
+            // Native Recipes-style auto-blur: the nav bar stays present but
+            // empty + transparent at rest. SwiftUI fades in its `.bar`
+            // material the moment content scrolls under the status bar.
+            // The placeholder ToolbarItem keeps the bar from collapsing.
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Color.clear.frame(width: 1, height: 1)
+                }
+            }
+            // The empty nav-bar layer would otherwise intercept taps in the
+            // ~44pt zone above the week bar, blocking the day chips. We let
+            // SwiftUI keep rendering the bar (so the auto-blur still runs),
+            // but disable its UIKit hit testing so touches fall through to
+            // the scroll content underneath. There are no real toolbar
+            // items, so nothing legitimate is lost.
+            .background(NavBarHitTestPassthrough())
             .task(id: datesViewModel.weekStartISO) {
                 await mealStore.loadSavedPlanFromBackend(weekStart: datesViewModel.weekStartISO)
                 await mealStore.loadWeekPlanFromBackend(
@@ -205,4 +229,46 @@ struct CalendarView: View {
 
 #Preview {
     CalendarView()
+}
+
+// MARK: - Nav bar hit-test pass-through
+//
+// SwiftUI's `NavigationStack` keeps the toolbar layer "live" so the auto-blur
+// material can fade in on scroll, but that layer also captures touches across
+// its full ~44pt height — even when the toolbar is visually empty. That
+// blocks the week-bar chips from receiving taps once the layout extends
+// under it via `.ignoresSafeArea(.container, edges: .top)`.
+//
+// We don't have any real toolbar items here (just an invisible 1×1 placeholder
+// used to keep the bar from collapsing). Disabling user interaction on the
+// underlying `UINavigationBar` lets touches fall through to the SwiftUI
+// content below while leaving the auto-blur rendering intact.
+private struct NavBarHitTestPassthrough: UIViewRepresentable {
+    func makeUIView(context: Context) -> UIView {
+        BarUnlocker()
+    }
+
+    func updateUIView(_ uiView: UIView, context: Context) {}
+
+    private final class BarUnlocker: UIView {
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            // Defer one runloop tick so the navigation controller is wired up.
+            DispatchQueue.main.async { [weak self] in
+                self?.findNavigationBar()?.isUserInteractionEnabled = false
+            }
+        }
+
+        private func findNavigationBar() -> UINavigationBar? {
+            var responder: UIResponder? = self
+            while let r = responder {
+                if let vc = r as? UIViewController,
+                   let bar = vc.navigationController?.navigationBar {
+                    return bar
+                }
+                responder = r.next
+            }
+            return nil
+        }
+    }
 }

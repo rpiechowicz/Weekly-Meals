@@ -33,22 +33,32 @@ struct EditorialMacroBlock: View {
         let faint = Color.wmFaint(scheme)
 
         VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .bottom, spacing: 14) {
-                // Kcal block — `flex: '0 0 auto'` in design (takes its natural width).
-                VStack(alignment: .leading, spacing: 2) {
+            HStack(alignment: .bottom, spacing: 28) {
+                // Kcal block — fixed 140pt width so the macros grid stays
+                // anchored regardless of how many digits the kcal value has
+                // ("0" / "610" / "1140" all leave the macros in the exact
+                // same horizontal slot). Values that overflow the slot
+                // (5+ digits) shrink via `minimumScaleFactor(0.6)`.
+                VStack(alignment: .leading, spacing: 0) {
                     Text("KALORIE")
                         .font(.system(size: 9, weight: .bold))
                         .tracking(2)
                         .foregroundStyle(muted)
+                        .padding(.bottom, -2)
 
                     HStack(alignment: .lastTextBaseline, spacing: 4) {
+                        // Always render at full 44pt regardless of digit
+                        // count — `monospacedDigit()` (inside CountingNumber)
+                        // keeps each digit the same width, and the 140pt
+                        // outer slot already fits a 4-digit value with room
+                        // to spare. No scaling factor → no visual jitter
+                        // between "0", "500", "1500".
                         CountingNumber(target: kcal)
                             .font(.system(size: 44, weight: .heavy))
                             .tracking(-1.6)
                             .foregroundStyle(isEmpty ? faint : label)
                             .lineLimit(1)
-                            .minimumScaleFactor(0.6)
-                            .fixedSize(horizontal: false, vertical: true)
+                            .fixedSize()
 
                         Text(verbatim: "/ \(target)")
                             .font(.system(size: 11, weight: .semibold))
@@ -58,9 +68,11 @@ struct EditorialMacroBlock: View {
                             .fixedSize()
                     }
                 }
-                .layoutPriority(1)
+                .frame(width: 140, alignment: .leading)
 
-                // Macros grid — `flex: 1` in design (takes remaining space).
+                // Macros grid — fills the remaining space; with the kcal
+                // block at a fixed width, the 3 columns stay equal-width
+                // no matter the digit count.
                 MacroStatGrid(
                     protein: protein,
                     fat: fat,
@@ -172,17 +184,19 @@ private struct MacroStat: View {
                 .frame(height: 1)
                 .padding(.bottom, 4)
 
-            HStack(spacing: 5) {
+            HStack(spacing: 4) {
                 Circle()
                     .fill(isEmpty ? faint : dot)
                     .frame(width: 6, height: 6)
 
+                // 8pt + tracking 0.6 lets the longest label ("TŁUSZCZE") fit
+                // in its narrow column at the same size as "BIAŁKO" / "WĘGLE"
+                // — no truncation, no per-label scaling, all three uniform.
                 Text(label)
-                    .font(.system(size: 9, weight: .bold))
-                    .tracking(1.4)
+                    .font(.system(size: 8, weight: .bold))
+                    .tracking(0.6)
                     .foregroundStyle(muted)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.7)
             }
 
             HStack(alignment: .lastTextBaseline, spacing: 2) {
@@ -191,7 +205,6 @@ private struct MacroStat: View {
                     .tracking(-0.5)
                     .foregroundStyle(isEmpty ? faint : labelColor)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.7)
 
                 Text("g")
                     .font(.system(size: 11, weight: .semibold))
