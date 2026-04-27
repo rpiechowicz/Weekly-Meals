@@ -7,11 +7,28 @@ import SwiftUI
 enum WMPalette {
     // Warm terracotta family — primary brand accent. Reads as food + warmth
     // without going saturated red.
-    static let terracotta = Color(red: 219 / 255, green: 132 / 255, blue: 82 / 255)      // oklch(0.72 0.14 48)
+    //
+    // Each accent ships dark-first values from the design tokens. In light
+    // mode the lighter accents (`butter`, `sage`) get darker variants so
+    // they remain readable against the cream canvas — without the swap,
+    // butter on `#FAF6F0` washes out completely.
+    static let terracotta = dynamicColor(
+        dark:  (219, 132, 82),   // oklch(0.72 0.14 48)
+        light: (182, 100, 60)    // oklch(0.60 0.15 40) — same as terracottaDeep, darkens for cream bg
+    )
     static let terracottaDeep = Color(red: 182 / 255, green: 100 / 255, blue: 60 / 255)  // oklch(0.60 0.15 40)
-    static let sage = Color(red: 135 / 255, green: 194 / 255, blue: 165 / 255)           // oklch(0.74 0.10 155)
-    static let indigo = Color(red: 101 / 255, green: 115 / 255, blue: 202 / 255)         // oklch(0.62 0.14 265)
-    static let butter = Color(red: 232 / 255, green: 207 / 255, blue: 133 / 255)         // oklch(0.88 0.10 88)
+    static let sage = dynamicColor(
+        dark:  (135, 194, 165),  // oklch(0.74 0.10 155)
+        light: (76, 135, 102)    // oklch(0.55 0.10 155) — darkened for legibility on cream
+    )
+    static let indigo = dynamicColor(
+        dark:  (101, 115, 202),  // oklch(0.62 0.14 265)
+        light: (75, 88, 175)     // slightly darker for cream-bg contrast
+    )
+    static let butter = dynamicColor(
+        dark:  (232, 207, 133),  // oklch(0.88 0.10 88)
+        light: (160, 120, 40)    // oklch(0.55 0.12 80) — mustard, readable on cream
+    )
 
     // Warm canvas. Dark is near-black with a warm brown cast.
     static let canvasDark = Color(red: 26 / 255, green: 20 / 255, blue: 17 / 255)     // #1A1411
@@ -19,6 +36,30 @@ enum WMPalette {
 
     static let labelDark = Color(red: 251 / 255, green: 243 / 255, blue: 232 / 255)   // #FBF3E8
     static let labelLight = Color(red: 26 / 255, green: 20 / 255, blue: 17 / 255)     // #1A1411
+
+    /// Builds a `Color` whose underlying `UIColor` switches at the trait
+    /// level — drop-in replacement for SwiftUI dynamic colors. Inputs are
+    /// `(R, G, B)` 0–255 tuples for dark/light variants.
+    private static func dynamicColor(
+        dark: (Int, Int, Int),
+        light: (Int, Int, Int)
+    ) -> Color {
+        let darkUIColor = UIColor(
+            red: CGFloat(dark.0) / 255,
+            green: CGFloat(dark.1) / 255,
+            blue: CGFloat(dark.2) / 255,
+            alpha: 1
+        )
+        let lightUIColor = UIColor(
+            red: CGFloat(light.0) / 255,
+            green: CGFloat(light.1) / 255,
+            blue: CGFloat(light.2) / 255,
+            alpha: 1
+        )
+        return Color(uiColor: UIColor { trait in
+            trait.userInterfaceStyle == .dark ? darkUIColor : lightUIColor
+        })
+    }
 }
 
 extension Color {

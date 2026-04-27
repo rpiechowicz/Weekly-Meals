@@ -446,29 +446,7 @@ private struct HatchPattern: View {
     }
 }
 
-// MARK: - Color helper
-
-private extension Color {
-    /// Approximate color mixing (Cozy Kitchen design uses `color-mix(in oklch, …)`).
-    /// SwiftUI doesn't expose components reliably, so we sample a UIColor and blend in linear sRGB.
-    func mix(with other: Color, by fraction: CGFloat) -> Color {
-        let f = max(0, min(1, fraction))
-
-        let a = UIColor(self).cgColor.components ?? [0, 0, 0, 1]
-        let b = UIColor(other).cgColor.components ?? [0, 0, 0, 1]
-
-        // Pad mono components.
-        let aR = a.count >= 3 ? a[0] : a[0]
-        let aG = a.count >= 3 ? a[1] : a[0]
-        let aB = a.count >= 3 ? a[2] : a[0]
-        let bR = b.count >= 3 ? b[0] : b[0]
-        let bG = b.count >= 3 ? b[1] : b[0]
-        let bB = b.count >= 3 ? b[2] : b[0]
-
-        return Color(
-            red:   Double(aR + (bR - aR) * f),
-            green: Double(aG + (bG - aG) * f),
-            blue:  Double(aB + (bB - aB) * f)
-        )
-    }
-}
+// `Color.mix(with:by:)` lives in
+// Views/Dashboard/Products/Components/EditorialShoppingHero.swift
+// (alongside the `mix(black:)` / `mix(white:)` helpers) — a single
+// internal extension shared across editorial v2 surfaces.
