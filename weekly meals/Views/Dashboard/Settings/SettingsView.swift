@@ -1476,8 +1476,8 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .center, spacing: 12) {
                 Text("Domownicy")
-                    .font(.system(size: 15, weight: .heavy))
-                    .tracking(-0.2)
+                    .font(.system(size: 18, weight: .heavy))
+                    .tracking(-0.3)
                     .foregroundStyle(Color.wmLabel(scheme))
 
                 Spacer(minLength: 0)
