@@ -254,26 +254,30 @@ struct ProductConstants {
         }
     }
 
+    // Editorial "Cozy Kitchen" palette — every department maps to one of the
+    // five WMPalette accents (sage / terracotta / terracottaDeep / butter /
+    // indigo). Source of truth: v2-design/Weekly Meals - Produkty.html
+    // (PROD_CATEGORIES + WM_TOKENS.accent).
     static func departmentColor(for department: String) -> Color {
         let d = department.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         switch d {
-        case Department.vegetables.lowercased():    return .green
-        case Department.fruits.lowercased():        return .red
-        case Department.meat.lowercased():          return .brown
-        case Department.fish.lowercased():          return .cyan
-        case Department.bakery.lowercased():        return .orange
-        case Department.dairy.lowercased():         return .blue
-        case Department.grains.lowercased():        return .yellow
-        case Department.canned.lowercased():        return .teal
-        case Department.beverages.lowercased():     return .blue
-        case Department.snacks.lowercased():        return .pink
-        case Department.household.lowercased():     return .purple
-        case Department.frozen.lowercased():        return .cyan
-        case Department.spices.lowercased():        return .red
-        case Department.oils.lowercased():          return .yellow
-        case Department.alcohols.lowercased():      return .purple
-        case Department.bakerySweets.lowercased():  return .pink
-        default:                       return .secondary
+        case Department.vegetables.lowercased():    return WMPalette.sage
+        case Department.fruits.lowercased():        return WMPalette.terracotta
+        case Department.meat.lowercased():          return WMPalette.terracottaDeep
+        case Department.fish.lowercased():          return WMPalette.indigo
+        case Department.bakery.lowercased():        return WMPalette.butter
+        case Department.dairy.lowercased():         return WMPalette.butter
+        case Department.grains.lowercased():        return WMPalette.indigo
+        case Department.canned.lowercased():        return WMPalette.terracotta
+        case Department.beverages.lowercased():     return WMPalette.indigo
+        case Department.snacks.lowercased():        return WMPalette.terracotta
+        case Department.household.lowercased():     return WMPalette.sage
+        case Department.frozen.lowercased():        return WMPalette.indigo
+        case Department.spices.lowercased():        return WMPalette.terracottaDeep
+        case Department.oils.lowercased():          return WMPalette.butter
+        case Department.alcohols.lowercased():      return WMPalette.indigo
+        case Department.bakerySweets.lowercased():  return WMPalette.butter
+        default:                                    return WMPalette.sage
         }
     }
 }
