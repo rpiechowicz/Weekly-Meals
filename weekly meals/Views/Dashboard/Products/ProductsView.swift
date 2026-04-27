@@ -204,7 +204,11 @@ struct ProductsView: View {
 
     private var pageBottomPadding: CGFloat { 40 }
     private var pageHorizontalPadding: CGFloat { 20 }
-    private var pageTopPadding: CGFloat { 58 }
+    // Push the eyebrow clear of the status-bar / Dynamic Island zone.
+    // 58pt was right on the edge — the eyebrow was visually glued to the
+    // notch. 78pt mirrors Kalendarz v2's WeekBar offset, so both v2 tabs
+    // start their content at the same screen position.
+    private var pageTopPadding: CGFloat { 78 }
 
     // MARK: - Body
 

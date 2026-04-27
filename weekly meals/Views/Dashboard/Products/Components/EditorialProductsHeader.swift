@@ -22,12 +22,7 @@ struct EditorialProductsHeader: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .center, spacing: 12) {
-                Text(eyebrowText)
-                    .font(.system(size: 10.5, weight: .bold))
-                    .tracking(1.6)
-                    .foregroundStyle(WMPalette.terracotta)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.85)
+                eyebrowRow
 
                 Spacer(minLength: 8)
 
@@ -69,8 +64,22 @@ struct EditorialProductsHeader: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var eyebrowText: String {
-        "№ \(weekNumber) · ZAKUPY TYGODNIA"
+    /// Eyebrow row with the week number rolling up via `CountingNumber` —
+    /// same component the Kalendarz kcal counter uses, so the count-up
+    /// animation feels native across screens. The literal pieces ("№", " · "
+    /// suffix) flank the animated digit so the tracking + font apply
+    /// uniformly across all glyphs.
+    private var eyebrowRow: some View {
+        HStack(spacing: 0) {
+            Text("№ ")
+            CountingNumber(target: weekNumber)
+            Text(" · ZAKUPY TYGODNIA")
+        }
+        .font(.system(size: 10.5, weight: .bold))
+        .tracking(1.6)
+        .foregroundStyle(WMPalette.terracotta)
+        .lineLimit(1)
+        .minimumScaleFactor(0.85)
     }
 }
 

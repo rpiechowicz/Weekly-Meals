@@ -98,22 +98,40 @@ struct EditorialAisleSection: View {
             .frame(maxWidth: .infinity, alignment: .leading)
 
             // Stat column — count line on top, progress rod below it.
-            // `fixedSize` keeps the column tight (no horizontal stretching),
-            // and `minimumScaleFactor` on the count text shrinks digits like
-            // "10/12 · 83%" if a long department name eats into this column.
+            // `fixedSize` keeps the column tight (no horizontal stretching);
+            // numbers animate via `CountingNumber` (same load-ramp + smooth
+            // recount on change as Kalendarz's kcal counter).
             VStack(alignment: .trailing, spacing: 6) {
                 HStack(spacing: 0) {
-                    Text(verbatim: "\(bought)/\(total)")
+                    CountingNumber(target: bought)
                         .font(.system(size: 12, weight: .heavy))
                         .tracking(-0.2)
                         .foregroundStyle(Color.wmLabel(scheme))
-                        .monospacedDigit()
 
-                    Text(verbatim: " · \(percent)%")
+                    Text("/")
+                        .font(.system(size: 12, weight: .heavy))
+                        .tracking(-0.2)
+                        .foregroundStyle(Color.wmLabel(scheme))
+
+                    CountingNumber(target: total)
+                        .font(.system(size: 12, weight: .heavy))
+                        .tracking(-0.2)
+                        .foregroundStyle(Color.wmLabel(scheme))
+
+                    Text(verbatim: " · ")
                         .font(.system(size: 12, weight: .medium))
                         .tracking(-0.2)
                         .foregroundStyle(Color.wmMuted(scheme))
-                        .monospacedDigit()
+
+                    CountingNumber(target: percent)
+                        .font(.system(size: 12, weight: .medium))
+                        .tracking(-0.2)
+                        .foregroundStyle(Color.wmMuted(scheme))
+
+                    Text("%")
+                        .font(.system(size: 12, weight: .medium))
+                        .tracking(-0.2)
+                        .foregroundStyle(Color.wmMuted(scheme))
                 }
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
@@ -132,7 +150,7 @@ struct EditorialAisleSection: View {
                             )
                         )
                         .frame(width: 64 * CGFloat(percent) / 100, height: 5)
-                        .animation(.easeInOut(duration: 0.24), value: bought)
+                        .animation(.easeInOut(duration: 0.32), value: bought)
                 }
             }
             .fixedSize()
