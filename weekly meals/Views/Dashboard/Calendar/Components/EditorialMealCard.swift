@@ -159,8 +159,9 @@ private struct AssignedHero: View {
                     .clipped()
             )
             .overlay(bottomScrim)
-            .overlay(alignment: .bottom) { titleAndBadges }
+            .overlay(alignment: .topLeading) { badgeColumn }
             .overlay(alignment: .topTrailing) { heartButton }
+            .overlay(alignment: .bottom) { titleOnly }
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             .shadow(color: .black.opacity(0.45), radius: 14, x: 0, y: 10)
             .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
@@ -222,32 +223,32 @@ private struct AssignedHero: View {
         .allowsHitTesting(false)
     }
 
-    private var titleAndBadges: some View {
-        // `position: 'absolute', left: 0, right: 0, bottom: 0, padding: '14px 16px 16px',
-        //  display: 'flex', alignItems: 'flex-end', gap: 12`.
-        // Bottom-anchored by the parent `ZStack(alignment: .bottom)`.
-        HStack(alignment: .bottom, spacing: 12) {
-            Text(recipe.name)
-                .font(.system(size: 22, weight: .bold))
-                .tracking(-0.5)
-                .foregroundStyle(.white)
-                .lineLimit(3)
-                .multilineTextAlignment(.leading)
-                .allowsTightening(true)
-                .minimumScaleFactor(0.8)
-                .fixedSize(horizontal: false, vertical: true)
-                .shadow(color: .black.opacity(0.45), radius: 7, x: 0, y: 2)
-                .frame(maxWidth: .infinity, alignment: .leading)
+    /// Title pinned to the bottom of the card — full width, no badges next to it.
+    private var titleOnly: some View {
+        Text(recipe.name)
+            .font(.system(size: 22, weight: .bold))
+            .tracking(-0.5)
+            .foregroundStyle(.white)
+            .lineLimit(3)
+            .multilineTextAlignment(.leading)
+            .allowsTightening(true)
+            .minimumScaleFactor(0.8)
+            .fixedSize(horizontal: false, vertical: true)
+            .shadow(color: .black.opacity(0.45), radius: 7, x: 0, y: 2)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16)
+            .padding(.bottom, 16)
+    }
 
-            VStack(alignment: .trailing, spacing: 6) {
-                GlassBadge(icon: "clock",      value: recipe.prepTimeMinutes,                 unit: " min")
-                GlassBadge(icon: "flame.fill", value: Int(recipe.nutritionPerServing.kcal),   unit: " kcal")
-            }
-            .fixedSize()
+    /// Badge row pinned to the top-leading corner — clock and flame side by side.
+    private var badgeColumn: some View {
+        HStack(spacing: 6) {
+            GlassBadge(icon: "clock",      value: recipe.prepTimeMinutes,               unit: " min")
+            GlassBadge(icon: "flame.fill", value: Int(recipe.nutritionPerServing.kcal), unit: " kcal")
         }
-        .padding(.top, 14)
-        .padding(.horizontal, 16)
-        .padding(.bottom, 16)
+        .fixedSize()
+        .padding(.top, 12)
+        .padding(.leading, 12)
     }
 
     private var heartButton: some View {
@@ -304,15 +305,13 @@ private struct GlassBadge: View {
                 .font(.system(size: 12, weight: .bold))
                 .foregroundStyle(.white.opacity(0.95))
 
-            HStack(spacing: 0) {
-                CountingNumber(target: value)
-                Text(verbatim: unit)
-            }
-            .font(.system(size: 11, weight: .bold))
-            .tracking(0.2)
-            .foregroundStyle(.white)
-            .lineLimit(1)
-            .fixedSize()
+            Text(verbatim: "\(value)\(unit)")
+                .font(.system(size: 11, weight: .bold))
+                .tracking(0.2)
+                .foregroundStyle(.white)
+                .monospacedDigit()
+                .lineLimit(1)
+                .fixedSize()
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
