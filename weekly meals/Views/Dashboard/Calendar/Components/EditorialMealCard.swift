@@ -448,7 +448,11 @@ private struct HatchPattern: View {
 
 // MARK: - Color helper
 
-private extension Color {
+// Promoted from `private` to internal so Settings v2 (and any future
+// editorial surface) can reuse the same blend instead of duplicating the
+// extension. `mix(black:)` / `mix(white:)` convenience helpers added for
+// the Settings tile gradients + destructive button washes.
+extension Color {
     /// Approximate color mixing (Cozy Kitchen design uses `color-mix(in oklch, …)`).
     /// SwiftUI doesn't expose components reliably, so we sample a UIColor and blend in linear sRGB.
     func mix(with other: Color, by fraction: CGFloat) -> Color {
@@ -470,5 +474,13 @@ private extension Color {
             green: Double(aG + (bG - aG) * f),
             blue:  Double(aB + (bB - aB) * f)
         )
+    }
+
+    func mix(black fraction: CGFloat) -> Color {
+        self.mix(with: .black, by: fraction)
+    }
+
+    func mix(white fraction: CGFloat) -> Color {
+        self.mix(with: .white, by: fraction)
     }
 }

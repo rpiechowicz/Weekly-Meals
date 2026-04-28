@@ -6,6 +6,12 @@ struct CalendarView: View {
     @Environment(\.recipeCatalogStore) private var recipeCatalogStore
     @Environment(\.colorScheme) private var scheme
 
+    // Mirrors the AppStorage row owned by Settings → Dieta i alergeny. The
+    // value is synced to the backend by SessionStore so it stays in sync
+    // across devices, and surfaced here as the kcal target on the macros
+    // block (so the day's "X / GOAL" reading reflects the user's choice).
+    @AppStorage("settings.diet.calorieGoal") private var calorieGoal: Int = 2000
+
     @State private var detailRecipe: Recipe?
     @State private var showAssigner = false
 
@@ -91,7 +97,8 @@ struct CalendarView: View {
                             kcal: dayKcal,
                             protein: dayProtein,
                             fat: dayFat,
-                            carbs: dayCarbs
+                            carbs: dayCarbs,
+                            target: calorieGoal
                         )
                         .padding(.horizontal, 22)
                         .padding(.bottom, 22)
