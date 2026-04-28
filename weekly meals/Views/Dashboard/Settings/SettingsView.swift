@@ -16,6 +16,7 @@ struct SettingsView: View {
     @AppStorage("settings.household.name") private var persistedHouseholdName: String = ""
     @AppStorage("settings.diet.preference") private var dietPreferenceRaw: String = DietPreference.none.rawValue
     @AppStorage("settings.diet.allergens") private var allergensRaw: String = ""
+    @AppStorage("settings.diet.calorieGoal") private var calorieGoal: Int = 2000
 
     @State private var showCreateHouseholdSheet = false
     @State private var showHouseholdSheet = false
@@ -33,6 +34,14 @@ struct SettingsView: View {
 
     private static let householdNameMinLength = 2
     private static let householdNameMaxLength = 50
+
+    // Calorie goal range — 1200 kcal is the lower medical safety bound for
+    // adults; 3500 covers heavy training. 50 kcal step keeps the slider
+    // tactile without snapping to silly precision.
+    private static let calorieGoalMin: Int = 1200
+    private static let calorieGoalMax: Int = 3500
+    private static let calorieGoalStep: Int = 50
+    private static let calorieGoalDefault: Int = 2000
 
     // Static FAQ content rendered by `helpSheet`. Grouped by topic so the
     // user can jump straight to the area they care about; only one row is
@@ -225,20 +234,23 @@ struct SettingsView: View {
             .compactMap { Allergen(rawValue: String($0)) })
     }
 
-    /// Inline value next to "Dieta i alergeny" — combines the diet name
-    /// and the allergen count into a single one-liner. Falls back to a
-    /// "Skonfiguruj" hint when nothing is set so the row reads as
-    /// actionable rather than empty.
+    /// Inline value next to "Dieta i alergeny" — kcal is always-on so it
+    /// always shows up; diet name is prepended when set, allergen count
+    /// is appended when at least one is picked. Capped at two pieces so
+    /// the value column doesn't overflow on narrow rows.
     private var dietRowValue: String {
-        let allergens = selectedAllergens.count
-        let hasDiet = currentDiet != .none
+        var parts: [String] = []
 
-        switch (hasDiet, allergens) {
-        case (false, 0):                    return "Skonfiguruj"
-        case (true, 0):                     return currentDiet.title
-        case (false, let count):            return "\(count) \(allergenWord(for: count))"
-        case (true, let count):             return "\(currentDiet.title) · \(count)"
+        if currentDiet != .none {
+            parts.append(currentDiet.title)
         }
+        parts.append("\(calorieGoal) kcal")
+        if !selectedAllergens.isEmpty {
+            let count = selectedAllergens.count
+            parts.append("\(count) \(allergenWord(for: count))")
+        }
+
+        return parts.prefix(2).joined(separator: " · ")
     }
 
     private func allergenWord(for count: Int) -> String {
@@ -953,10 +965,11 @@ struct SettingsView: View {
                         .foregroundStyle(Color.wmMuted(scheme))
                         .fixedSize(horizontal: false, vertical: true)
 
+                    calorieGoalSection
                     dietPickerSection
                     allergensSection
 
-                    if currentDiet != .none || !selectedAllergens.isEmpty {
+                    if currentDiet != .none || calorieGoal != Self.calorieGoalDefault || !selectedAllergens.isEmpty {
                         resetPreferencesButton
                             .padding(.top, 4)
                     }
@@ -967,6 +980,27 @@ struct SettingsView: View {
             }
             .scrollIndicators(.hidden)
         }
+        // Debounced sync: every time any of the three preference fields
+        // changes the previous task is cancelled and a new one is scheduled
+        // 600ms later. Slider drags coalesce into a single backend write
+        // instead of one per micro-step.
+        .task(id: dietPreferencesSyncToken) {
+            try? await Task.sleep(for: .milliseconds(600))
+            guard !Task.isCancelled else { return }
+            await sessionStore.saveUserPreferences(
+                diet: currentDiet.rawValue,
+                calorieGoal: calorieGoal,
+                allergens: selectedAllergens.map(\.rawValue)
+            )
+        }
+    }
+
+    /// Stable token that changes whenever the user touches any preference
+    /// field — drives `task(id:)` so SwiftUI cancels the in-flight save and
+    /// schedules a fresh one. Using a single concatenated string keeps the
+    /// modifier signature simple.
+    private var dietPreferencesSyncToken: String {
+        "\(dietPreferenceRaw)|\(calorieGoal)|\(allergensRaw)"
     }
 
     private var dietPickerSection: some View {
@@ -1053,6 +1087,92 @@ struct SettingsView: View {
             }
         }
         .animation(.smooth(duration: 0.18), value: selected)
+    }
+
+    private var calorieGoalSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            EditorialSheetSectionLabel(title: "Cel kaloryczny")
+
+            VStack(alignment: .leading, spacing: 18) {
+                HStack(alignment: .center, spacing: 14) {
+                    EditorialSettingsTileIcon(icon: "flame.fill", color: WMPalette.terracotta)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Dzienny cel")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(Color.wmLabel(scheme))
+                        Text("Aplikacja podpowie, jak rozłożyć posiłki w ciągu dnia.")
+                            .font(.system(size: 12, weight: .regular))
+                            .foregroundStyle(Color.wmMuted(scheme))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                calorieGoalEditor
+            }
+            .padding(18)
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(Color.wmTileBg(scheme))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(Color.wmTileStroke(scheme), lineWidth: 1)
+            )
+        }
+    }
+
+    /// Big animated kcal readout above a 50-kcal-stepped slider — that's
+    /// the whole picker. No quick-pick chips, no on/off toggle: the goal
+    /// is always set, the slider is the only control.
+    private var calorieGoalEditor: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .lastTextBaseline, spacing: 8) {
+                Text(calorieGoal, format: .number.grouping(.never))
+                    .font(.system(size: 44, weight: .heavy))
+                    .tracking(-1.4)
+                    .foregroundStyle(WMPalette.terracotta)
+                    .monospacedDigit()
+                    .contentTransition(.numericText(value: Double(calorieGoal)))
+
+                Text("kcal / dzień")
+                    .font(.system(size: 13, weight: .semibold))
+                    .tracking(-0.1)
+                    .foregroundStyle(Color.wmMuted(scheme))
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .animation(.smooth(duration: 0.18), value: calorieGoal)
+
+            VStack(spacing: 6) {
+                Slider(
+                    value: Binding(
+                        get: { Double(calorieGoal) },
+                        set: { calorieGoal = snappedCalorieGoal(from: $0) }
+                    ),
+                    in: Double(Self.calorieGoalMin)...Double(Self.calorieGoalMax),
+                    step: Double(Self.calorieGoalStep)
+                )
+                .tint(WMPalette.terracotta)
+
+                HStack {
+                    Text("\(Self.calorieGoalMin)")
+                    Spacer()
+                    Text("\(Self.calorieGoalMax)")
+                }
+                .font(.system(size: 11, weight: .medium))
+                .monospacedDigit()
+                .foregroundStyle(Color.wmFaint(scheme))
+            }
+        }
+    }
+
+    /// Round an arbitrary slider value to the nearest 50-kcal step and
+    /// clamp it to the [min, max] range. Defensive against the rare
+    /// off-end value the UISlider can emit at the extremes.
+    private func snappedCalorieGoal(from raw: Double) -> Int {
+        let stepped = (raw / Double(Self.calorieGoalStep)).rounded() * Double(Self.calorieGoalStep)
+        return min(max(Int(stepped), Self.calorieGoalMin), Self.calorieGoalMax)
     }
 
     private var allergensSection: some View {
@@ -1147,13 +1267,15 @@ struct SettingsView: View {
         .accessibilityValue(isSelected ? "Zaznaczone" : "Niezaznaczone")
     }
 
-    /// Dim red pill that wipes both the diet preference and all allergens
-    /// in one tap — only shown when there's actually something to reset.
+    /// Dim red pill that wipes the diet preference, calorie goal and all
+    /// allergens in one tap — only shown when there's actually something
+    /// to reset.
     private var resetPreferencesButton: some View {
         Button {
             withAnimation(.smooth(duration: 0.22)) {
                 dietPreferenceRaw = DietPreference.none.rawValue
                 allergensRaw = ""
+                calorieGoal = Self.calorieGoalDefault
             }
         } label: {
             HStack(spacing: 8) {

@@ -164,6 +164,16 @@ private struct HouseholdMembersCachePayload: Codable {
     let savedAt: Date
 }
 
+/// Backend payload for `users:preferences:get` and the response of
+/// `users:preferences:update`. The backend uses uppercase enum values
+/// (`VEGETARIAN`, `NONE`); iOS stores them lowercased in AppStorage so we
+/// normalise on the boundary.
+private struct BackendUserPreferencesDTO: Decodable {
+    let dietPreference: String
+    let calorieGoal: Int
+    let allergens: [String]
+}
+
 @MainActor
 @Observable
 final class SessionStore {
@@ -463,6 +473,13 @@ final class SessionStore {
         let initialWeekStart = datesViewModel.weekStartISO
         Task {
             await shoppingListStore.load(weekStart: initialWeekStart)
+        }
+
+        // Pull the user's diet / kcal / allergens row so AppStorage
+        // mirrors the backend before any view reads from it. Cached values
+        // continue to display while this runs in the background.
+        Task { @MainActor [weak self] in
+            await self?.loadUserPreferences()
         }
     }
 
@@ -1068,6 +1085,87 @@ final class SessionStore {
         }
         householdMembersTask = task
         await task.value
+    }
+
+    // MARK: - User preferences (diet, kcal, allergens)
+    //
+    // Source of truth lives in `@AppStorage` so SwiftUI views read it
+    // synchronously. SessionStore mirrors writes to the backend so the row
+    // persists across devices and powers other views (e.g. Calendar's kcal
+    // target). On first session bootstrap, we pull the row from the server
+    // and seed local storage — overwriting the AppStorage defaults.
+
+    private enum PreferencesKeys {
+        static let diet = "settings.diet.preference"
+        static let calorieGoal = "settings.diet.calorieGoal"
+        static let allergens = "settings.diet.allergens"
+    }
+
+    /// Pull the user's preferences row from the backend and write into
+    /// AppStorage. Silent on failure — local cache stays as fallback so
+    /// the UI keeps working offline.
+    @MainActor
+    func loadUserPreferences() async {
+        guard let userId = currentUserId, !userId.isEmpty else { return }
+        let socket = realtimeSocket ?? SocketIORecipeSocketClient(baseURL: baseURL)
+
+        do {
+            let envelope: WsEnvelope<BackendUserPreferencesDTO> = try await socket.emitWithAck(
+                event: "users:preferences:get",
+                payload: ["userId": userId],
+                as: WsEnvelope<BackendUserPreferencesDTO>.self
+            )
+            guard envelope.ok, let prefs = envelope.data else { return }
+
+            let defaults = UserDefaults.standard
+            defaults.set(prefs.dietPreference.lowercased(), forKey: PreferencesKeys.diet)
+            defaults.set(prefs.calorieGoal, forKey: PreferencesKeys.calorieGoal)
+            defaults.set(
+                prefs.allergens
+                    .map { $0.lowercased() }
+                    .sorted()
+                    .joined(separator: ","),
+                forKey: PreferencesKeys.allergens
+            )
+        } catch {
+            // Swallow — preferences are non-critical, AppStorage default
+            // applies. Will retry on the next session bootstrap.
+        }
+    }
+
+    /// Push the supplied preferences slice to the backend. Pass only the
+    /// fields you want to change — the backend merges with the existing
+    /// row. Allergens, when supplied, replace the full set.
+    @MainActor
+    func saveUserPreferences(
+        diet: String? = nil,
+        calorieGoal: Int? = nil,
+        allergens: [String]? = nil
+    ) async {
+        guard let userId = currentUserId, !userId.isEmpty else { return }
+
+        var data: [String: Any] = [:]
+        if let diet { data["dietPreference"] = diet.uppercased() }
+        if let calorieGoal { data["calorieGoal"] = calorieGoal }
+        if let allergens {
+            data["allergens"] = allergens
+                .map { $0.lowercased() }
+                .sorted()
+        }
+        guard !data.isEmpty else { return }
+
+        let socket = realtimeSocket ?? SocketIORecipeSocketClient(baseURL: baseURL)
+
+        do {
+            let _: WsEnvelope<BackendUserPreferencesDTO> = try await socket.emitWithAck(
+                event: "users:preferences:update",
+                payload: ["userId": userId, "data": data],
+                as: WsEnvelope<BackendUserPreferencesDTO>.self
+            )
+        } catch {
+            // Swallow — local AppStorage is already updated optimistically.
+            // We retry on the next change.
+        }
     }
 
     private var householdMembersCacheURL: URL {
