@@ -6,6 +6,10 @@ import SwiftUI
 // backend. Production code injects the real instances at the root of the view
 // tree (see `weekly_mealsApp` / SessionStore wiring).
 
+private struct SessionStoreKey: EnvironmentKey {
+    @MainActor static let defaultValue = SessionStore()
+}
+
 private struct WeeklyMealStoreKey: EnvironmentKey {
     static let defaultValue = WeeklyMealStore()
 }
@@ -27,6 +31,11 @@ private struct ShoppingListStoreKey: EnvironmentKey {
 }
 
 extension EnvironmentValues {
+    var sessionStore: SessionStore {
+        get { self[SessionStoreKey.self] }
+        set { self[SessionStoreKey.self] = newValue }
+    }
+
     var weeklyMealStore: WeeklyMealStore {
         get { self[WeeklyMealStoreKey.self] }
         set { self[WeeklyMealStoreKey.self] = newValue }
