@@ -80,8 +80,12 @@ final class SessionStore {
     private let startupTimeoutSeconds: Double = 6
     private let startupImagePrefetchCount: Int = 12
     /// Loader nie znika szybciej niż po tym czasie — nawet przy cieplutkim starcie
-    /// (wszystko z cache). Bez tego loader tylko mignął, co wyglądało jak przeskok.
-    private let startupMinimumDisplaySeconds: Double = 1.2
+    /// (wszystko z cache). Wartość zsynchronizowana z animacją kafelków
+    /// w `StartupLoaderView`: niedziela (index 6) dopełnia się o
+    /// `6 * 0.28 + 0.20 * 2.8 = 2.24 s` (stagger × index + ramp end %).
+    /// Crossfade do dashboardu startuje dokładnie w momencie zakończenia
+    /// wave'a — żaden kafelek się nie urywa przed zapełnieniem.
+    private let startupMinimumDisplaySeconds: Double = 2.24
 
     init() {
         pendingPushDeviceToken = UserDefaults.standard.string(forKey: Keys.pushDeviceToken)

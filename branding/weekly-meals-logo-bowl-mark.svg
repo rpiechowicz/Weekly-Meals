@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 100 100">
+  <title>Weekly Meals — Steaming Bowl monochrome mark</title>
+  <!-- monochrome mark for one-color usage (cream on dark, dark on cream) -->
+  <g fill="currentColor">
+    <ellipse cx="50" cy="56" rx="30" ry="5"/>
+    <path d="M22 56 Q22 78 50 80 Q78 78 78 56 Z" opacity="0.85"/>
+  </g>
+  <g stroke="currentColor" stroke-width="3.2" stroke-linecap="round" fill="none" opacity="0.92">
+    <path d="M36 46 C32 40 40 36 36 28"/>
+    <path d="M50 46 C46 40 54 36 50 26"/>
+    <path d="M64 46 C60 40 68 36 64 28"/>
+  </g>
+</svg>
