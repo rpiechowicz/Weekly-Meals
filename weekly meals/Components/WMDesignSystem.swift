@@ -72,21 +72,28 @@ extension Color {
     }
 
     static func wmMuted(_ scheme: ColorScheme) -> Color {
+        // Light mode opacity bumped from 0.56 → 0.66 to match the design's
+        // `rgba(26,15,10,0.68)` muted token — captions and meta rows on the
+        // cream canvas were reading too washed-out at 0.56.
         scheme == .dark
             ? Color(red: 251 / 255, green: 243 / 255, blue: 232 / 255).opacity(0.58)
-            : Color(red: 26 / 255, green: 20 / 255, blue: 17 / 255).opacity(0.56)
+            : Color(red: 26 / 255, green: 20 / 255, blue: 17 / 255).opacity(0.66)
     }
 
     static func wmTileBg(_ scheme: ColorScheme) -> Color {
+        // Cards on cream need slightly more body than the dark-first 0.04 to
+        // visibly separate from the canvas — bumped to 0.06.
         scheme == .dark
             ? Color(red: 251 / 255, green: 243 / 255, blue: 232 / 255).opacity(0.04)
-            : Color(red: 26 / 255, green: 20 / 255, blue: 17 / 255).opacity(0.04)
+            : Color(red: 26 / 255, green: 20 / 255, blue: 17 / 255).opacity(0.06)
     }
 
     static func wmTileStroke(_ scheme: ColorScheme) -> Color {
+        // Hairline strokes on light mode go from 0.06 → 0.12 so card edges
+        // and circular xmark wells remain visible against the cream canvas.
         scheme == .dark
             ? Color(red: 251 / 255, green: 243 / 255, blue: 232 / 255).opacity(0.06)
-            : Color(red: 26 / 255, green: 20 / 255, blue: 17 / 255).opacity(0.06)
+            : Color(red: 26 / 255, green: 20 / 255, blue: 17 / 255).opacity(0.12)
     }
 
     static func wmFeatureRowBg(_ scheme: ColorScheme) -> Color {
@@ -100,9 +107,11 @@ extension Color {
     }
 
     static func wmRule(_ scheme: ColorScheme) -> Color {
+        // Divider rules on cream need extra contrast — bumped 0.12 → 0.18 so
+        // section dividers and ingredient hairlines are clearly visible.
         scheme == .dark
             ? WMPalette.labelDark.opacity(0.12)
-            : WMPalette.labelLight.opacity(0.12)
+            : WMPalette.labelLight.opacity(0.18)
     }
 
     static func wmFaint(_ scheme: ColorScheme) -> Color {
