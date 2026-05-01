@@ -122,18 +122,16 @@ struct RecipesView: View {
             }
             .searchable(text: $searchText, prompt: "Szukaj przepisów")
             .sheet(item: $selectedRecipe) { selected in
-                NavigationStack {
-                    RecipeDetailView(
-                        recipe: selected,
-                        onToggleFavorite: {
-                            Task {
-                                await recipeCatalogStore.toggleFavorite(recipeId: selected.id)
-                                selectedRecipe = recipeCatalogStore.recipes.first(where: { $0.id == selected.id })
-                            }
+                RecipeDetailView(
+                    recipe: selected,
+                    onToggleFavorite: {
+                        Task {
+                            await recipeCatalogStore.toggleFavorite(recipeId: selected.id)
+                            selectedRecipe = recipeCatalogStore.recipes.first(where: { $0.id == selected.id })
                         }
-                    )
-                    .navigationBarTitleDisplayMode(.inline)
-                }
+                    },
+                    onClose: { selectedRecipe = nil }
+                )
                 .presentationDetents([.large])
                 .dashboardLiquidSheet()
             }
@@ -639,20 +637,18 @@ private struct RecipeCategorySheetView: View {
                 }
                 .searchable(text: $searchText, prompt: "Szukaj w tej kategorii")
                 .sheet(item: $selectedRecipe) { selected in
-                    NavigationStack {
-                        RecipeDetailView(
-                            recipe: selected,
-                            onToggleFavorite: {
-                                Task { @MainActor in
-                                    await recipeCatalogStore.toggleFavorite(recipeId: selected.id)
-                                    selectedRecipe = await recipeCatalogStore.loadRecipeDetail(recipeId: selected.id)
-                                        ?? recipeCatalogStore.recipes.first(where: { $0.id == selected.id })
-                                        ?? selected
-                                }
+                    RecipeDetailView(
+                        recipe: selected,
+                        onToggleFavorite: {
+                            Task { @MainActor in
+                                await recipeCatalogStore.toggleFavorite(recipeId: selected.id)
+                                selectedRecipe = await recipeCatalogStore.loadRecipeDetail(recipeId: selected.id)
+                                    ?? recipeCatalogStore.recipes.first(where: { $0.id == selected.id })
+                                    ?? selected
                             }
-                        )
-                        .navigationBarTitleDisplayMode(.inline)
-                    }
+                        },
+                        onClose: { selectedRecipe = nil }
+                    )
                     .presentationDetents([.large])
                     .dashboardLiquidSheet()
                 }

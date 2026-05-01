@@ -176,20 +176,18 @@ struct CalendarView: View {
                 .dashboardLiquidSheet()
             }
             .sheet(item: $detailRecipe) { selected in
-                NavigationStack {
-                    RecipeDetailView(
-                        recipe: selected,
-                        onToggleFavorite: {
-                            Task { @MainActor in
-                                await recipeCatalogStore.toggleFavorite(recipeId: selected.id)
-                                detailRecipe = await recipeCatalogStore.loadRecipeDetail(recipeId: selected.id)
-                                    ?? recipeCatalogStore.recipes.first(where: { $0.id == selected.id })
-                                    ?? selected
-                            }
+                RecipeDetailView(
+                    recipe: selected,
+                    onToggleFavorite: {
+                        Task { @MainActor in
+                            await recipeCatalogStore.toggleFavorite(recipeId: selected.id)
+                            detailRecipe = await recipeCatalogStore.loadRecipeDetail(recipeId: selected.id)
+                                ?? recipeCatalogStore.recipes.first(where: { $0.id == selected.id })
+                                ?? selected
                         }
-                    )
-                    .navigationBarTitleDisplayMode(.inline)
-                }
+                    },
+                    onClose: { detailRecipe = nil }
+                )
                 .presentationDetents([.large])
                 .dashboardLiquidSheet()
             }
